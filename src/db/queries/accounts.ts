@@ -1,0 +1,87 @@
+import { asc, eq, sql } from 'drizzle-orm';
+
+import type { Database } from '../client';
+import { accounts, transactions, type Account, type NewAccount } from '../schema';
+
+export type AccountType = 'cash' | 'bank' | 'ewallet' | 'credit_card' | 'other';
+
+export interface AccountWithBalance extends Account {
+  /** Starting balance plus the net (income − expense) of every transaction assigned to this account, in minor units */
+  balance: number;
+}
+
+export interface ListAccountsOptions {
+  includeArchived?: boolean;
+}
+
+const balanceExpr = sql<number>`${accounts.startingBalance} + coalesce(sum(case
+  when ${transactions.type} = 'income' then ${transactions.amount}
+  when ${transactions.type} = 'expense' then -${transactions.amount}
+  else 0 end), 0)`;
+
+export async function listAccounts(db: Database, options: ListAccountsOptions = {}): Promise<AccountWithBalance[]> {
+  const { includeArchived = false } = options;
+
+  const query = db
+    .select({
+      id: accounts.id,
+      name: accounts.name,
+      type: accounts.type,
+      color: accounts.color,
+      icon: accounts.icon,
+      startingBalance: accounts.startingBalance,
+      isArchived: accounts.isArchived,
+      createdAt: accounts.createdAt,
+      balance: balanceExpr,
+    })
+    .from(accounts)
+    .leftJoin(transactions, eq(transactions.accountId, accounts.id))
+    .groupBy(accounts.id)
+    .orderBy(asc(accounts.name));
+
+  if (includeArchived) return query;
+  return query.where(eq(accounts.isArchived, false));
+}
+
+export async function getAccount(db: Database, id: number): Promise<Account | undefined> {
+  const [row] = await db.select().from(accounts).where(eq(accounts.id, id)).limit(1);
+  return row;
+}
+
+export interface AccountInput {
+  name: string;
+  type: AccountType;
+  color: string;
+  icon?: string | null;
+  /** Integer amount in minor units (centavos) */
+  startingBalance: number;
+}
+
+export async function createAccount(db: Database, input: AccountInput): Promise<Account> {
+  const values: NewAccount = {
+    name: input.name.trim(),
+    type: input.type,
+    color: input.color,
+    icon: input.icon ?? null,
+    startingBalance: input.startingBalance,
+  };
+  const [row] = await db.insert(accounts).values(values).returning();
+  return row;
+}
+
+export async function updateAccount(db: Database, id: number, input: AccountInput): Promise<void> {
+  await db
+    .update(accounts)
+    .set({
+      name: input.name.trim(),
+      type: input.type,
+      color: input.color,
+      icon: input.icon ?? null,
+      startingBalance: input.startingBalance,
+    })
+    .where(eq(accounts.id, id));
+}
+
+export async function setAccountArchived(db: Database, id: number, isArchived: boolean): Promise<void> {
+  await db.update(accounts).set({ isArchived }).where(eq(accounts.id, id));
+}

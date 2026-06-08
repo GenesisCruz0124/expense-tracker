@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1780850735557,
+      "tag": "0000_numerous_iron_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1780899309344,
+      "tag": "0001_spooky_layla_miller",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1780900556799,
+      "tag": "0002_clammy_zemo",
+      "breakpoints": true
+    }
+  ]
+}
