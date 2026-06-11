@@ -1,10 +1,14 @@
 import { asc, eq, sql } from 'drizzle-orm';
 
 import type { Database } from '../client';
-import { accounts, transactions, type Account, type NewAccount } from '../schema';
+import { accountCategories, accounts, transactions, type Account, type NewAccount } from '../schema';
 
 export interface AccountWithBalance extends Account {
-  /** Starting balance plus the net (income − expense) of every transaction assigned to this account, in minor units */
+  /**
+   * Starting balance plus the net effect of every transaction assigned to this account, in minor units.
+   * For standard accounts, income adds and expenses subtract. For credit card accounts the balance
+   * represents the amount owed, so expenses (purchases) add and income (payments/refunds) subtract.
+   */
   balance: number;
 }
 
@@ -13,9 +17,15 @@ export interface ListAccountsOptions {
 }
 
 const balanceExpr = sql<number>`${accounts.startingBalance} + coalesce(sum(case
-  when ${transactions.type} = 'income' then ${transactions.amount}
-  when ${transactions.type} = 'expense' then -${transactions.amount}
-  else 0 end), 0)`;
+  when ${accountCategories.kind} = 'credit_card' then
+    case when ${transactions.type} = 'expense' then ${transactions.amount}
+      when ${transactions.type} = 'income' then -${transactions.amount}
+      else 0 end
+  else
+    case when ${transactions.type} = 'income' then ${transactions.amount}
+      when ${transactions.type} = 'expense' then -${transactions.amount}
+      else 0 end
+  end), 0)`;
 
 export async function listAccounts(db: Database, options: ListAccountsOptions = {}): Promise<AccountWithBalance[]> {
   const { includeArchived = false } = options;
@@ -36,6 +46,7 @@ export async function listAccounts(db: Database, options: ListAccountsOptions = 
     })
     .from(accounts)
     .leftJoin(transactions, eq(transactions.accountId, accounts.id))
+    .leftJoin(accountCategories, eq(accountCategories.id, accounts.categoryId))
     .groupBy(accounts.id)
     .orderBy(asc(accounts.name));
 

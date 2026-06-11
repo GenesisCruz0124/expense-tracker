@@ -24,6 +24,7 @@ export const accountCategories = sqliteTable(
     name: text('name').notNull(),
     color: text('color').notNull(),
     icon: text('icon'),
+    kind: text('kind', { enum: ['standard', 'credit_card'] }).notNull().default('standard'),
     isArchived: integer('is_archived', { mode: 'boolean' }).notNull().default(false),
     createdAt: text('created_at')
       .notNull()

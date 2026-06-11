@@ -27,6 +27,8 @@ export interface AccountCategoryInput {
   name: string;
   color: string;
   icon?: string | null;
+  /** 'credit_card' accounts track a balance owed: expenses increase it, income/payments decrease it. */
+  kind?: 'standard' | 'credit_card';
 }
 
 export async function createAccountCategory(db: Database, input: AccountCategoryInput): Promise<AccountCategory> {
@@ -34,6 +36,7 @@ export async function createAccountCategory(db: Database, input: AccountCategory
     name: input.name.trim(),
     color: input.color,
     icon: input.icon ?? null,
+    kind: input.kind ?? 'standard',
   };
   const [row] = await db.insert(accountCategories).values(values).returning();
   return row;
@@ -46,6 +49,7 @@ export async function updateAccountCategory(db: Database, id: number, input: Acc
       name: input.name.trim(),
       color: input.color,
       icon: input.icon ?? null,
+      kind: input.kind ?? 'standard',
     })
     .where(eq(accountCategories.id, id));
 }
