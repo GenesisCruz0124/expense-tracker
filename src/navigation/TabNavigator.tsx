@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { PALETTE } from '../constants/colors';
+import AccountCategoriesScreen from '../screens/AccountCategoriesScreen';
 import AccountsScreen from '../screens/AccountsScreen';
 import BudgetsScreen from '../screens/BudgetsScreen';
 import CategoriesScreen from '../screens/CategoriesScreen';
@@ -66,7 +67,12 @@ function MoreNavigator() {
   return (
     <MoreStack.Navigator>
       <MoreStack.Screen name="Settings" component={SettingsScreen} />
-      <MoreStack.Screen name="Categories" component={CategoriesScreen} />
+      <MoreStack.Screen name="Categories" component={CategoriesScreen} options={{ title: 'Categories' }} />
+      <MoreStack.Screen
+        name="AccountCategories"
+        component={AccountCategoriesScreen}
+        options={{ title: 'Account categories' }}
+      />
       <MoreStack.Screen
         name="Budgets"
         component={BudgetsScreen}
@@ -131,9 +137,6 @@ export function TabNavigator() {
           tabBarIcon: ({ focused }) => <TabGlyph glyph="⚙️" focused={focused} />,
         }}
         listeners={({ navigation }) => ({
-          // Dashboard's "Manage →" links push deep into this stack (e.g. Recurring, Budgets),
-          // which React Navigation then remembers. Always land on the More landing page when
-          // switching to this tab from the tab bar, instead of resuming that pushed screen.
           tabPress: () => {
             navigation.navigate('MoreTab', { screen: 'Settings' });
           },

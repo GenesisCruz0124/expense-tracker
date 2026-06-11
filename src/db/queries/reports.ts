@@ -29,7 +29,13 @@ export async function categoryBreakdown(
     })
     .from(transactions)
     .leftJoin(categories, eq(transactions.categoryId, categories.id))
-    .where(and(eq(transactions.type, type), between(transactions.occurredAt, range.start, range.end)))
+    .where(
+      and(
+        eq(transactions.type, type),
+        eq(transactions.excludeFromExpense, false),
+        between(transactions.occurredAt, range.start, range.end),
+      ),
+    )
     .groupBy(transactions.categoryId)
     .orderBy(sql`${totalExpr} desc`);
 
@@ -64,7 +70,9 @@ export async function incomeVsExpenseTrend(db: Database, ranges: MonthRange[]): 
       total: sql<number>`coalesce(sum(${transactions.amount}), 0)`,
     })
     .from(transactions)
-    .where(between(transactions.occurredAt, overallStart, overallEnd))
+    .where(
+      and(eq(transactions.excludeFromExpense, false), between(transactions.occurredAt, overallStart, overallEnd)),
+    )
     .groupBy(monthKeyExpr, transactions.type);
 
   const totalsByMonth = new Map<string, { income: number; expense: number }>();
@@ -95,7 +103,7 @@ export async function monthlyTotals(db: Database, range: { start: string; end: s
       total: sql<number>`coalesce(sum(${transactions.amount}), 0)`,
     })
     .from(transactions)
-    .where(between(transactions.occurredAt, range.start, range.end))
+    .where(and(eq(transactions.excludeFromExpense, false), between(transactions.occurredAt, range.start, range.end)))
     .groupBy(transactions.type);
 
   const totals: MonthlyTotals = { income: 0, expense: 0 };

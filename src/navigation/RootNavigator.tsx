@@ -2,6 +2,7 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import AddBillScreen from '../screens/AddBillScreen';
+import AddEditAccountCategoryScreen from '../screens/AddEditAccountCategoryScreen';
 import AddEditAccountScreen from '../screens/AddEditAccountScreen';
 import AddEditBudgetScreen from '../screens/AddEditBudgetScreen';
 import AddEditCategoryScreen from '../screens/AddEditCategoryScreen';
@@ -21,6 +22,11 @@ export function RootNavigator() {
       <Stack.Group screenOptions={{ presentation: 'modal' }}>
         <Stack.Screen name="AddEditTransaction" component={AddEditTransactionScreen} options={{ title: 'Transaction' }} />
         <Stack.Screen name="AddEditCategory" component={AddEditCategoryScreen} options={{ title: 'Category' }} />
+        <Stack.Screen
+          name="AddEditAccountCategory"
+          component={AddEditAccountCategoryScreen}
+          options={{ title: 'Account category' }}
+        />
         <Stack.Screen name="AddEditAccount" component={AddEditAccountScreen} options={{ title: 'Account' }} />
         <Stack.Screen name="AddEditBudget" component={AddEditBudgetScreen} options={{ title: 'Budget' }} />
         <Stack.Screen

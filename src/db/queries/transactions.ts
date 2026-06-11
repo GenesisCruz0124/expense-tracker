@@ -51,6 +51,7 @@ export async function listTransactions(
       categoryId: transactions.categoryId,
       accountId: transactions.accountId,
       receiptImageUri: transactions.receiptImageUri,
+      excludeFromExpense: transactions.excludeFromExpense,
       recurringId: transactions.recurringId,
       createdAt: transactions.createdAt,
       updatedAt: transactions.updatedAt,
@@ -82,6 +83,7 @@ export interface TransactionInput {
   categoryId?: number | null;
   accountId?: number | null;
   receiptImageUri?: string | null;
+  excludeFromExpense?: boolean;
 }
 
 function toNewTransactionValues(input: TransactionInput): NewTransaction {
@@ -93,6 +95,7 @@ function toNewTransactionValues(input: TransactionInput): NewTransaction {
     categoryId: input.categoryId ?? null,
     accountId: input.accountId ?? null,
     receiptImageUri: input.receiptImageUri ?? null,
+    excludeFromExpense: input.excludeFromExpense ?? false,
   };
 }
 

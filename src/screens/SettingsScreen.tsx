@@ -1,12 +1,17 @@
 import React, { useCallback, useState } from 'react';
 import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 
 import { PALETTE } from '../constants/colors';
 import { useDatabase } from '../context/DatabaseProvider';
 import { deleteAllTransactions } from '../db/queries/transactions';
+import type { MoreStackParamList } from '../navigation/types';
 import { getNotificationPermissionStatus, requestNotificationPermissions } from '../utils/notifications';
+
+const DEVELOPER_EMAIL = 'genesiscruz.dev@gmail.com';
 
 const STATUS_LABEL: Record<Notifications.PermissionStatus, string> = {
   [Notifications.PermissionStatus.GRANTED]: 'Enabled',
@@ -15,6 +20,7 @@ const STATUS_LABEL: Record<Notifications.PermissionStatus, string> = {
 };
 
 export default function SettingsScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<MoreStackParamList>>();
   const { db, notifyDataChanged } = useDatabase();
   const [status, setStatus] = useState<Notifications.PermissionStatus | null>(null);
   const [clearing, setClearing] = useState(false);
@@ -54,6 +60,22 @@ export default function SettingsScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Manage</Text>
+        <Pressable style={styles.row} onPress={() => navigation.navigate('Categories')}>
+          <Text style={styles.rowLabel}>Categories</Text>
+          <Text style={styles.rowChevron}>›</Text>
+        </Pressable>
+        <Pressable style={styles.row} onPress={() => navigation.navigate('AccountCategories')}>
+          <Text style={styles.rowLabel}>Account categories</Text>
+          <Text style={styles.rowChevron}>›</Text>
+        </Pressable>
+        <Pressable style={styles.row} onPress={() => navigation.navigate('Budgets')}>
+          <Text style={styles.rowLabel}>Budgets</Text>
+          <Text style={styles.rowChevron}>›</Text>
+        </Pressable>
+      </View>
+
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Budget alerts</Text>
         <View style={styles.row}>
@@ -103,6 +125,14 @@ export default function SettingsScreen() {
           <Text style={styles.rowLabel}>App</Text>
           <Text style={styles.rowValue}>Expense Tracker</Text>
         </View>
+        <View style={styles.row}>
+          <Text style={styles.rowLabel}>Version</Text>
+          <Text style={styles.rowValue}>{Constants.expoConfig?.version ?? '—'}</Text>
+        </View>
+        <Pressable style={styles.row} onPress={() => Linking.openURL(`mailto:${DEVELOPER_EMAIL}`)}>
+          <Text style={styles.rowLabel}>Developer</Text>
+          <Text style={[styles.rowValue, styles.rowValueLink]}>{DEVELOPER_EMAIL}</Text>
+        </Pressable>
       </View>
     </ScrollView>
   );
@@ -123,6 +153,8 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   rowLabel: { fontSize: 14, color: PALETTE.textPrimary, fontWeight: '600' },
   rowValue: { fontSize: 14, color: PALETTE.textSecondary },
+  rowChevron: { fontSize: 18, color: PALETTE.textSecondary },
+  rowValueLink: { color: PALETTE.net, fontWeight: '600' },
   button: { alignSelf: 'flex-start', paddingVertical: 8, paddingHorizontal: 14, borderRadius: 10, backgroundColor: `${PALETTE.net}1A` },
   buttonText: { fontSize: 13, fontWeight: '700', color: PALETTE.net },
   dangerButton: { backgroundColor: `${PALETTE.danger}1A` },

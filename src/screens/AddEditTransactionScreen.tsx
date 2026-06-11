@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 
 import { AccountPicker } from '../components/AccountPicker';
@@ -33,6 +33,7 @@ export default function AddEditTransactionScreen() {
   const [occurredAt, setOccurredAt] = useState(() => formatIsoDate(new Date()));
   const [note, setNote] = useState('');
   const [receiptImageUri, setReceiptImageUri] = useState<string | null>(null);
+  const [excludeFromExpense, setExcludeFromExpense] = useState(false);
   const [loading, setLoading] = useState(isEditing);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,6 +51,7 @@ export default function AddEditTransactionScreen() {
       setOccurredAt(existing.occurredAt);
       setNote(existing.note ?? '');
       setReceiptImageUri(existing.receiptImageUri);
+      setExcludeFromExpense(existing.excludeFromExpense);
       setLoading(false);
     })();
     return () => {
@@ -65,6 +67,7 @@ export default function AddEditTransactionScreen() {
     if (nextType === type) return;
     setType(nextType);
     setCategoryId(null);
+    if (nextType === 'income') setExcludeFromExpense(false);
   }
 
   async function handleSave() {
@@ -81,7 +84,16 @@ export default function AddEditTransactionScreen() {
 
     setSaving(true);
     try {
-      const input = { type, amount, occurredAt, note: note.trim() || null, categoryId, accountId, receiptImageUri };
+      const input = {
+        type,
+        amount,
+        occurredAt,
+        note: note.trim() || null,
+        categoryId,
+        accountId,
+        receiptImageUri,
+        excludeFromExpense,
+      };
       if (isEditing) {
         await updateTransaction(transactionId, input);
       } else {
@@ -174,6 +186,18 @@ export default function AddEditTransactionScreen() {
         <ReceiptImagePicker uri={receiptImageUri} onChange={setReceiptImageUri} />
       </View>
 
+      {type === 'expense' ? (
+        <View style={styles.toggleRow}>
+          <View style={styles.toggleTextGroup}>
+            <Text style={styles.label}>Exclude from reports</Text>
+            <Text style={styles.helperText}>
+              Skip this transaction in spending reports and totals — useful for transfers or reimbursements.
+            </Text>
+          </View>
+          <Switch value={excludeFromExpense} onValueChange={setExcludeFromExpense} trackColor={{ true: PALETTE.net }} />
+        </View>
+      ) : null}
+
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       <Pressable style={[styles.saveButton, saving && styles.saveButtonDisabled]} onPress={handleSave} disabled={saving}>
@@ -220,6 +244,20 @@ const styles = StyleSheet.create({
     minHeight: 80,
     textAlignVertical: 'top',
   },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    backgroundColor: PALETTE.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.border,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  toggleTextGroup: { flex: 1, gap: 4 },
+  helperText: { fontSize: 12, color: PALETTE.textSecondary, lineHeight: 16 },
   error: { fontSize: 13, color: PALETTE.danger, textAlign: 'center' },
   saveButton: { backgroundColor: PALETTE.net, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   saveButtonDisabled: { opacity: 0.6 },

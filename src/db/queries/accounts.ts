@@ -3,8 +3,6 @@ import { asc, eq, sql } from 'drizzle-orm';
 import type { Database } from '../client';
 import { accounts, transactions, type Account, type NewAccount } from '../schema';
 
-export type AccountType = 'cash' | 'bank' | 'ewallet' | 'credit_card' | 'other';
-
 export interface AccountWithBalance extends Account {
   /** Starting balance plus the net (income − expense) of every transaction assigned to this account, in minor units */
   balance: number;
@@ -26,9 +24,11 @@ export async function listAccounts(db: Database, options: ListAccountsOptions = 
     .select({
       id: accounts.id,
       name: accounts.name,
-      type: accounts.type,
+      categoryId: accounts.categoryId,
       color: accounts.color,
       icon: accounts.icon,
+      accountNumber: accounts.accountNumber,
+      qrImageUri: accounts.qrImageUri,
       startingBalance: accounts.startingBalance,
       isArchived: accounts.isArchived,
       createdAt: accounts.createdAt,
@@ -50,9 +50,11 @@ export async function getAccount(db: Database, id: number): Promise<Account | un
 
 export interface AccountInput {
   name: string;
-  type: AccountType;
+  categoryId: number;
   color: string;
   icon?: string | null;
+  accountNumber?: string | null;
+  qrImageUri?: string | null;
   /** Integer amount in minor units (centavos) */
   startingBalance: number;
 }
@@ -60,9 +62,11 @@ export interface AccountInput {
 export async function createAccount(db: Database, input: AccountInput): Promise<Account> {
   const values: NewAccount = {
     name: input.name.trim(),
-    type: input.type,
+    categoryId: input.categoryId,
     color: input.color,
     icon: input.icon ?? null,
+    accountNumber: input.accountNumber?.trim() || null,
+    qrImageUri: input.qrImageUri ?? null,
     startingBalance: input.startingBalance,
   };
   const [row] = await db.insert(accounts).values(values).returning();
@@ -74,9 +78,11 @@ export async function updateAccount(db: Database, id: number, input: AccountInpu
     .update(accounts)
     .set({
       name: input.name.trim(),
-      type: input.type,
+      categoryId: input.categoryId,
       color: input.color,
       icon: input.icon ?? null,
+      accountNumber: input.accountNumber?.trim() || null,
+      qrImageUri: input.qrImageUri ?? null,
       startingBalance: input.startingBalance,
     })
     .where(eq(accounts.id, id));

@@ -17,14 +17,33 @@ export const categories = sqliteTable(
   (table) => [uniqueIndex('idx_categories_name').on(table.name)],
 );
 
+export const accountCategories = sqliteTable(
+  'account_categories',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    name: text('name').notNull(),
+    color: text('color').notNull(),
+    icon: text('icon'),
+    isArchived: integer('is_archived', { mode: 'boolean' }).notNull().default(false),
+    createdAt: text('created_at')
+      .notNull()
+      .default(sql`(datetime('now'))`),
+  },
+  (table) => [uniqueIndex('idx_account_categories_name').on(table.name)],
+);
+
 export const accounts = sqliteTable(
   'accounts',
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
     name: text('name').notNull(),
-    type: text('type', { enum: ['cash', 'bank', 'ewallet', 'credit_card', 'other'] }).notNull(),
+    categoryId: integer('category_id')
+      .notNull()
+      .references(() => accountCategories.id),
     color: text('color').notNull(),
     icon: text('icon'),
+    accountNumber: text('account_number'),
+    qrImageUri: text('qr_image_uri'),
     startingBalance: integer('starting_balance').notNull().default(0),
     isArchived: integer('is_archived', { mode: 'boolean' }).notNull().default(false),
     createdAt: text('created_at')
@@ -69,6 +88,7 @@ export const transactions = sqliteTable(
       onDelete: 'set null',
     }),
     receiptImageUri: text('receipt_image_uri'),
+    excludeFromExpense: integer('exclude_from_expense', { mode: 'boolean' }).notNull().default(false),
     createdAt: text('created_at')
       .notNull()
       .default(sql`(datetime('now'))`),
@@ -108,6 +128,8 @@ export const budgets = sqliteTable(
 
 export type Category = typeof categories.$inferSelect;
 export type NewCategory = typeof categories.$inferInsert;
+export type AccountCategory = typeof accountCategories.$inferSelect;
+export type NewAccountCategory = typeof accountCategories.$inferInsert;
 export type Account = typeof accounts.$inferSelect;
 export type NewAccount = typeof accounts.$inferInsert;
 export type Transaction = typeof transactions.$inferSelect;

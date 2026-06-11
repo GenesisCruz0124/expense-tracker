@@ -1,23 +1,21 @@
-import React, { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
+import * as Clipboard from 'expo-clipboard';
+import * as MediaLibrary from 'expo-media-library';
+import QRCode from 'react-native-qrcode-svg';
+import { captureRef } from 'react-native-view-shot';
 
+import { AccountCategoryPicker } from '../components/AccountCategoryPicker';
 import { AmountInput } from '../components/AmountInput';
+import { QrImagePicker } from '../components/QrImagePicker';
 import { ACCOUNT_ICON_OPTIONS, DEFAULT_ACCOUNT_ICON } from '../constants/accountIcons';
 import { CATEGORY_COLOR_PALETTE, PALETTE } from '../constants/colors';
 import { useDatabase } from '../context/DatabaseProvider';
-import { getAccount, type AccountType } from '../db/queries/accounts';
+import { getAccount } from '../db/queries/accounts';
 import { useAccounts } from '../hooks/useAccounts';
 import { fromMinorUnits, toMinorUnits } from '../utils/currency';
 import type { RootStackParamList } from '../navigation/types';
-
-const TYPE_OPTIONS: { value: AccountType; label: string }[] = [
-  { value: 'cash', label: 'Cash' },
-  { value: 'bank', label: 'Bank' },
-  { value: 'ewallet', label: 'E-wallet' },
-  { value: 'credit_card', label: 'Credit card' },
-  { value: 'other', label: 'Other' },
-];
 
 export default function AddEditAccountScreen() {
   const navigation = useNavigation();
@@ -29,13 +27,18 @@ export default function AddEditAccountScreen() {
   const { createAccount, updateAccount } = useAccounts({ includeArchived: true });
 
   const [name, setName] = useState('');
-  const [type, setType] = useState<AccountType>('cash');
+  const [categoryId, setCategoryId] = useState<number | null>(null);
   const [color, setColor] = useState<string>(CATEGORY_COLOR_PALETTE[0]);
   const [icon, setIcon] = useState<string>(DEFAULT_ACCOUNT_ICON);
+  const [accountNumber, setAccountNumber] = useState('');
+  const [qrImageUri, setQrImageUri] = useState<string | null>(null);
   const [balanceText, setBalanceText] = useState('0');
   const [loading, setLoading] = useState(isEditing);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [savingQr, setSavingQr] = useState(false);
+  const qrRef = useRef<View>(null);
 
   useEffect(() => {
     if (!isEditing) return;
@@ -44,9 +47,11 @@ export default function AddEditAccountScreen() {
       const existing = await getAccount(db, accountId);
       if (!existing || cancelled) return;
       setName(existing.name);
-      setType(existing.type as AccountType);
+      setCategoryId(existing.categoryId);
       setColor(existing.color);
       setIcon(existing.icon ?? DEFAULT_ACCOUNT_ICON);
+      setAccountNumber(existing.accountNumber ?? '');
+      setQrImageUri(existing.qrImageUri ?? null);
       setBalanceText(String(fromMinorUnits(existing.startingBalance)));
       setLoading(false);
     })();
@@ -71,10 +76,14 @@ export default function AddEditAccountScreen() {
       setError('Enter a valid starting balance.');
       return;
     }
+    if (categoryId == null) {
+      setError('Choose an account category.');
+      return;
+    }
 
     setSaving(true);
     try {
-      const input = { name: trimmed, type, color, icon, startingBalance };
+      const input = { name: trimmed, categoryId, color, icon, accountNumber, qrImageUri, startingBalance };
       if (isEditing) {
         await updateAccount(accountId, input);
       } else {
@@ -85,6 +94,34 @@ export default function AddEditAccountScreen() {
       setError(err instanceof Error ? err.message : 'Could not save — is the name already in use?');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleCopyAccountNumber() {
+    const trimmed = accountNumber.trim();
+    if (!trimmed) return;
+    await Clipboard.setStringAsync(trimmed);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+
+  async function handleSaveQr() {
+    const trimmed = accountNumber.trim();
+    if (!trimmed) return;
+    setSavingQr(true);
+    try {
+      const permission = await MediaLibrary.requestPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Photo access needed', 'Allow photo library access in Settings to save the QR code.');
+        return;
+      }
+      const uri = await captureRef(qrRef, { format: 'png', quality: 1 });
+      await MediaLibrary.saveToLibraryAsync(uri);
+      Alert.alert('Saved', 'QR code saved to your photos.');
+    } catch (err) {
+      Alert.alert('Could not save QR code', err instanceof Error ? err.message : 'Something went wrong.');
+    } finally {
+      setSavingQr(false);
     }
   }
 
@@ -110,21 +147,8 @@ export default function AddEditAccountScreen() {
       </View>
 
       <View style={styles.field}>
-        <Text style={styles.label}>Type</Text>
-        <View style={styles.optionRow}>
-          {TYPE_OPTIONS.map((option) => {
-            const selected = option.value === type;
-            return (
-              <Pressable
-                key={option.value}
-                onPress={() => setType(option.value)}
-                style={[styles.optionChip, selected && styles.optionChipSelected]}
-              >
-                <Text style={[styles.optionChipText, selected && styles.optionChipTextSelected]}>{option.label}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
+        <Text style={styles.label}>Category</Text>
+        <AccountCategoryPicker selectedCategoryId={categoryId} onSelect={setCategoryId} />
       </View>
 
       <View style={styles.field}>
@@ -162,6 +186,49 @@ export default function AddEditAccountScreen() {
         </View>
       </View>
 
+      <View style={styles.field}>
+        <Text style={styles.label}>Account number</Text>
+        <View style={styles.accountNumberRow}>
+          <TextInput
+            style={[styles.input, styles.accountNumberInput]}
+            value={accountNumber}
+            onChangeText={setAccountNumber}
+            placeholder="e.g. 1234 5678 9012"
+            placeholderTextColor={PALETTE.textSecondary}
+          />
+          <Pressable
+            style={[styles.copyButton, !accountNumber.trim() && styles.saveButtonDisabled]}
+            onPress={handleCopyAccountNumber}
+            disabled={!accountNumber.trim()}
+          >
+            <Text style={styles.copyButtonText}>{copied ? 'Copied' : 'Copy'}</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      {accountNumber.trim() ? (
+        <View style={styles.field}>
+          <Text style={styles.label}>QR code</Text>
+          <View style={styles.qrCard}>
+            <View ref={qrRef} collapsable={false} style={styles.qrCapture}>
+              <QRCode value={accountNumber.trim()} size={180} />
+            </View>
+            <Pressable
+              style={[styles.saveQrButton, savingQr && styles.saveButtonDisabled]}
+              onPress={handleSaveQr}
+              disabled={savingQr}
+            >
+              <Text style={styles.saveQrButtonText}>{savingQr ? 'Saving…' : 'Save QR to gallery'}</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
+
+      <View style={styles.field}>
+        <Text style={styles.label}>Received payment via QR</Text>
+        <QrImagePicker uri={qrImageUri} onChange={setQrImageUri} />
+      </View>
+
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       <Pressable style={[styles.saveButton, saving && styles.saveButtonDisabled]} onPress={handleSave} disabled={saving}>
@@ -188,19 +255,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: PALETTE.textPrimary,
   },
-  optionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  optionChip: {
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: PALETTE.border,
-    backgroundColor: PALETTE.surface,
-  },
-  optionChipSelected: { borderColor: PALETTE.net, backgroundColor: `${PALETTE.net}1A` },
-  optionChipText: { fontSize: 13, fontWeight: '600', color: PALETTE.textSecondary },
-  optionChipTextSelected: { color: PALETTE.net },
   swatchRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   swatch: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   swatchSelected: { borderWidth: 2.5, borderColor: PALETTE.textPrimary },
@@ -218,6 +272,35 @@ const styles = StyleSheet.create({
   },
   iconOptionSelected: { borderColor: PALETTE.net, backgroundColor: `${PALETTE.net}1A` },
   iconOptionText: { fontSize: 20 },
+  accountNumberRow: { flexDirection: 'row', gap: 10, alignItems: 'center' },
+  accountNumberInput: { flex: 1 },
+  copyButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: PALETTE.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.border,
+  },
+  copyButtonText: { fontSize: 13, fontWeight: '600', color: PALETTE.net },
+  qrCard: {
+    backgroundColor: PALETTE.surface,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.border,
+    padding: 20,
+    alignItems: 'center',
+    gap: 16,
+  },
+  qrCapture: { backgroundColor: '#fff', padding: 16, borderRadius: 8 },
+  saveQrButton: {
+    backgroundColor: PALETTE.net,
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  saveQrButtonText: { color: '#fff', fontSize: 14, fontWeight: '700' },
   error: { fontSize: 13, color: PALETTE.danger, textAlign: 'center' },
   saveButton: { backgroundColor: PALETTE.net, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   saveButtonDisabled: { opacity: 0.6 },

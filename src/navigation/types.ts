@@ -11,6 +11,7 @@ export type AccountsStackParamList = {
 export type MoreStackParamList = {
   Settings: undefined;
   Categories: undefined;
+  AccountCategories: undefined;
   /** `fromDashboard` swaps the back button to jump straight to the Dashboard tab instead of Settings. */
   Budgets: { fromDashboard?: boolean } | undefined;
 };
@@ -28,6 +29,7 @@ export type RootStackParamList = {
   Tabs: NavigatorScreenParams<TabParamList>;
   AddEditTransaction: { transactionId?: number } | undefined;
   AddEditCategory: { categoryId?: number } | undefined;
+  AddEditAccountCategory: { accountCategoryId?: number } | undefined;
   AddEditBudget: { budgetId?: number; monthKey: string };
   AddEditRecurring: { recurringId?: number } | undefined;
   AddBill: undefined;

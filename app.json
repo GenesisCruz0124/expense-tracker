@@ -2,7 +2,7 @@
   "expo": {
     "name": "Expense Tracker",
     "slug": "expense-tracker",
-    "version": "1.0.0",
+    "version": "1.0.4",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -34,6 +34,13 @@
         {
           "photosPermission": "Allow Expense Tracker to access your photos to attach a receipt image.",
           "cameraPermission": "Allow Expense Tracker to use your camera to capture a receipt photo."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow Expense Tracker to access your photos.",
+          "savePhotosPermission": "Allow Expense Tracker to save QR codes to your photos."
         }
       ]
     ]
