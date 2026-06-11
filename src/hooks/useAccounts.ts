@@ -16,13 +16,18 @@ export function useAccounts(options: ListAccountsOptions = {}) {
   const { db, refreshSignal, notifyDataChanged } = useDatabase();
   const [accounts, setAccounts] = useState<AccountWithBalance[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
 
   const optionsKey = JSON.stringify(options);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      setAccounts(await listAccounts(db, options));
+      const result = await listAccounts(db, options);
+      setAccounts(result);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error(String(err)));
     } finally {
       setLoading(false);
     }
@@ -64,5 +69,5 @@ export function useAccounts(options: ListAccountsOptions = {}) {
     [db, notifyDataChanged, refresh],
   );
 
-  return { accounts, loading, refresh, createAccount, updateAccount, setArchived };
+  return { accounts, loading, error, refresh, createAccount, updateAccount, setArchived };
 }

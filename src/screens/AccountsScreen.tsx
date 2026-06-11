@@ -19,7 +19,7 @@ interface AccountSection {
 export default function AccountsScreen() {
   const navigation = useNavigation();
   const [showArchived, setShowArchived] = useState(false);
-  const { accounts, setArchived } = useAccounts({ includeArchived: true });
+  const { accounts, error, setArchived } = useAccounts({ includeArchived: true });
   const { accountCategories } = useAccountCategories({ includeArchived: true });
 
   const visible = accounts.filter((account) => (showArchived ? account.isArchived : !account.isArchived));
@@ -39,6 +39,12 @@ export default function AccountsScreen() {
         <Text style={styles.toggleLabel}>Show archived</Text>
         <Switch value={showArchived} onValueChange={setShowArchived} trackColor={{ true: PALETTE.net }} />
       </View>
+
+      {error ? (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorBannerText}>Couldn't load accounts: {error.message}</Text>
+        </View>
+      ) : null}
 
       <SectionList
         sections={sections}
@@ -94,6 +100,14 @@ const styles = StyleSheet.create({
     borderBottomColor: PALETTE.border,
   },
   toggleLabel: { fontSize: 14, fontWeight: '600', color: PALETTE.textPrimary },
+  errorBanner: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: '#FEE2E2',
+  },
+  errorBannerText: { color: PALETTE.expense, fontSize: 13, fontWeight: '600' },
   listContent: { padding: 16 },
   emptyContainer: { flexGrow: 1, justifyContent: 'center' },
   sectionHeader: {
