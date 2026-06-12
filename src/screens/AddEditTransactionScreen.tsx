@@ -9,13 +9,13 @@ import { DateField } from '../components/DateField';
 import { ReceiptImagePicker } from '../components/ReceiptImagePicker';
 import { PALETTE } from '../constants/colors';
 import { useDatabase } from '../context/DatabaseProvider';
-import { getTransaction } from '../db/queries/transactions';
+import { getTransaction, getTransferLegs } from '../db/queries/transactions';
 import { useTransactions } from '../hooks/useTransactions';
 import { fromMinorUnits, toMinorUnits } from '../utils/currency';
 import { formatIsoDate } from '../utils/dateRanges';
 import type { RootStackParamList } from '../navigation/types';
 
-type TransactionType = 'expense' | 'income';
+type TransactionType = 'expense' | 'income' | 'transfer';
 
 export default function AddEditTransactionScreen() {
   const navigation = useNavigation();
@@ -24,12 +24,15 @@ export default function AddEditTransactionScreen() {
   const isEditing = transactionId != null;
 
   const { db } = useDatabase();
-  const { createTransaction, updateTransaction, deleteTransaction } = useTransactions();
+  const { createTransaction, updateTransaction, deleteTransaction, createTransfer, updateTransfer, deleteTransfer } =
+    useTransactions();
 
   const [type, setType] = useState<TransactionType>('expense');
   const [amountText, setAmountText] = useState('');
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [accountId, setAccountId] = useState<number | null>(null);
+  const [toAccountId, setToAccountId] = useState<number | null>(null);
+  const [transferId, setTransferId] = useState<number | null>(null);
   const [occurredAt, setOccurredAt] = useState(() => formatIsoDate(new Date()));
   const [note, setNote] = useState('');
   const [receiptImageUri, setReceiptImageUri] = useState<string | null>(null);
@@ -44,6 +47,22 @@ export default function AddEditTransactionScreen() {
     (async () => {
       const existing = await getTransaction(db, transactionId);
       if (!existing || cancelled) return;
+
+      if (existing.transferId != null) {
+        const legs = await getTransferLegs(db, existing.transferId);
+        if (!legs || cancelled) return;
+        setType('transfer');
+        setTransferId(legs.transferId);
+        setAmountText(String(fromMinorUnits(legs.fromTransaction.amount)));
+        setAccountId(legs.fromTransaction.accountId);
+        setToAccountId(legs.toTransaction.accountId);
+        setOccurredAt(legs.fromTransaction.occurredAt);
+        setNote(legs.fromTransaction.note ?? '');
+        setReceiptImageUri(legs.fromTransaction.receiptImageUri);
+        setLoading(false);
+        return;
+      }
+
       setType(existing.type);
       setAmountText(String(fromMinorUnits(existing.amount)));
       setCategoryId(existing.categoryId);
@@ -67,7 +86,12 @@ export default function AddEditTransactionScreen() {
     if (nextType === type) return;
     setType(nextType);
     setCategoryId(null);
-    if (nextType === 'income') setExcludeFromExpense(false);
+    if (nextType === 'transfer') {
+      setExcludeFromExpense(false);
+      setToAccountId(null);
+    } else if (nextType === 'income') {
+      setExcludeFromExpense(false);
+    }
   }
 
   async function handleSave() {
@@ -79,6 +103,40 @@ export default function AddEditTransactionScreen() {
     }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(occurredAt)) {
       setError('Enter a valid date in YYYY-MM-DD format.');
+      return;
+    }
+
+    if (type === 'transfer') {
+      if (!accountId || !toAccountId) {
+        setError('Choose both a from and to account.');
+        return;
+      }
+      if (accountId === toAccountId) {
+        setError('Choose two different accounts to transfer between.');
+        return;
+      }
+
+      setSaving(true);
+      try {
+        const input = {
+          fromAccountId: accountId,
+          toAccountId,
+          amount,
+          occurredAt,
+          note: note.trim() || null,
+          receiptImageUri,
+        };
+        if (transferId != null) {
+          await updateTransfer(transferId, input);
+        } else {
+          await createTransfer(input);
+        }
+        navigation.goBack();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Something went wrong while saving.');
+      } finally {
+        setSaving(false);
+      }
       return;
     }
 
@@ -115,7 +173,11 @@ export default function AddEditTransactionScreen() {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
-          await deleteTransaction(transactionId, type, occurredAt);
+          if (transferId != null) {
+            await deleteTransfer(transferId);
+          } else if (type !== 'transfer') {
+            await deleteTransaction(transactionId, type, occurredAt);
+          }
           navigation.goBack();
         },
       },
@@ -133,9 +195,9 @@ export default function AddEditTransactionScreen() {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <View style={styles.typeToggle}>
-        {(['expense', 'income'] as const).map((option) => {
+        {(['expense', 'income', 'transfer'] as const).map((option) => {
           const selected = option === type;
-          const tone = option === 'expense' ? PALETTE.expense : PALETTE.income;
+          const tone = option === 'expense' ? PALETTE.expense : option === 'income' ? PALETTE.income : PALETTE.net;
           return (
             <Pressable
               key={option}
@@ -143,7 +205,7 @@ export default function AddEditTransactionScreen() {
               style={[styles.typeOption, selected && { backgroundColor: tone, borderColor: tone }]}
             >
               <Text style={[styles.typeOptionText, selected && styles.typeOptionTextSelected]}>
-                {option === 'expense' ? 'Expense' : 'Income'}
+                {option === 'expense' ? 'Expense' : option === 'income' ? 'Income' : 'Transfer'}
               </Text>
             </Pressable>
           );
@@ -155,15 +217,30 @@ export default function AddEditTransactionScreen() {
         <AmountInput value={amountText} onChangeText={setAmountText} />
       </View>
 
-      <View style={styles.field}>
-        <Text style={styles.label}>Category</Text>
-        <CategoryPicker forType={type} selectedCategoryId={categoryId} onSelect={setCategoryId} />
-      </View>
+      {type !== 'transfer' ? (
+        <View style={styles.field}>
+          <Text style={styles.label}>Category</Text>
+          <CategoryPicker forType={type} selectedCategoryId={categoryId} onSelect={setCategoryId} />
+        </View>
+      ) : null}
 
-      <View style={styles.field}>
-        <Text style={styles.label}>Account</Text>
-        <AccountPicker selectedAccountId={accountId} onSelect={setAccountId} />
-      </View>
+      {type === 'transfer' ? (
+        <>
+          <View style={styles.field}>
+            <Text style={styles.label}>From account</Text>
+            <AccountPicker selectedAccountId={accountId} onSelect={setAccountId} />
+          </View>
+          <View style={styles.field}>
+            <Text style={styles.label}>To account</Text>
+            <AccountPicker selectedAccountId={toAccountId} onSelect={setToAccountId} />
+          </View>
+        </>
+      ) : (
+        <View style={styles.field}>
+          <Text style={styles.label}>Account</Text>
+          <AccountPicker selectedAccountId={accountId} onSelect={setAccountId} />
+        </View>
+      )}
 
       <View style={styles.field}>
         <DateField label="Date" value={occurredAt} onChangeText={setOccurredAt} />

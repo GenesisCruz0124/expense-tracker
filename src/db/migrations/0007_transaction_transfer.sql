@@ -1,0 +1,1 @@
+ALTER TABLE `transactions` ADD `transfer_id` integer;

@@ -5,7 +5,7 @@ import { PALETTE } from '../constants/colors';
 import type { TransactionWithCategory } from '../db/queries/transactions';
 import { formatCurrency } from '../utils/currency';
 import { formatDisplayDate } from '../utils/dateRanges';
-import { CategoryBadge, UncategorizedBadge } from './CategoryBadge';
+import { CategoryBadge, TransferBadge, UncategorizedBadge } from './CategoryBadge';
 
 interface Props {
   transaction: TransactionWithCategory;
@@ -13,14 +13,17 @@ interface Props {
 }
 
 export function TransactionListItem({ transaction, onPress }: Props) {
+  const isTransfer = transaction.transferId != null;
   const isIncome = transaction.type === 'income';
-  const amountColor = isIncome ? PALETTE.income : PALETTE.expense;
+  const amountColor = isTransfer ? PALETTE.net : isIncome ? PALETTE.income : PALETTE.expense;
   const sign = isIncome ? '+' : '−';
 
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
       <View style={styles.main}>
-        {transaction.categoryName ? (
+        {isTransfer ? (
+          <TransferBadge />
+        ) : transaction.categoryName ? (
           <CategoryBadge name={transaction.categoryName} color={transaction.categoryColor ?? PALETTE.textSecondary} icon={transaction.categoryIcon} />
         ) : (
           <UncategorizedBadge />

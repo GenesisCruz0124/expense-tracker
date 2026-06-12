@@ -52,6 +52,7 @@ export async function listTransactions(
       accountId: transactions.accountId,
       receiptImageUri: transactions.receiptImageUri,
       excludeFromExpense: transactions.excludeFromExpense,
+      transferId: transactions.transferId,
       recurringId: transactions.recurringId,
       createdAt: transactions.createdAt,
       updatedAt: transactions.updatedAt,
@@ -97,6 +98,82 @@ function toNewTransactionValues(input: TransactionInput): NewTransaction {
     receiptImageUri: input.receiptImageUri ?? null,
     excludeFromExpense: input.excludeFromExpense ?? false,
   };
+}
+
+export interface TransferInput {
+  fromAccountId: number;
+  toAccountId: number;
+  /** Integer amount in minor units (cents) */
+  amount: number;
+  occurredAt: string;
+  note?: string | null;
+  receiptImageUri?: string | null;
+}
+
+export interface TransferLegs {
+  transferId: number;
+  fromTransaction: Transaction;
+  toTransaction: Transaction;
+}
+
+/** A transfer is recorded as a linked pair of legs: an expense out of the source account
+ * and an income into the destination account, both excluded from expense/income reports. */
+export async function createTransfer(db: Database, input: TransferInput): Promise<TransferLegs> {
+  const shared = {
+    amount: input.amount,
+    occurredAt: input.occurredAt,
+    note: input.note?.trim() || null,
+    receiptImageUri: input.receiptImageUri ?? null,
+    excludeFromExpense: true,
+    categoryId: null,
+  };
+
+  const [fromTransaction] = await db
+    .insert(transactions)
+    .values({ ...shared, type: 'expense', accountId: input.fromAccountId })
+    .returning();
+  const [toTransaction] = await db
+    .insert(transactions)
+    .values({ ...shared, type: 'income', accountId: input.toAccountId, transferId: fromTransaction.id })
+    .returning();
+  await db.update(transactions).set({ transferId: fromTransaction.id }).where(eq(transactions.id, fromTransaction.id));
+
+  return { transferId: fromTransaction.id, fromTransaction: { ...fromTransaction, transferId: fromTransaction.id }, toTransaction };
+}
+
+/** Fetches both legs of a transfer, identifying the expense (from) and income (to) sides. */
+export async function getTransferLegs(db: Database, transferId: number): Promise<TransferLegs | undefined> {
+  const rows = await db.select().from(transactions).where(eq(transactions.transferId, transferId));
+  const fromTransaction = rows.find((row) => row.type === 'expense');
+  const toTransaction = rows.find((row) => row.type === 'income');
+  if (!fromTransaction || !toTransaction) return undefined;
+  return { transferId, fromTransaction, toTransaction };
+}
+
+export async function updateTransfer(db: Database, transferId: number, input: TransferInput): Promise<void> {
+  const legs = await getTransferLegs(db, transferId);
+  if (!legs) throw new Error('Transfer not found.');
+
+  const shared = {
+    amount: input.amount,
+    occurredAt: input.occurredAt,
+    note: input.note?.trim() || null,
+    receiptImageUri: input.receiptImageUri ?? null,
+    updatedAt: sql`(datetime('now'))`,
+  };
+
+  await db
+    .update(transactions)
+    .set({ ...shared, accountId: input.fromAccountId })
+    .where(eq(transactions.id, legs.fromTransaction.id));
+  await db
+    .update(transactions)
+    .set({ ...shared, accountId: input.toAccountId })
+    .where(eq(transactions.id, legs.toTransaction.id));
+}
+
+export async function deleteTransfer(db: Database, transferId: number): Promise<void> {
+  await db.delete(transactions).where(eq(transactions.transferId, transferId));
 }
 
 export async function createTransaction(db: Database, input: TransactionInput): Promise<Transaction> {

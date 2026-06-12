@@ -90,6 +90,7 @@ export const transactions = sqliteTable(
     }),
     receiptImageUri: text('receipt_image_uri'),
     excludeFromExpense: integer('exclude_from_expense', { mode: 'boolean' }).notNull().default(false),
+    transferId: integer('transfer_id'),
     createdAt: text('created_at')
       .notNull()
       .default(sql`(datetime('now'))`),

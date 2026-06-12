@@ -5,12 +5,16 @@ import { useDatabase } from '../context/DatabaseProvider';
 import { checkBudgetAlerts } from '../db/budgetAlerts';
 import {
   createTransaction as createTransactionQuery,
+  createTransfer as createTransferQuery,
   deleteTransaction as deleteTransactionQuery,
+  deleteTransfer as deleteTransferQuery,
   listTransactions,
   updateTransaction as updateTransactionQuery,
+  updateTransfer as updateTransferQuery,
   type ListTransactionsFilter,
   type TransactionInput,
   type TransactionWithCategory,
+  type TransferInput,
 } from '../db/queries/transactions';
 
 export function useTransactions(filter: ListTransactionsFilter = {}) {
@@ -74,5 +78,43 @@ export function useTransactions(filter: ListTransactionsFilter = {}) {
     [db, afterMutation],
   );
 
-  return { transactions, loading, refresh, createTransaction, updateTransaction, deleteTransaction };
+  const createTransfer = useCallback(
+    async (input: TransferInput) => {
+      const legs = await createTransferQuery(db, input);
+      notifyDataChanged();
+      await refresh();
+      return legs;
+    },
+    [db, notifyDataChanged, refresh],
+  );
+
+  const updateTransfer = useCallback(
+    async (transferId: number, input: TransferInput) => {
+      await updateTransferQuery(db, transferId, input);
+      notifyDataChanged();
+      await refresh();
+    },
+    [db, notifyDataChanged, refresh],
+  );
+
+  const deleteTransfer = useCallback(
+    async (transferId: number) => {
+      await deleteTransferQuery(db, transferId);
+      notifyDataChanged();
+      await refresh();
+    },
+    [db, notifyDataChanged, refresh],
+  );
+
+  return {
+    transactions,
+    loading,
+    refresh,
+    createTransaction,
+    updateTransaction,
+    deleteTransaction,
+    createTransfer,
+    updateTransfer,
+    deleteTransfer,
+  };
 }

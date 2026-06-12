@@ -50,6 +50,13 @@
       "when": 1781300000000,
       "tag": "0006_account_category_kind",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1781400000000,
+      "tag": "0007_transaction_transfer",
+      "breakpoints": true
     }
   ]
 }

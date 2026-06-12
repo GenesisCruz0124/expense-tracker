@@ -30,6 +30,15 @@ export function UncategorizedBadge() {
   );
 }
 
+export function TransferBadge() {
+  return (
+    <View style={[styles.badge, { backgroundColor: `${PALETTE.net}1A`, borderColor: `${PALETTE.net}40` }]}>
+      <Text style={styles.icon}>🔁</Text>
+      <Text style={[styles.label, { color: PALETTE.net }]}>Transfer</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   badge: {
     flexDirection: 'row',
