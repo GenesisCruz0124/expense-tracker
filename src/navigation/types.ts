@@ -12,8 +12,6 @@ export type MoreStackParamList = {
   Settings: undefined;
   Categories: undefined;
   AccountCategories: undefined;
-  /** `fromDashboard` swaps the back button to jump straight to the Dashboard tab instead of Settings. */
-  Budgets: { fromDashboard?: boolean } | undefined;
 };
 
 export type TabParamList = {
@@ -22,6 +20,7 @@ export type TabParamList = {
   AccountsTab: NavigatorScreenParams<AccountsStackParamList>;
   Bills: undefined;
   Reports: undefined;
+  Budgets: undefined;
   MoreTab: NavigatorScreenParams<MoreStackParamList>;
 };
 

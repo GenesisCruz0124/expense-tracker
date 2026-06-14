@@ -1,8 +1,7 @@
 import React from 'react';
-import { Pressable, Text } from 'react-native';
+import { Text } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { PALETTE } from '../constants/colors';
 import AccountCategoriesScreen from '../screens/AccountCategoriesScreen';
@@ -25,22 +24,6 @@ function TabGlyph({ glyph, focused }: { glyph: string; focused: boolean }) {
   return <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.45 }}>{glyph}</Text>;
 }
 
-// Dashboard's "Manage →" / "View all →" links push these screens onto the More stack from a
-// different tab. The default back button would pop to Settings (the stack's first screen),
-// which feels wrong when the user actually came from the Dashboard — so swap it for a button
-// that jumps straight back there.
-function BackToDashboardButton({ navigation }: { navigation: NativeStackNavigationProp<MoreStackParamList> }) {
-  return (
-    <Pressable
-      onPress={() => (navigation as unknown as { navigate: (name: 'Dashboard') => void }).navigate('Dashboard')}
-      hitSlop={10}
-      style={{ paddingRight: 16 }}
-    >
-      <Text style={{ fontSize: 17, fontWeight: '600', color: PALETTE.net }}>‹ Dashboard</Text>
-    </Pressable>
-  );
-}
-
 function TransactionsNavigator() {
   return (
     <TransactionsStack.Navigator>
@@ -61,8 +44,9 @@ function AccountsNavigator() {
   );
 }
 
-// Hosts Settings plus the management screens (Categories, Budgets) as pushes, keeping the
-// bottom tab bar lean instead of one-per-screen. Recurring lives in its own "Bills" tab.
+// Hosts Settings plus the management screens (Categories, Account categories) as pushes,
+// keeping the bottom tab bar lean instead of one-per-screen. Recurring and Budgets live in
+// their own tabs.
 function MoreNavigator() {
   return (
     <MoreStack.Navigator>
@@ -72,13 +56,6 @@ function MoreNavigator() {
         name="AccountCategories"
         component={AccountCategoriesScreen}
         options={{ title: 'Account categories' }}
-      />
-      <MoreStack.Screen
-        name="Budgets"
-        component={BudgetsScreen}
-        options={({ navigation, route }) =>
-          route.params?.fromDashboard ? { headerLeft: () => <BackToDashboardButton navigation={navigation} /> } : {}
-        }
       />
     </MoreStack.Navigator>
   );
@@ -127,6 +104,11 @@ export function TabNavigator() {
         name="Reports"
         component={ReportsScreen}
         options={{ tabBarIcon: ({ focused }) => <TabGlyph glyph="📊" focused={focused} /> }}
+      />
+      <Tab.Screen
+        name="Budgets"
+        component={BudgetsScreen}
+        options={{ tabBarIcon: ({ focused }) => <TabGlyph glyph="🎯" focused={focused} /> }}
       />
       <Tab.Screen
         name="MoreTab"

@@ -132,14 +132,7 @@ export default function DashboardScreen() {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Budgets needing attention</Text>
-          <Pressable
-            onPress={() =>
-              navigation.navigate('Tabs', {
-                screen: 'MoreTab',
-                params: { screen: 'Budgets', params: { fromDashboard: true } },
-              })
-            }
-          >
+          <Pressable onPress={() => navigation.navigate('Tabs', { screen: 'Budgets' })}>
             <Text style={styles.sectionLink}>View all →</Text>
           </Pressable>
         </View>
