@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PALETTE } from '../constants/colors';
 import { useAccountCategories } from '../hooks/useAccountCategories';
@@ -29,7 +30,7 @@ export function AccountCategoryPicker({ selectedCategoryId, onSelect }: Props) {
       </Pressable>
 
       <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setVisible(false)}>
-        <View style={styles.modal}>
+        <SafeAreaView style={styles.modal} edges={['top', 'bottom']}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Choose a category</Text>
             <Pressable onPress={() => setVisible(false)} hitSlop={8}>
@@ -62,7 +63,7 @@ export function AccountCategoryPicker({ selectedCategoryId, onSelect }: Props) {
               </Pressable>
             )}
           />
-        </View>
+        </SafeAreaView>
       </Modal>
     </View>
   );

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PALETTE } from '../constants/colors';
 import { useCategories } from '../hooks/useCategories';
@@ -33,7 +34,7 @@ export function FilterSheet({
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={styles.modal}>
+      <SafeAreaView style={styles.modal} edges={['top', 'bottom']}>
         <View style={styles.header}>
           <Text style={styles.title}>Filters</Text>
           <Pressable onPress={onClose} hitSlop={8}>
@@ -74,7 +75,7 @@ export function FilterSheet({
             <Text style={styles.clearText}>Clear all filters</Text>
           </Pressable>
         </ScrollView>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 }

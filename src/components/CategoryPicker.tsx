@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PALETTE } from '../constants/colors';
 import { useCategories } from '../hooks/useCategories';
@@ -56,7 +57,7 @@ export function CategoryPicker({ forType, selectedCategoryId, onSelect, billersO
       </Pressable>
 
       <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={close}>
-        <View style={styles.modal}>
+        <SafeAreaView style={styles.modal} edges={['top', 'bottom']}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{billersOnly ? 'Choose a biller' : 'Choose a category'}</Text>
             <Pressable onPress={close} hitSlop={8}>
@@ -96,7 +97,7 @@ export function CategoryPicker({ forType, selectedCategoryId, onSelect, billersO
                     query
                       ? `Nothing matches "${query}". Try a different search.`
                       : billersOnly
-                        ? 'Add billers from the Bills tab to track recurring payments.'
+                        ? 'Add billers from More > Billers to track recurring payments.'
                         : 'Add categories from the More tab to start organizing transactions.'
                   }
                 />
@@ -112,7 +113,7 @@ export function CategoryPicker({ forType, selectedCategoryId, onSelect, billersO
               </Pressable>
             )}
           />
-        </View>
+        </SafeAreaView>
       </Modal>
     </View>
   );
