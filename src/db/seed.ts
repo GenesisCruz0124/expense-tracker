@@ -58,6 +58,8 @@ const ADDITIONAL_CATEGORIES: NewCategory[] = [
   { name: 'Fuel', type: 'expense', color: '#F97316', icon: '🚗' },
   // Shopping
   { name: 'Toys', type: 'expense', color: '#EC4899', icon: '🎁' },
+  // Household
+  { name: 'Household', type: 'expense', color: '#06B6D4', icon: '🏠' },
 ];
 
 const BILLER_NAMES = [
