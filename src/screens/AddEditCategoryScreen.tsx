@@ -19,13 +19,15 @@ export default function AddEditCategoryScreen() {
   const navigation = useNavigation();
   const route = useRoute<RouteProp<RootStackParamList, 'AddEditCategory'>>();
   const categoryId = route.params?.categoryId;
+  const lockType = route.params?.lockType;
   const isEditing = categoryId != null;
+  const noun = lockType ? 'biller' : 'category';
 
   const { db } = useDatabase();
   const { createCategory, updateCategory } = useCategories({ includeArchived: true });
 
   const [name, setName] = useState('');
-  const [type, setType] = useState<CategoryType>('expense');
+  const [type, setType] = useState<CategoryType>(lockType ?? 'expense');
   const [color, setColor] = useState<string>(CATEGORY_COLOR_PALETTE[0]);
   const [icon, setIcon] = useState<string>(DEFAULT_CATEGORY_ICON);
   const [loading, setLoading] = useState(isEditing);
@@ -50,8 +52,8 @@ export default function AddEditCategoryScreen() {
   }, [db, isEditing, categoryId]);
 
   useEffect(() => {
-    navigation.setOptions({ title: isEditing ? 'Edit category' : 'Add category' });
-  }, [navigation, isEditing]);
+    navigation.setOptions({ title: isEditing ? `Edit ${noun}` : `Add ${noun}` });
+  }, [navigation, isEditing, noun]);
 
   async function handleSave() {
     setError(null);
@@ -98,23 +100,25 @@ export default function AddEditCategoryScreen() {
         />
       </View>
 
-      <View style={styles.field}>
-        <Text style={styles.label}>Used for</Text>
-        <View style={styles.optionRow}>
-          {TYPE_OPTIONS.map((option) => {
-            const selected = option.value === type;
-            return (
-              <Pressable
-                key={option.value}
-                onPress={() => setType(option.value)}
-                style={[styles.optionChip, selected && styles.optionChipSelected]}
-              >
-                <Text style={[styles.optionChipText, selected && styles.optionChipTextSelected]}>{option.label}</Text>
-              </Pressable>
-            );
-          })}
+      {!lockType ? (
+        <View style={styles.field}>
+          <Text style={styles.label}>Used for</Text>
+          <View style={styles.optionRow}>
+            {TYPE_OPTIONS.map((option) => {
+              const selected = option.value === type;
+              return (
+                <Pressable
+                  key={option.value}
+                  onPress={() => setType(option.value)}
+                  style={[styles.optionChip, selected && styles.optionChipSelected]}
+                >
+                  <Text style={[styles.optionChipText, selected && styles.optionChipTextSelected]}>{option.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
-      </View>
+      ) : null}
 
       <View style={styles.field}>
         <Text style={styles.label}>Color</Text>
@@ -149,7 +153,7 @@ export default function AddEditCategoryScreen() {
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       <Pressable style={[styles.saveButton, saving && styles.saveButtonDisabled]} onPress={handleSave} disabled={saving}>
-        <Text style={styles.saveButtonText}>{saving ? 'Saving…' : isEditing ? 'Save changes' : 'Add category'}</Text>
+        <Text style={styles.saveButtonText}>{saving ? 'Saving…' : isEditing ? 'Save changes' : `Add ${noun}`}</Text>
       </Pressable>
     </ScrollView>
   );

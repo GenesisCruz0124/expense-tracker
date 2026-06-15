@@ -34,7 +34,10 @@ export default function BillersScreen() {
           />
         }
         renderItem={({ item }) => (
-          <Pressable style={styles.row} onPress={() => navigation.navigate('AddEditCategory', { categoryId: item.id })}>
+          <Pressable
+            style={styles.row}
+            onPress={() => navigation.navigate('AddEditCategory', { categoryId: item.id, lockType: 'expense' })}
+          >
             <View style={styles.rowMain}>
               <CategoryBadge name={item.name} color={item.color} icon={item.icon} />
             </View>
@@ -45,7 +48,7 @@ export default function BillersScreen() {
         )}
       />
 
-      <Pressable style={styles.fab} onPress={() => navigation.navigate('AddEditCategory')}>
+      <Pressable style={styles.fab} onPress={() => navigation.navigate('AddEditCategory', { lockType: 'expense' })}>
         <Text style={styles.fabIcon}>+</Text>
       </Pressable>
     </View>
