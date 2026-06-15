@@ -37,6 +37,7 @@ export async function listBills(db: Database): Promise<BillWithDetails[]> {
       remindedAt: bills.remindedAt,
       isPaid: bills.isPaid,
       paidTransactionId: bills.paidTransactionId,
+      excludeFromExpense: bills.excludeFromExpense,
       createdAt: bills.createdAt,
       categoryName: categories.name,
       categoryColor: categories.color,
@@ -70,6 +71,8 @@ export interface BillInput {
   dueDate: string;
   frequency: BillFrequency;
   reminderDaysBefore: number;
+  /** When true, the expense logged by "mark as paid" is excluded from expense reports. */
+  excludeFromExpense?: boolean;
 }
 
 function toNewBillValues(input: BillInput): NewBill {
@@ -82,6 +85,7 @@ function toNewBillValues(input: BillInput): NewBill {
     dueDate: input.dueDate,
     frequency: input.frequency,
     reminderDaysBefore: input.reminderDaysBefore,
+    excludeFromExpense: input.excludeFromExpense ?? false,
   };
 }
 
@@ -142,6 +146,7 @@ export async function markBillPaid(db: Database, id: number, occurredAt: string)
         establishment: billerName,
         categoryId: bill.categoryId,
         accountId: bill.accountId,
+        excludeFromExpense: bill.excludeFromExpense,
       })
       .returning();
 

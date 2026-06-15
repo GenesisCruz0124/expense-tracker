@@ -152,6 +152,7 @@ export const bills = sqliteTable(
     remindedAt: text('reminded_at'),
     isPaid: integer('is_paid', { mode: 'boolean' }).notNull().default(false),
     paidTransactionId: integer('paid_transaction_id').references(() => transactions.id, { onDelete: 'set null' }),
+    excludeFromExpense: integer('exclude_from_expense', { mode: 'boolean' }).notNull().default(false),
     createdAt: text('created_at')
       .notNull()
       .default(sql`(datetime('now'))`),

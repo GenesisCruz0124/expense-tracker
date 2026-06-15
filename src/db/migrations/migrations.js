@@ -20,6 +20,7 @@ import m0015 from './0015_transaction_fee.sql';
 import m0016 from './0016_account_net_worth_flag.sql';
 import m0017 from './0017_loan_account_category.sql';
 import m0018 from './0018_account_monthly_amount_due.sql';
+import m0019 from './0019_bill_exclude_from_expense.sql';
 
   export default {
     journal,
@@ -42,7 +43,8 @@ m0014,
 m0015,
 m0016,
 m0017,
-m0018
+m0018,
+m0019
     }
   }
   
