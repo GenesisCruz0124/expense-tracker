@@ -23,7 +23,9 @@ export default function AddEditAccountScreen() {
   const isEditing = accountId != null;
 
   const { db } = useDatabase();
-  const { createAccount, updateAccount, markMonthlyDueUnpaid } = useAccounts({ includeArchived: true });
+  const { createAccount, updateAccount, markMonthlyDuePaid, markMonthlyDueUnpaid } = useAccounts({
+    includeArchived: true,
+  });
   const { accountCategories } = useAccountCategories({ includeArchived: true });
   const currentMonthKey = monthKeyFor(new Date());
 
@@ -144,11 +146,29 @@ export default function AddEditAccountScreen() {
     }
   }
 
+  async function handleMarkDuePaid() {
+    if (!isEditing) return;
+    await markMonthlyDuePaid(accountId, currentMonthKey);
+    setMonthlyDueLastPaidMonth(currentMonthKey);
+    setRemainingMonths((value) => (value > 0 ? value - 1 : value));
+    const amountDue = toMinorUnits(monthlyAmountDueText);
+    const currentBalance = toMinorUnits(balanceText);
+    if (amountDue != null && currentBalance != null) {
+      setBalanceText(String(fromMinorUnits(currentBalance - amountDue)));
+      setBalanceLastUpdatedAt(formatIsoDate(new Date()));
+    }
+  }
+
   async function handleMarkDueUnpaid() {
     if (!isEditing) return;
     await markMonthlyDueUnpaid(accountId);
     setMonthlyDueLastPaidMonth(null);
     setRemainingMonths((value) => value + 1);
+    const amountDue = toMinorUnits(monthlyAmountDueText);
+    const currentBalance = toMinorUnits(balanceText);
+    if (amountDue != null && currentBalance != null) {
+      setBalanceText(String(fromMinorUnits(currentBalance + amountDue)));
+    }
   }
 
   function handleIncrementBalance() {
@@ -221,11 +241,21 @@ export default function AddEditAccountScreen() {
         </View>
       ) : null}
 
-      {isCreditCardKind && monthlyDueLastPaidMonth === currentMonthKey ? (
-        <Pressable style={styles.undoRow} onPress={handleMarkDueUnpaid}>
-          <Text style={styles.undoText}>This month's due is marked as paid</Text>
-          <Text style={styles.undoAction}>Undo</Text>
-        </Pressable>
+      {isCreditCardKind && isEditing && toMinorUnits(monthlyAmountDueText) != null ? (
+        monthlyDueLastPaidMonth === currentMonthKey ? (
+          <Pressable style={styles.undoRow} onPress={handleMarkDueUnpaid}>
+            <Text style={styles.undoText}>This month's due is marked as paid</Text>
+            <Text style={styles.undoAction}>Undo</Text>
+          </Pressable>
+        ) : (
+          <Pressable style={styles.undoRow} onPress={handleMarkDuePaid}>
+            <View style={styles.toggleTextGroup}>
+              <Text style={styles.undoText}>Mark this month's due as paid</Text>
+              <Text style={styles.helperText}>Subtracts the monthly amount from the balance above.</Text>
+            </View>
+            <Text style={styles.undoAction}>−{formatCurrency(toMinorUnits(monthlyAmountDueText)!)}</Text>
+          </Pressable>
+        )
       ) : null}
 
       {isInvestmentKind ? (
