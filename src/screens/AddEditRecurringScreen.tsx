@@ -43,6 +43,7 @@ export default function AddEditRecurringScreen() {
   const [type, setType] = useState<TransactionType>('expense');
   const [amountText, setAmountText] = useState('');
   const [categoryId, setCategoryId] = useState<number | null>(null);
+  const [billerId, setBillerId] = useState<number | null>(null);
   const [isOneTime, setIsOneTime] = useState(false);
   const [frequency, setFrequency] = useState<Frequency>('monthly');
   const [intervalText, setIntervalText] = useState('1');
@@ -63,6 +64,7 @@ export default function AddEditRecurringScreen() {
       setType(existing.type);
       setAmountText(String(fromMinorUnits(existing.amount)));
       setCategoryId(existing.categoryId);
+      setBillerId(existing.billerId);
       setFrequency(existing.frequency);
       setIntervalText(String(existing.intervalCount));
       setStartDate(existing.startDate);
@@ -120,6 +122,7 @@ export default function AddEditRecurringScreen() {
         amount,
         note: note.trim() || null,
         categoryId,
+        billerId: type === 'expense' ? billerId : null,
         frequency: saveFrequency,
         intervalCount: saveIntervalCount,
         startDate,
@@ -176,6 +179,13 @@ export default function AddEditRecurringScreen() {
         <Text style={styles.label}>Category</Text>
         <CategoryPicker forType={type} selectedCategoryId={categoryId} onSelect={setCategoryId} />
       </View>
+
+      {type === 'expense' ? (
+        <View style={styles.field}>
+          <Text style={styles.label}>Biller (optional)</Text>
+          <CategoryPicker forType="expense" selectedCategoryId={billerId} onSelect={setBillerId} billersOnly />
+        </View>
+      ) : null}
 
       <View style={styles.field}>
         <Text style={styles.label}>Repeats</Text>

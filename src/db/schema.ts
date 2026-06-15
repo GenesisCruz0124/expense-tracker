@@ -63,6 +63,7 @@ export const recurringTransactions = sqliteTable(
     amount: integer('amount').notNull(),
     note: text('note'),
     categoryId: integer('category_id').references(() => categories.id, { onDelete: 'set null' }),
+    billerId: integer('biller_id').references(() => categories.id, { onDelete: 'set null' }),
     frequency: text('frequency', { enum: ['weekly', 'monthly'] }).notNull(),
     intervalCount: integer('interval_count').notNull().default(1),
     startDate: text('start_date').notNull(),

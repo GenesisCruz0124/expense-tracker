@@ -2,6 +2,7 @@ import { and, asc, eq, lte, sql } from 'drizzle-orm';
 
 import type { Database } from '../client';
 import {
+  categories,
   recurringTransactions,
   transactions,
   type NewRecurringTransaction,
@@ -29,6 +30,7 @@ export async function listRecurringTransactions(db: Database): Promise<Recurring
       amount: recurringTransactions.amount,
       note: recurringTransactions.note,
       categoryId: recurringTransactions.categoryId,
+      billerId: recurringTransactions.billerId,
       frequency: recurringTransactions.frequency,
       intervalCount: recurringTransactions.intervalCount,
       startDate: recurringTransactions.startDate,
@@ -55,6 +57,7 @@ export interface RecurringInput {
   amount: number;
   note?: string | null;
   categoryId?: number | null;
+  billerId?: number | null;
   frequency: 'weekly' | 'monthly';
   intervalCount: number;
   startDate: string;
@@ -67,6 +70,7 @@ export async function createRecurringTransaction(db: Database, input: RecurringI
     amount: input.amount,
     note: input.note?.trim() || null,
     categoryId: input.categoryId ?? null,
+    billerId: input.billerId ?? null,
     frequency: input.frequency,
     intervalCount: input.intervalCount,
     startDate: input.startDate,
@@ -86,6 +90,7 @@ export async function updateRecurringTransaction(db: Database, id: number, input
       amount: input.amount,
       note: input.note?.trim() || null,
       categoryId: input.categoryId ?? null,
+      billerId: input.billerId ?? null,
       frequency: input.frequency,
       intervalCount: input.intervalCount,
       startDate: input.startDate,
@@ -138,12 +143,19 @@ export async function generateDueRecurringTransactions(
     if (result.dueDates.length === 0) continue;
 
     await db.transaction(async (tx) => {
+      let billerName: string | null = null;
+      if (rule.billerId != null) {
+        const [biller] = await tx.select({ name: categories.name }).from(categories).where(eq(categories.id, rule.billerId)).limit(1);
+        billerName = biller?.name ?? null;
+      }
+
       for (const dueDate of result.dueDates) {
         await tx.insert(transactions).values({
           type: rule.type,
           amount: rule.amount,
           occurredAt: dueDate,
           note: rule.note,
+          establishment: billerName,
           categoryId: rule.categoryId,
           recurringId: rule.id,
         });
