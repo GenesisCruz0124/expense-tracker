@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm';
 import type { Database } from './client';
 import { categories, type NewCategory } from './schema';
 
@@ -38,10 +39,12 @@ const ADDITIONAL_CATEGORIES: NewCategory[] = [
   { name: 'PNB Parking', type: 'expense', color: '#3B82F6', icon: '🚗' },
   { name: 'Netflix', type: 'expense', color: '#F59E0B', icon: '🎬' },
   { name: 'Claude', type: 'expense', color: '#A855F7', icon: '💼' },
-  { name: 'Mothe', type: 'expense', color: '#EC4899', icon: '🎁' },
+  { name: 'Mother', type: 'expense', color: '#EC4899', icon: '🎁' },
 ];
 
 /** Adds the requested income/biller categories on every launch, skipping any that already exist. */
 export async function seedAdditionalCategories(db: Database): Promise<void> {
+  // Fix up the earlier "Mothe" typo for installs that already seeded it.
+  await db.update(categories).set({ name: 'Mother' }).where(eq(categories.name, 'Mothe'));
   await db.insert(categories).values(ADDITIONAL_CATEGORIES).onConflictDoNothing({ target: categories.name });
 }
