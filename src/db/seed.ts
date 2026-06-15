@@ -56,6 +56,8 @@ const ADDITIONAL_CATEGORIES: NewCategory[] = [
   { name: 'Parcel Delivery', type: 'expense', color: '#6366F1', icon: '🎁' },
   // Transport
   { name: 'Fuel', type: 'expense', color: '#F97316', icon: '🚗' },
+  // Shopping
+  { name: 'Toys', type: 'expense', color: '#EC4899', icon: '🎁' },
 ];
 
 const BILLER_NAMES = [
