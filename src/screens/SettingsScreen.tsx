@@ -9,6 +9,7 @@ import { PALETTE } from '../constants/colors';
 import { useDatabase } from '../context/DatabaseProvider';
 import { deleteAllTransactions } from '../db/queries/transactions';
 import type { MoreStackParamList } from '../navigation/types';
+import { createBackupFile, pickBackupFile, restoreBackupFromFile, shareBackupFile } from '../utils/backup';
 import { getNotificationPermissionStatus, requestNotificationPermissions } from '../utils/notifications';
 
 const DEVELOPER_EMAIL = 'genesiscruz.dev@gmail.com';
@@ -24,6 +25,8 @@ export default function SettingsScreen() {
   const { db, notifyDataChanged } = useDatabase();
   const [status, setStatus] = useState<Notifications.PermissionStatus | null>(null);
   const [clearing, setClearing] = useState(false);
+  const [backingUp, setBackingUp] = useState(false);
+  const [restoring, setRestoring] = useState(false);
 
   const refreshStatus = useCallback(() => {
     getNotificationPermissionStatus().then(setStatus);
@@ -51,6 +54,54 @@ export default function SettingsScreen() {
               notifyDataChanged();
             } finally {
               setClearing(false);
+            }
+          },
+        },
+      ],
+    );
+  }
+
+  async function handleCreateBackup() {
+    setBackingUp(true);
+    try {
+      const fileUri = await createBackupFile(db);
+      await shareBackupFile(fileUri);
+    } catch (error) {
+      Alert.alert('Backup failed', error instanceof Error ? error.message : 'Something went wrong while creating the backup.');
+    } finally {
+      setBackingUp(false);
+    }
+  }
+
+  async function handleRestoreBackup() {
+    let pickedUri: string | null;
+    try {
+      pickedUri = await pickBackupFile();
+    } catch (error) {
+      Alert.alert('Restore failed', error instanceof Error ? error.message : 'Could not open the file picker.');
+      return;
+    }
+    if (!pickedUri) return;
+    const fileUri = pickedUri;
+
+    Alert.alert(
+      'Restore from backup?',
+      'This replaces all current transactions, accounts, categories, budgets, and recurring rules with the contents of this backup. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Restore',
+          style: 'destructive',
+          onPress: async () => {
+            setRestoring(true);
+            try {
+              await restoreBackupFromFile(db, fileUri);
+              notifyDataChanged();
+              Alert.alert('Restore complete', 'Your data has been restored from the backup.');
+            } catch (error) {
+              Alert.alert('Restore failed', error instanceof Error ? error.message : 'Something went wrong while restoring the backup.');
+            } finally {
+              setRestoring(false);
             }
           },
         },
@@ -91,6 +142,23 @@ export default function SettingsScreen() {
         <Text style={styles.helperText}>
           Budget alerts are checked when you open the app or log an expense — not via background polling, since this
           app runs entirely offline on your device.
+        </Text>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Backup & restore</Text>
+        <Text style={styles.helperText}>
+          Export everything — transactions, accounts, categories, budgets, recurring rules, and attached receipt and
+          QR images — into a single backup file you can save or send anywhere.
+        </Text>
+        <Pressable style={styles.button} onPress={handleCreateBackup} disabled={backingUp || restoring}>
+          <Text style={styles.buttonText}>{backingUp ? 'Preparing backup…' : 'Create backup'}</Text>
+        </Pressable>
+        <Pressable style={styles.button} onPress={handleRestoreBackup} disabled={backingUp || restoring}>
+          <Text style={styles.buttonText}>{restoring ? 'Restoring…' : 'Restore from backup'}</Text>
+        </Pressable>
+        <Text style={styles.helperText}>
+          Restoring replaces all current data on this device with the contents of the chosen backup file.
         </Text>
       </View>
 
