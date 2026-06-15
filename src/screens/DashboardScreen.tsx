@@ -8,9 +8,9 @@ import { EmptyState } from '../components/EmptyState';
 import { MonthSelector } from '../components/MonthSelector';
 import { SummaryCard } from '../components/SummaryCard';
 import { PALETTE } from '../constants/colors';
-import type { RecurringWithStatus } from '../db/queries/recurring';
+import type { BillWithDetails } from '../db/queries/bills';
+import { useBills } from '../hooks/useBills';
 import { useBudgets } from '../hooks/useBudgets';
-import { useRecurringTransactions } from '../hooks/useRecurringTransactions';
 import { useReportsData } from '../hooks/useReportsData';
 import { formatCurrency } from '../utils/currency';
 import { formatDisplayDate, monthRangeFor, parseIsoDate, shiftMonth } from '../utils/dateRanges';
@@ -30,10 +30,10 @@ const BILL_STATUS_COLOR: Record<BillStatus['tone'], string> = {
   upcoming: PALETTE.textSecondary,
 };
 
-function billStatusFor(rule: RecurringWithStatus, today: Date): BillStatus {
-  if (rule.isPaid) return { tone: 'paid', label: 'Paid' };
+function billStatusFor(bill: BillWithDetails, today: Date): BillStatus {
+  if (bill.isPaid) return { tone: 'paid', label: 'Paid' };
 
-  const daysUntil = differenceInCalendarDays(parseIsoDate(rule.nextRunDate), today);
+  const daysUntil = differenceInCalendarDays(parseIsoDate(bill.dueDate), today);
   if (daysUntil < 0) {
     const overdueDays = Math.abs(daysUntil);
     return { tone: 'overdue', label: overdueDays === 1 ? '1 day overdue' : `${overdueDays} days overdue` };
@@ -53,11 +53,11 @@ export default function DashboardScreen() {
 
   const { totals, categoryData, loading, refresh } = useReportsData(anchorDate, 6);
   const { budgets } = useBudgets(range);
-  const { rules } = useRecurringTransactions();
+  const { bills } = useBills();
 
   const today = new Date();
   const net = totals.income - totals.expense;
-  const upcomingBills = rules.filter((rule) => rule.isActive && rule.type === 'expense').slice(0, 3);
+  const upcomingBills = bills.filter((bill) => !bill.isPaid).slice(0, 3);
   const attentionBudgets = budgets
     .filter((budget) => budget.percentUsed >= budget.alertThresholdPct)
     .sort((a, b) => b.percentUsed - a.percentUsed)
@@ -96,7 +96,7 @@ export default function DashboardScreen() {
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Upcoming bills</Text>
           <View style={styles.sectionHeaderActions}>
-            <Pressable onPress={() => navigation.navigate('AddEditRecurring')}>
+            <Pressable onPress={() => navigation.navigate('AddEditBill')}>
               <Text style={styles.sectionLink}>+ Add</Text>
             </Pressable>
             <Pressable onPress={() => navigation.navigate('Tabs', { screen: 'Bills' })}>
@@ -108,20 +108,20 @@ export default function DashboardScreen() {
           <EmptyState icon="↻" title="No upcoming bills" message="Set up rent, subscriptions, or other recurring expenses to track them here." />
         ) : (
           <View style={styles.list}>
-            {upcomingBills.map((rule) => {
-              const status = billStatusFor(rule, today);
+            {upcomingBills.map((bill) => {
+              const status = billStatusFor(bill, today);
               return (
-                <View key={rule.id} style={styles.listRow}>
+                <View key={bill.id} style={styles.listRow}>
                   <View style={styles.listRowMain}>
-                    <Text style={styles.listRowTitle}>{rule.note || 'Bill'}</Text>
+                    <Text style={styles.listRowTitle}>{bill.name}</Text>
                     <View style={styles.billMetaRow}>
-                      <Text style={styles.listRowSubtitle}>Due {formatDisplayDate(rule.nextRunDate)}</Text>
+                      <Text style={styles.listRowSubtitle}>Due {formatDisplayDate(bill.dueDate)}</Text>
                       <View style={[styles.billStatusBadge, { backgroundColor: `${BILL_STATUS_COLOR[status.tone]}1A` }]}>
                         <Text style={[styles.billStatusText, { color: BILL_STATUS_COLOR[status.tone] }]}>{status.label}</Text>
                       </View>
                     </View>
                   </View>
-                  <Text style={[styles.listRowAmount, { color: PALETTE.expense }]}>−{formatCurrency(rule.amount)}</Text>
+                  <Text style={[styles.listRowAmount, { color: PALETTE.expense }]}>−{formatCurrency(bill.amount)}</Text>
                 </View>
               );
             })}
