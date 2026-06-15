@@ -13,6 +13,7 @@ export type MoreStackParamList = {
   Settings: undefined;
   Categories: undefined;
   AccountCategories: undefined;
+  Billers: undefined;
 };
 
 export type TabParamList = {

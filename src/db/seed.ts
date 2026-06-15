@@ -40,6 +40,11 @@ const ADDITIONAL_CATEGORIES: NewCategory[] = [
   { name: 'Netflix', type: 'expense', color: '#F59E0B', icon: '🎬' },
   { name: 'Claude', type: 'expense', color: '#A855F7', icon: '💼' },
   { name: 'Mother', type: 'expense', color: '#EC4899', icon: '🎁' },
+  { name: 'Meralco', type: 'expense', color: '#EAB308', icon: '💡' },
+  { name: 'Manila Water', type: 'expense', color: '#06B6D4', icon: '🧾' },
+  { name: 'St. Peter Plan', type: 'expense', color: '#F97316', icon: '🏥' },
+  { name: 'Disney+', type: 'expense', color: '#3B82F6', icon: '🎬' },
+  { name: 'Google Play', type: 'expense', color: '#22C55E', icon: '📱' },
   // Food
   { name: 'Dine-In', type: 'expense', color: '#14B8A6', icon: '🍔' },
   { name: 'Fast Food', type: 'expense', color: '#EF4444', icon: '🍔' },
