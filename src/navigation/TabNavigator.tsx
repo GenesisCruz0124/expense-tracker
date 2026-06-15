@@ -7,10 +7,10 @@ import { PALETTE } from '../constants/colors';
 import AccountCategoriesScreen from '../screens/AccountCategoriesScreen';
 import AccountsScreen from '../screens/AccountsScreen';
 import AccountTransactionsScreen from '../screens/AccountTransactionsScreen';
+import BillsScreen from '../screens/BillsScreen';
 import BudgetsScreen from '../screens/BudgetsScreen';
 import CategoriesScreen from '../screens/CategoriesScreen';
 import DashboardScreen from '../screens/DashboardScreen';
-import RecurringTransactionsScreen from '../screens/RecurringTransactionsScreen';
 import ReportsScreen from '../screens/ReportsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import TransactionsListScreen from '../screens/TransactionsListScreen';
@@ -100,7 +100,7 @@ export function TabNavigator() {
       />
       <Tab.Screen
         name="Bills"
-        component={RecurringTransactionsScreen}
+        component={BillsScreen}
         options={{
           title: 'Bills',
           tabBarIcon: ({ focused }) => <TabGlyph glyph="🧾" focused={focused} />,

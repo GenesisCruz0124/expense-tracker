@@ -1,0 +1,119 @@
+import { asc, eq } from 'drizzle-orm';
+
+import type { Database } from '../client';
+import { accounts, bills, categories, transactions, type Bill, type NewBill } from '../schema';
+
+export interface BillWithDetails extends Bill {
+  categoryName: string | null;
+  categoryColor: string | null;
+  categoryIcon: string | null;
+  accountName: string | null;
+  accountColor: string | null;
+  accountIcon: string | null;
+}
+
+export async function listBills(db: Database): Promise<BillWithDetails[]> {
+  return db
+    .select({
+      id: bills.id,
+      name: bills.name,
+      amount: bills.amount,
+      categoryId: bills.categoryId,
+      accountId: bills.accountId,
+      dueDate: bills.dueDate,
+      reminderDaysBefore: bills.reminderDaysBefore,
+      remindedAt: bills.remindedAt,
+      isPaid: bills.isPaid,
+      paidTransactionId: bills.paidTransactionId,
+      createdAt: bills.createdAt,
+      categoryName: categories.name,
+      categoryColor: categories.color,
+      categoryIcon: categories.icon,
+      accountName: accounts.name,
+      accountColor: accounts.color,
+      accountIcon: accounts.icon,
+    })
+    .from(bills)
+    .leftJoin(categories, eq(bills.categoryId, categories.id))
+    .leftJoin(accounts, eq(bills.accountId, accounts.id))
+    .orderBy(asc(bills.isPaid), asc(bills.dueDate));
+}
+
+export async function getBill(db: Database, id: number): Promise<Bill | undefined> {
+  const [row] = await db.select().from(bills).where(eq(bills.id, id)).limit(1);
+  return row;
+}
+
+export interface BillInput {
+  name: string;
+  /** Integer amount in minor units (cents) */
+  amount: number;
+  categoryId?: number | null;
+  accountId?: number | null;
+  dueDate: string;
+  reminderDaysBefore: number;
+}
+
+function toNewBillValues(input: BillInput): NewBill {
+  return {
+    name: input.name.trim(),
+    amount: input.amount,
+    categoryId: input.categoryId ?? null,
+    accountId: input.accountId ?? null,
+    dueDate: input.dueDate,
+    reminderDaysBefore: input.reminderDaysBefore,
+  };
+}
+
+export async function createBill(db: Database, input: BillInput): Promise<Bill> {
+  const [row] = await db.insert(bills).values(toNewBillValues(input)).returning();
+  return row;
+}
+
+export async function updateBill(db: Database, id: number, input: BillInput): Promise<void> {
+  await db.update(bills).set(toNewBillValues(input)).where(eq(bills.id, id));
+}
+
+export async function deleteBill(db: Database, id: number): Promise<void> {
+  await db.delete(bills).where(eq(bills.id, id));
+}
+
+/** Marks a bill as paid by logging an expense transaction and linking it back via `paidTransactionId`. */
+export async function markBillPaid(db: Database, id: number, occurredAt: string): Promise<void> {
+  const bill = await getBill(db, id);
+  if (!bill || bill.isPaid) return;
+
+  await db.transaction(async (tx) => {
+    const [transaction] = await tx
+      .insert(transactions)
+      .values({
+        type: 'expense',
+        amount: bill.amount,
+        occurredAt,
+        note: bill.name,
+        categoryId: bill.categoryId,
+        accountId: bill.accountId,
+      })
+      .returning();
+
+    await tx.update(bills).set({ isPaid: true, paidTransactionId: transaction.id }).where(eq(bills.id, id));
+  });
+}
+
+/** Reverses `markBillPaid` — deletes the linked transaction and resets the bill to unpaid. */
+export async function markBillUnpaid(db: Database, id: number): Promise<void> {
+  const bill = await getBill(db, id);
+  if (!bill || !bill.isPaid) return;
+
+  await db.transaction(async (tx) => {
+    if (bill.paidTransactionId != null) {
+      await tx.delete(transactions).where(eq(transactions.id, bill.paidTransactionId));
+    }
+    await tx.update(bills).set({ isPaid: false, paidTransactionId: null }).where(eq(bills.id, id));
+  });
+}
+
+/** Records that a due-date reminder has been sent so `checkBillReminders` doesn't repeat it. */
+export async function markBillReminded(db: Database, id: number, remindedAt: string): Promise<void> {
+  await db.update(bills).set({ remindedAt }).where(eq(bills.id, id));
+}

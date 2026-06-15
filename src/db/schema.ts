@@ -128,6 +128,26 @@ export const budgets = sqliteTable(
   ],
 );
 
+export const bills = sqliteTable(
+  'bills',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    name: text('name').notNull(),
+    amount: integer('amount').notNull(),
+    categoryId: integer('category_id').references(() => categories.id, { onDelete: 'set null' }),
+    accountId: integer('account_id').references(() => accounts.id, { onDelete: 'set null' }),
+    dueDate: text('due_date').notNull(),
+    reminderDaysBefore: integer('reminder_days_before').notNull().default(1),
+    remindedAt: text('reminded_at'),
+    isPaid: integer('is_paid', { mode: 'boolean' }).notNull().default(false),
+    paidTransactionId: integer('paid_transaction_id').references(() => transactions.id, { onDelete: 'set null' }),
+    createdAt: text('created_at')
+      .notNull()
+      .default(sql`(datetime('now'))`),
+  },
+  (table) => [index('idx_bills_due_date').on(table.dueDate, table.isPaid)],
+);
+
 export type Category = typeof categories.$inferSelect;
 export type NewCategory = typeof categories.$inferInsert;
 export type AccountCategory = typeof accountCategories.$inferSelect;
@@ -140,3 +160,5 @@ export type Budget = typeof budgets.$inferSelect;
 export type NewBudget = typeof budgets.$inferInsert;
 export type RecurringTransaction = typeof recurringTransactions.$inferSelect;
 export type NewRecurringTransaction = typeof recurringTransactions.$inferInsert;
+export type Bill = typeof bills.$inferSelect;
+export type NewBill = typeof bills.$inferInsert;

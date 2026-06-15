@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import AddEditAccountCategoryScreen from '../screens/AddEditAccountCategoryScreen';
 import AddEditAccountScreen from '../screens/AddEditAccountScreen';
+import AddEditBillScreen from '../screens/AddEditBillScreen';
 import AddEditBudgetScreen from '../screens/AddEditBudgetScreen';
 import AddEditCategoryScreen from '../screens/AddEditCategoryScreen';
 import AddEditRecurringScreen from '../screens/AddEditRecurringScreen';
@@ -33,6 +34,7 @@ export function RootNavigator() {
           component={AddEditRecurringScreen}
           options={{ title: 'Recurring transaction' }}
         />
+        <Stack.Screen name="AddEditBill" component={AddEditBillScreen} options={{ title: 'Bill' }} />
       </Stack.Group>
     </Stack.Navigator>
   );
