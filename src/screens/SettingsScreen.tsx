@@ -121,10 +121,6 @@ export default function SettingsScreen() {
           <Text style={styles.rowLabel}>Account Types</Text>
           <Text style={styles.rowChevron}>›</Text>
         </Pressable>
-        <Pressable style={styles.row} onPress={() => navigation.navigate('Billers')}>
-          <Text style={styles.rowLabel}>Manage Billers</Text>
-          <Text style={styles.rowChevron}>›</Text>
-        </Pressable>
       </View>
 
       <View style={styles.section}>
