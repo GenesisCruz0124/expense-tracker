@@ -156,24 +156,43 @@ export async function setAccountArchived(db: Database, id: number, isArchived: b
 
 /**
  * Marks an account's monthly amount due as paid for `monthKey` ('YYYY-MM'), hiding it from the
- * Recurring screen until the next month, and decrements `remainingMonths` if set and above zero.
+ * Recurring screen until the next month, decrements `remainingMonths` if set and above zero, and
+ * subtracts `monthlyAmountDue` from the account's balance.
  */
 export async function markMonthlyDuePaid(db: Database, id: number, monthKey: string): Promise<void> {
-  const [account] = await db.select({ remainingMonths: accounts.remainingMonths }).from(accounts).where(eq(accounts.id, id)).limit(1);
+  const [account] = await db
+    .select({
+      remainingMonths: accounts.remainingMonths,
+      monthlyAmountDue: accounts.monthlyAmountDue,
+      startingBalance: accounts.startingBalance,
+    })
+    .from(accounts)
+    .where(eq(accounts.id, id))
+    .limit(1);
+  if (!account) return;
   await db
     .update(accounts)
     .set({
       monthlyDueLastPaidMonth: monthKey,
       remainingMonths:
-        account?.remainingMonths != null && account.remainingMonths > 0 ? account.remainingMonths - 1 : account?.remainingMonths ?? null,
+        account.remainingMonths != null && account.remainingMonths > 0 ? account.remainingMonths - 1 : account.remainingMonths,
+      startingBalance: account.startingBalance - (account.monthlyAmountDue ?? 0),
     })
     .where(eq(accounts.id, id));
 }
 
-/** Reverses `markMonthlyDuePaid`, restoring the account's monthly due to the Recurring screen. */
+/**
+ * Reverses `markMonthlyDuePaid`, restoring the account's monthly due to the Recurring screen and
+ * adding `monthlyAmountDue` back to the account's balance.
+ */
 export async function markMonthlyDueUnpaid(db: Database, id: number): Promise<void> {
   const [account] = await db
-    .select({ remainingMonths: accounts.remainingMonths, monthlyDueLastPaidMonth: accounts.monthlyDueLastPaidMonth })
+    .select({
+      remainingMonths: accounts.remainingMonths,
+      monthlyDueLastPaidMonth: accounts.monthlyDueLastPaidMonth,
+      monthlyAmountDue: accounts.monthlyAmountDue,
+      startingBalance: accounts.startingBalance,
+    })
     .from(accounts)
     .where(eq(accounts.id, id))
     .limit(1);
@@ -183,6 +202,7 @@ export async function markMonthlyDueUnpaid(db: Database, id: number): Promise<vo
     .set({
       monthlyDueLastPaidMonth: null,
       remainingMonths: account.remainingMonths != null ? account.remainingMonths + 1 : null,
+      startingBalance: account.startingBalance + (account.monthlyAmountDue ?? 0),
     })
     .where(eq(accounts.id, id));
 }

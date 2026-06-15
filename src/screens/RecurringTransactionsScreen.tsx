@@ -18,7 +18,7 @@ const MONTHLY_FACTOR: Record<'weekly' | 'monthly', number> = { weekly: 52 / 12, 
 export default function RecurringTransactionsScreen() {
   const navigation = useNavigation();
   const { rules, setActive } = useRecurringTransactions();
-  const { accounts, incrementBalance } = useAccounts();
+  const { accounts, markMonthlyDuePaid, incrementBalance } = useAccounts();
   const { accountCategories } = useAccountCategories();
   const currentMonthKey = monthKeyFor(new Date());
 
@@ -50,13 +50,6 @@ export default function RecurringTransactionsScreen() {
     [accounts, accountCategories, currentMonthKey],
   );
 
-  const totalInvestmentDue = useMemo(
-    () => investmentAccounts.reduce((sum, account) => sum + (account.monthlyContribution ?? 0), 0),
-    [investmentAccounts],
-  );
-
-  const netThisMonth = useMemo(() => totalInvestmentDue - totalLoanDue, [totalInvestmentDue, totalLoanDue]);
-
   const { recurringMonthlyIncome, recurringMonthlyExpense } = useMemo(() => {
     let income = 0;
     let expense = 0;
@@ -73,6 +66,13 @@ export default function RecurringTransactionsScreen() {
     }
     return { recurringMonthlyIncome: income, recurringMonthlyExpense: expense };
   }, [rules]);
+
+  function handleMarkPaid(account: AccountWithBalance) {
+    Alert.alert('Mark as paid?', `This hides "${account.name}" from Recurring until next month.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Mark paid', onPress: () => markMonthlyDuePaid(account.id, currentMonthKey) },
+    ]);
+  }
 
   function handleAddContribution(account: AccountWithBalance) {
     Alert.alert(
@@ -100,21 +100,6 @@ export default function RecurringTransactionsScreen() {
         }
         ListHeaderComponent={
           <View style={styles.loanSection}>
-            {loanAccounts.length > 0 || investmentAccounts.length > 0 ? (
-              <View style={styles.monthSummaryRow}>
-                <Text style={styles.monthSummaryLabel}>This month</Text>
-                <Text
-                  style={[
-                    styles.monthSummaryAmount,
-                    { color: netThisMonth >= 0 ? PALETTE.income : PALETTE.expense },
-                  ]}
-                >
-                  {netThisMonth >= 0 ? '+' : '−'}
-                  {formatCurrency(Math.abs(netThisMonth))}
-                </Text>
-              </View>
-            ) : null}
-
             {loanAccounts.length > 0 ? (
               <>
                 <View style={styles.sectionHeaderRow}>
@@ -134,9 +119,20 @@ export default function RecurringTransactionsScreen() {
                       <Text style={styles.cardTitle}>{account.name}</Text>
                       <Text style={styles.cardSubtitle}>Due every month</Text>
                     </View>
-                    <Text style={[styles.cardAmount, { color: PALETTE.expense }]}>
-                      {formatCurrency(account.monthlyAmountDue!)}
-                    </Text>
+                    <View style={styles.amountColumn}>
+                      <Text style={[styles.cardAmount, { color: PALETTE.expense }]}>
+                        {formatCurrency(account.monthlyAmountDue!)}
+                      </Text>
+                      <Pressable
+                        style={styles.actionButton}
+                        onPress={(event) => {
+                          event.stopPropagation();
+                          handleMarkPaid(account);
+                        }}
+                      >
+                        <Text style={styles.actionButtonText}>Mark paid</Text>
+                      </Pressable>
+                    </View>
                   </Pressable>
                 ))}
               </>
@@ -144,12 +140,7 @@ export default function RecurringTransactionsScreen() {
 
             {investmentAccounts.length > 0 ? (
               <>
-                <View style={styles.sectionHeaderRow}>
-                  <Text style={styles.sectionTitle}>Investment contributions</Text>
-                  <Text style={[styles.sectionTotal, styles.sectionTotalIncome]}>
-                    Total {formatCurrency(totalInvestmentDue)}
-                  </Text>
-                </View>
+                <Text style={styles.sectionTitle}>Investment contributions</Text>
                 {investmentAccounts.map((account) => (
                   <Pressable
                     key={account.id}
@@ -265,19 +256,6 @@ const styles = StyleSheet.create({
   sectionTotal: { fontSize: 12, fontWeight: '700', color: PALETTE.expense },
   sectionTotalIncome: { color: PALETTE.income },
   recurringTotals: { flexDirection: 'row', gap: 10 },
-  monthSummaryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: PALETTE.surface,
-    borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: PALETTE.border,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-  },
-  monthSummaryLabel: { fontSize: 13, fontWeight: '700', color: PALETTE.textPrimary },
-  monthSummaryAmount: { fontSize: 16, fontWeight: '800' },
   avatar: {
     width: 38,
     height: 38,
