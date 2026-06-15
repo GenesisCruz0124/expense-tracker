@@ -40,6 +40,13 @@ const ADDITIONAL_CATEGORIES: NewCategory[] = [
   { name: 'Netflix', type: 'expense', color: '#F59E0B', icon: '🎬' },
   { name: 'Claude', type: 'expense', color: '#A855F7', icon: '💼' },
   { name: 'Mother', type: 'expense', color: '#EC4899', icon: '🎁' },
+  // Food
+  { name: 'Dine-In', type: 'expense', color: '#14B8A6', icon: '🍔' },
+  { name: 'Fast Food', type: 'expense', color: '#EF4444', icon: '🍔' },
+  { name: 'Food Delivery', type: 'expense', color: '#84CC16', icon: '🚗' },
+  { name: 'Cafe', type: 'expense', color: '#F59E0B', icon: '☕' },
+  { name: 'Grocery', type: 'expense', color: '#22C55E', icon: '🛍️' },
+  { name: 'Parcel Delivery', type: 'expense', color: '#6366F1', icon: '🎁' },
 ];
 
 /** Adds the requested income/biller categories on every launch, skipping any that already exist. */
