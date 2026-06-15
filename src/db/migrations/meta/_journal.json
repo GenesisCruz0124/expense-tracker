@@ -99,6 +99,13 @@
       "when": 1781518550657,
       "tag": "0013_flaky_chamber",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1781600000000,
+      "tag": "0014_investment_account_category",
+      "breakpoints": true
     }
   ]
 }
