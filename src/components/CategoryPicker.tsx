@@ -10,12 +10,14 @@ interface Props {
   forType: 'expense' | 'income';
   selectedCategoryId: number | null;
   onSelect: (categoryId: number | null) => void;
+  /** Restrict options to categories flagged as billers (used by the Add/Edit Bill screen). */
+  billersOnly?: boolean;
 }
 
 /** Filters its options to categories matching `forType` (or 'both') so a user logging an
  * expense never sees income-only categories like "Salary", and vice versa. */
-export function CategoryPicker({ forType, selectedCategoryId, onSelect }: Props) {
-  const { categories, loading } = useCategories({ forType });
+export function CategoryPicker({ forType, selectedCategoryId, onSelect, billersOnly }: Props) {
+  const { categories, loading } = useCategories({ forType, billersOnly });
   const [visible, setVisible] = useState(false);
   const [query, setQuery] = useState('');
 
@@ -48,7 +50,7 @@ export function CategoryPicker({ forType, selectedCategoryId, onSelect }: Props)
         {selected ? (
           <CategoryBadge name={selected.name} color={selected.color} icon={selected.icon} />
         ) : (
-          <Text style={styles.placeholder}>Select a category</Text>
+          <Text style={styles.placeholder}>{billersOnly ? 'Select a biller' : 'Select a category'}</Text>
         )}
         <Text style={styles.chevron}>⌄</Text>
       </Pressable>
@@ -56,7 +58,7 @@ export function CategoryPicker({ forType, selectedCategoryId, onSelect }: Props)
       <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={close}>
         <View style={styles.modal}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Choose a category</Text>
+            <Text style={styles.modalTitle}>{billersOnly ? 'Choose a biller' : 'Choose a category'}</Text>
             <Pressable onPress={close} hitSlop={8}>
               <Text style={styles.closeLink}>Done</Text>
             </Pressable>
@@ -67,7 +69,7 @@ export function CategoryPicker({ forType, selectedCategoryId, onSelect }: Props)
               style={styles.searchInput}
               value={query}
               onChangeText={setQuery}
-              placeholder="Type to search categories"
+              placeholder={billersOnly ? 'Type to search billers' : 'Type to search categories'}
               placeholderTextColor={PALETTE.textSecondary}
               autoCapitalize="none"
               autoCorrect={false}
@@ -89,11 +91,13 @@ export function CategoryPicker({ forType, selectedCategoryId, onSelect }: Props)
               !loading ? (
                 <EmptyState
                   icon="🏷️"
-                  title={query ? 'No matching categories' : 'No categories yet'}
+                  title={query ? `No matching ${billersOnly ? 'billers' : 'categories'}` : `No ${billersOnly ? 'billers' : 'categories'} yet`}
                   message={
                     query
                       ? `Nothing matches "${query}". Try a different search.`
-                      : 'Add categories from the More tab to start organizing transactions.'
+                      : billersOnly
+                        ? 'Add billers from the Bills tab to track recurring payments.'
+                        : 'Add categories from the More tab to start organizing transactions.'
                   }
                 />
               ) : null

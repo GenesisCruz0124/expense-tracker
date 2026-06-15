@@ -203,7 +203,7 @@ export default function AddEditBillScreen() {
             <Text style={styles.manageLink}>Manage billers</Text>
           </Pressable>
         </View>
-        <CategoryPicker forType="expense" selectedCategoryId={categoryId} onSelect={setCategoryId} />
+        <CategoryPicker forType="expense" selectedCategoryId={categoryId} onSelect={setCategoryId} billersOnly />
       </View>
 
       <View style={styles.field}>
