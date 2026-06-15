@@ -44,18 +44,22 @@ function AccountsNavigator() {
   );
 }
 
-// Hosts Settings plus the management screens (Categories, Account categories) as pushes,
-// keeping the bottom tab bar lean instead of one-per-screen. Recurring and Budgets live in
-// their own tabs.
+// Hosts Settings plus the management screens (Transaction Categories, Account Types) as
+// pushes, keeping the bottom tab bar lean instead of one-per-screen. Recurring and Budgets
+// live in their own tabs.
 function MoreNavigator() {
   return (
     <MoreStack.Navigator>
       <MoreStack.Screen name="Settings" component={SettingsScreen} />
-      <MoreStack.Screen name="Categories" component={CategoriesScreen} options={{ title: 'Categories' }} />
+      <MoreStack.Screen
+        name="Categories"
+        component={CategoriesScreen}
+        options={{ title: 'Transaction Categories' }}
+      />
       <MoreStack.Screen
         name="AccountCategories"
         component={AccountCategoriesScreen}
-        options={{ title: 'Account categories' }}
+        options={{ title: 'Account Types' }}
       />
     </MoreStack.Navigator>
   );

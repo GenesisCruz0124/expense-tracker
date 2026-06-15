@@ -63,11 +63,11 @@ export default function SettingsScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Manage</Text>
         <Pressable style={styles.row} onPress={() => navigation.navigate('Categories')}>
-          <Text style={styles.rowLabel}>Categories</Text>
+          <Text style={styles.rowLabel}>Transaction Categories</Text>
           <Text style={styles.rowChevron}>›</Text>
         </Pressable>
         <Pressable style={styles.row} onPress={() => navigation.navigate('AccountCategories')}>
-          <Text style={styles.rowLabel}>Account categories</Text>
+          <Text style={styles.rowLabel}>Account Types</Text>
           <Text style={styles.rowChevron}>›</Text>
         </Pressable>
       </View>
