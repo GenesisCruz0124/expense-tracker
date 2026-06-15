@@ -1,10 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import * as Clipboard from 'expo-clipboard';
-import * as MediaLibrary from 'expo-media-library';
-import QRCode from 'react-native-qrcode-svg';
-import { captureRef } from 'react-native-view-shot';
 
 import { AccountCategoryPicker } from '../components/AccountCategoryPicker';
 import { AmountInput } from '../components/AmountInput';
@@ -37,8 +34,6 @@ export default function AddEditAccountScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [savingQr, setSavingQr] = useState(false);
-  const qrRef = useRef<View>(null);
 
   useEffect(() => {
     if (!isEditing) return;
@@ -103,26 +98,6 @@ export default function AddEditAccountScreen() {
     await Clipboard.setStringAsync(trimmed);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
-  }
-
-  async function handleSaveQr() {
-    const trimmed = accountNumber.trim();
-    if (!trimmed) return;
-    setSavingQr(true);
-    try {
-      const permission = await MediaLibrary.requestPermissionsAsync();
-      if (!permission.granted) {
-        Alert.alert('Photo access needed', 'Allow photo library access in Settings to save the QR code.');
-        return;
-      }
-      const uri = await captureRef(qrRef, { format: 'png', quality: 1 });
-      await MediaLibrary.saveToLibraryAsync(uri);
-      Alert.alert('Saved', 'QR code saved to your photos.');
-    } catch (err) {
-      Alert.alert('Could not save QR code', err instanceof Error ? err.message : 'Something went wrong.');
-    } finally {
-      setSavingQr(false);
-    }
   }
 
   if (loading) {
@@ -206,24 +181,6 @@ export default function AddEditAccountScreen() {
         </View>
       </View>
 
-      {accountNumber.trim() ? (
-        <View style={styles.field}>
-          <Text style={styles.label}>QR code</Text>
-          <View style={styles.qrCard}>
-            <View ref={qrRef} collapsable={false} style={styles.qrCapture}>
-              <QRCode value={accountNumber.trim()} size={180} />
-            </View>
-            <Pressable
-              style={[styles.saveQrButton, savingQr && styles.saveButtonDisabled]}
-              onPress={handleSaveQr}
-              disabled={savingQr}
-            >
-              <Text style={styles.saveQrButtonText}>{savingQr ? 'Saving…' : 'Save QR to gallery'}</Text>
-            </Pressable>
-          </View>
-        </View>
-      ) : null}
-
       <View style={styles.field}>
         <Text style={styles.label}>Received payment via QR</Text>
         <QrImagePicker uri={qrImageUri} onChange={setQrImageUri} />
@@ -283,24 +240,6 @@ const styles = StyleSheet.create({
     borderColor: PALETTE.border,
   },
   copyButtonText: { fontSize: 13, fontWeight: '600', color: PALETTE.net },
-  qrCard: {
-    backgroundColor: PALETTE.surface,
-    borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: PALETTE.border,
-    padding: 20,
-    alignItems: 'center',
-    gap: 16,
-  },
-  qrCapture: { backgroundColor: '#fff', padding: 16, borderRadius: 8 },
-  saveQrButton: {
-    backgroundColor: PALETTE.net,
-    borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-  },
-  saveQrButtonText: { color: '#fff', fontSize: 14, fontWeight: '700' },
   error: { fontSize: 13, color: PALETTE.danger, textAlign: 'center' },
   saveButton: { backgroundColor: PALETTE.net, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   saveButtonDisabled: { opacity: 0.6 },
