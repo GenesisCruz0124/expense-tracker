@@ -16,11 +16,19 @@ import type { RootStackParamList } from '../navigation/types';
 type TransactionType = 'expense' | 'income';
 type Frequency = 'weekly' | 'monthly';
 
+interface RepeatPreset {
+  key: string;
+  label: string;
+  /** `null` marks "one-time" — the rule logs once on its start date, then deactivates. */
+  recurrence: { frequency: Frequency; intervalCount: number } | null;
+}
+
 /** Quick-pick presets for the "Repeats" row — each sets both the frequency and its interval. */
-const REPEAT_PRESETS: Array<{ key: string; label: string; frequency: Frequency; intervalCount: number }> = [
-  { key: 'weekly', label: 'Weekly', frequency: 'weekly', intervalCount: 1 },
-  { key: 'biweekly', label: 'Every 2 weeks', frequency: 'weekly', intervalCount: 2 },
-  { key: 'monthly', label: 'Monthly', frequency: 'monthly', intervalCount: 1 },
+const REPEAT_PRESETS: RepeatPreset[] = [
+  { key: 'once', label: 'One-time', recurrence: null },
+  { key: 'weekly', label: 'Weekly', recurrence: { frequency: 'weekly', intervalCount: 1 } },
+  { key: 'biweekly', label: 'Every 2 weeks', recurrence: { frequency: 'weekly', intervalCount: 2 } },
+  { key: 'monthly', label: 'Monthly', recurrence: { frequency: 'monthly', intervalCount: 1 } },
 ];
 
 export default function AddEditRecurringScreen() {
@@ -35,6 +43,7 @@ export default function AddEditRecurringScreen() {
   const [type, setType] = useState<TransactionType>('expense');
   const [amountText, setAmountText] = useState('');
   const [categoryId, setCategoryId] = useState<number | null>(null);
+  const [isOneTime, setIsOneTime] = useState(false);
   const [frequency, setFrequency] = useState<Frequency>('monthly');
   const [intervalText, setIntervalText] = useState('1');
   const [startDate, setStartDate] = useState(() => formatIsoDate(new Date()));
@@ -57,6 +66,7 @@ export default function AddEditRecurringScreen() {
       setFrequency(existing.frequency);
       setIntervalText(String(existing.intervalCount));
       setStartDate(existing.startDate);
+      setIsOneTime(existing.endDate != null && existing.endDate === existing.startDate);
       setHasEndDate(existing.endDate != null);
       setEndDate(existing.endDate ?? '');
       setNote(existing.note ?? '');
@@ -88,14 +98,25 @@ export default function AddEditRecurringScreen() {
       setError('Enter a valid start date in YYYY-MM-DD format.');
       return;
     }
-    if (hasEndDate && !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
-      setError('Enter a valid end date, or turn the end date off.');
-      return;
-    }
-    const intervalCount = Number(intervalText);
-    if (!Number.isInteger(intervalCount) || intervalCount < 1) {
-      setError('Repeat interval must be a whole number of 1 or more.');
-      return;
+
+    let saveFrequency: Frequency = frequency;
+    let saveIntervalCount = Number(intervalText);
+    let saveEndDate: string | null = null;
+
+    if (isOneTime) {
+      saveFrequency = 'monthly';
+      saveIntervalCount = 1;
+      saveEndDate = startDate;
+    } else {
+      if (hasEndDate && !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+        setError('Enter a valid end date, or turn the end date off.');
+        return;
+      }
+      if (!Number.isInteger(saveIntervalCount) || saveIntervalCount < 1) {
+        setError('Repeat interval must be a whole number of 1 or more.');
+        return;
+      }
+      saveEndDate = hasEndDate ? endDate : null;
     }
 
     setSaving(true);
@@ -105,10 +126,10 @@ export default function AddEditRecurringScreen() {
         amount,
         note: note.trim() || null,
         categoryId,
-        frequency,
-        intervalCount,
+        frequency: saveFrequency,
+        intervalCount: saveIntervalCount,
         startDate,
-        endDate: hasEndDate ? endDate : null,
+        endDate: saveEndDate,
       };
       if (isEditing) {
         await updateRule(recurringId, input);
@@ -184,13 +205,23 @@ export default function AddEditRecurringScreen() {
         <Text style={styles.label}>Repeats</Text>
         <View style={styles.optionRow}>
           {REPEAT_PRESETS.map((preset) => {
-            const selected = preset.frequency === frequency && preset.intervalCount === Number(intervalText);
+            const selected =
+              preset.recurrence == null
+                ? isOneTime
+                : !isOneTime &&
+                  preset.recurrence.frequency === frequency &&
+                  preset.recurrence.intervalCount === Number(intervalText);
             return (
               <Pressable
                 key={preset.key}
                 onPress={() => {
-                  setFrequency(preset.frequency);
-                  setIntervalText(String(preset.intervalCount));
+                  if (preset.recurrence == null) {
+                    setIsOneTime(true);
+                  } else {
+                    setIsOneTime(false);
+                    setFrequency(preset.recurrence.frequency);
+                    setIntervalText(String(preset.recurrence.intervalCount));
+                  }
                 }}
                 style={[styles.optionChip, selected && styles.optionChipSelected]}
               >
@@ -201,36 +232,42 @@ export default function AddEditRecurringScreen() {
         </View>
       </View>
 
-      <View style={styles.field}>
-        <Text style={styles.label}>Every</Text>
-        <View style={styles.intervalRow}>
-          <TextInput
-            style={styles.intervalInput}
-            value={intervalText}
-            onChangeText={(text) => setIntervalText(text.replace(/[^0-9]/g, ''))}
-            keyboardType="number-pad"
-            placeholder="1"
-            placeholderTextColor={PALETTE.textSecondary}
-          />
-          <Text style={styles.intervalUnit}>{frequency === 'weekly' ? 'week(s)' : 'month(s)'}</Text>
+      {isOneTime ? null : (
+        <View style={styles.field}>
+          <Text style={styles.label}>Every</Text>
+          <View style={styles.intervalRow}>
+            <TextInput
+              style={styles.intervalInput}
+              value={intervalText}
+              onChangeText={(text) => setIntervalText(text.replace(/[^0-9]/g, ''))}
+              keyboardType="number-pad"
+              placeholder="1"
+              placeholderTextColor={PALETTE.textSecondary}
+            />
+            <Text style={styles.intervalUnit}>{frequency === 'weekly' ? 'week(s)' : 'month(s)'}</Text>
+          </View>
         </View>
-      </View>
+      )}
 
       <View style={styles.field}>
         <DateField label="Start date" value={startDate} onChangeText={setStartDate} />
       </View>
 
-      <View style={styles.field}>
-        <View style={styles.endDateHeader}>
-          <Text style={styles.label}>End date</Text>
-          <Switch value={hasEndDate} onValueChange={setHasEndDate} trackColor={{ true: PALETTE.net }} />
+      {isOneTime ? (
+        <Text style={styles.helperText}>Logged once on its start date, then it drops off this list.</Text>
+      ) : (
+        <View style={styles.field}>
+          <View style={styles.endDateHeader}>
+            <Text style={styles.label}>End date</Text>
+            <Switch value={hasEndDate} onValueChange={setHasEndDate} trackColor={{ true: PALETTE.net }} />
+          </View>
+          {hasEndDate ? (
+            <DateField value={endDate} onChangeText={setEndDate} />
+          ) : (
+            <Text style={styles.helperText}>Leave off to repeat indefinitely.</Text>
+          )}
         </View>
-        {hasEndDate ? (
-          <DateField value={endDate} onChangeText={setEndDate} />
-        ) : (
-          <Text style={styles.helperText}>Leave off to repeat indefinitely.</Text>
-        )}
-      </View>
+      )}
 
       <View style={styles.field}>
         <Text style={styles.label}>Note</Text>

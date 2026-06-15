@@ -1,7 +1,6 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
-import AddBillScreen from '../screens/AddBillScreen';
 import AddEditAccountCategoryScreen from '../screens/AddEditAccountCategoryScreen';
 import AddEditAccountScreen from '../screens/AddEditAccountScreen';
 import AddEditBudgetScreen from '../screens/AddEditBudgetScreen';
@@ -34,7 +33,6 @@ export function RootNavigator() {
           component={AddEditRecurringScreen}
           options={{ title: 'Recurring transaction' }}
         />
-        <Stack.Screen name="AddBill" component={AddBillScreen} options={{ title: 'Add bill' }} />
       </Stack.Group>
     </Stack.Navigator>
   );

@@ -31,7 +31,6 @@ export type RootStackParamList = {
   AddEditAccountCategory: { accountCategoryId?: number } | undefined;
   AddEditBudget: { budgetId?: number; monthKey: string };
   AddEditRecurring: { recurringId?: number } | undefined;
-  AddBill: undefined;
   AddEditAccount: { accountId?: number } | undefined;
 };
 

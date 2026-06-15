@@ -32,7 +32,7 @@ export default function RecurringTransactionsScreen() {
         }
         renderItem={({ item }) => {
           const isIncome = item.type === 'income';
-          // One-time bills are modeled as a rule whose end date equals its start date — see AddBillScreen.
+          // One-time bills are modeled as a rule whose end date equals its start date — see AddEditRecurringScreen.
           const isOneTime = item.endDate != null && item.endDate === item.startDate;
           const unit = FREQUENCY_UNIT[item.frequency];
           const cadence = isOneTime

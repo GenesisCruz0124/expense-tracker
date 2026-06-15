@@ -96,7 +96,7 @@ export default function DashboardScreen() {
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Upcoming bills</Text>
           <View style={styles.sectionHeaderActions}>
-            <Pressable onPress={() => navigation.navigate('AddBill')}>
+            <Pressable onPress={() => navigation.navigate('AddEditRecurring')}>
               <Text style={styles.sectionLink}>+ Add</Text>
             </Pressable>
             <Pressable onPress={() => navigation.navigate('Tabs', { screen: 'Bills' })}>
