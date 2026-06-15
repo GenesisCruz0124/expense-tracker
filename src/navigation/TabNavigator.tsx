@@ -6,6 +6,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { PALETTE } from '../constants/colors';
 import AccountCategoriesScreen from '../screens/AccountCategoriesScreen';
 import AccountsScreen from '../screens/AccountsScreen';
+import AccountTransactionsScreen from '../screens/AccountTransactionsScreen';
 import BudgetsScreen from '../screens/BudgetsScreen';
 import CategoriesScreen from '../screens/CategoriesScreen';
 import DashboardScreen from '../screens/DashboardScreen';
@@ -40,6 +41,7 @@ function AccountsNavigator() {
   return (
     <AccountsStack.Navigator>
       <AccountsStack.Screen name="AccountsList" component={AccountsScreen} options={{ title: 'Accounts' }} />
+      <AccountsStack.Screen name="AccountTransactions" component={AccountTransactionsScreen} />
     </AccountsStack.Navigator>
   );
 }

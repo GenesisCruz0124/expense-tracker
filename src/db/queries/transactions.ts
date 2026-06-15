@@ -15,6 +15,7 @@ export interface TransactionWithCategory extends Transaction {
 export interface ListTransactionsFilter {
   type?: 'expense' | 'income';
   categoryIds?: number[];
+  accountIds?: number[];
   /** Inclusive ISO date range */
   start?: string;
   end?: string;
@@ -26,6 +27,9 @@ function buildFilterConditions(filter: ListTransactionsFilter): SQL[] {
   if (filter.type) conditions.push(eq(transactions.type, filter.type));
   if (filter.categoryIds && filter.categoryIds.length > 0) {
     conditions.push(inArray(transactions.categoryId, filter.categoryIds));
+  }
+  if (filter.accountIds && filter.accountIds.length > 0) {
+    conditions.push(inArray(transactions.accountId, filter.accountIds));
   }
   if (filter.start && filter.end) {
     conditions.push(between(transactions.occurredAt, filter.start, filter.end));

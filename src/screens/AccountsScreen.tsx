@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, SectionList, StyleSheet, Switch, Text, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, type CompositeNavigationProp } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { AccountBadge } from '../components/AccountBadge';
 import { EmptyState } from '../components/EmptyState';
@@ -9,6 +10,7 @@ import type { AccountWithBalance } from '../db/queries/accounts';
 import { useAccountCategories } from '../hooks/useAccountCategories';
 import { useAccounts } from '../hooks/useAccounts';
 import { formatCurrency } from '../utils/currency';
+import type { AccountsStackParamList, RootStackParamList } from '../navigation/types';
 
 interface AccountSection {
   title: string;
@@ -16,8 +18,13 @@ interface AccountSection {
   data: AccountWithBalance[];
 }
 
+type AccountsScreenNavigationProp = CompositeNavigationProp<
+  NativeStackNavigationProp<AccountsStackParamList, 'AccountsList'>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
+
 export default function AccountsScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<AccountsScreenNavigationProp>();
   const [showArchived, setShowArchived] = useState(false);
   const { accounts, error, setArchived } = useAccounts({ includeArchived: true });
   const { accountCategories } = useAccountCategories({ includeArchived: true });
@@ -67,16 +74,25 @@ export default function AccountsScreen() {
           </View>
         )}
         renderItem={({ item }) => (
-          <Pressable style={styles.row} onPress={() => navigation.navigate('AddEditAccount', { accountId: item.id })}>
+          <Pressable style={styles.row} onPress={() => navigation.navigate('AccountTransactions', { accountId: item.id })}>
             <View style={styles.rowMain}>
               <AccountBadge name={item.name} color={item.color} icon={item.icon} />
               <Text style={[styles.balance, { color: item.balance < 0 ? PALETTE.expense : PALETTE.textPrimary }]}>
                 {formatCurrency(item.balance)}
               </Text>
             </View>
-            <Pressable onPress={() => setArchived(item.id, !item.isArchived)} hitSlop={8} style={styles.archiveButton}>
-              <Text style={styles.archiveButtonText}>{item.isArchived ? 'Restore' : 'Archive'}</Text>
-            </Pressable>
+            <View style={styles.rowActions}>
+              <Pressable
+                onPress={() => navigation.navigate('AddEditAccount', { accountId: item.id })}
+                hitSlop={8}
+                style={styles.editButton}
+              >
+                <Text style={styles.editButtonText}>✏️</Text>
+              </Pressable>
+              <Pressable onPress={() => setArchived(item.id, !item.isArchived)} hitSlop={8} style={styles.archiveButton}>
+                <Text style={styles.archiveButtonText}>{item.isArchived ? 'Restore' : 'Archive'}</Text>
+              </Pressable>
+            </View>
           </Pressable>
         )}
       />
@@ -134,6 +150,9 @@ const styles = StyleSheet.create({
   },
   rowMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
   balance: { fontSize: 14, fontWeight: '700' },
+  rowActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  editButton: { paddingVertical: 6, paddingHorizontal: 6 },
+  editButtonText: { fontSize: 15 },
   archiveButton: { paddingVertical: 6, paddingHorizontal: 10 },
   archiveButtonText: { fontSize: 13, fontWeight: '600', color: PALETTE.net },
   fab: {

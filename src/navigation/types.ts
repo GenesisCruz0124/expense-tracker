@@ -6,6 +6,7 @@ export type TransactionsStackParamList = {
 
 export type AccountsStackParamList = {
   AccountsList: undefined;
+  AccountTransactions: { accountId: number };
 };
 
 export type MoreStackParamList = {
