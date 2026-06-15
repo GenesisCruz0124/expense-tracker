@@ -26,6 +26,8 @@ type AccountsScreenNavigationProp = CompositeNavigationProp<
   NativeStackNavigationProp<RootStackParamList>
 >;
 
+const AMOUNT_MASK = '••••••';
+
 /** Returns the last 4 digits of an account number for a masked subtitle, or null if too short to mask. */
 function lastFourDigits(accountNumber: string | null): string | null {
   const digits = (accountNumber ?? '').replace(/\D/g, '');
@@ -35,6 +37,7 @@ function lastFourDigits(accountNumber: string | null): string | null {
 export default function AccountsScreen() {
   const navigation = useNavigation<AccountsScreenNavigationProp>();
   const [showArchived, setShowArchived] = useState(false);
+  const [hideAmounts, setHideAmounts] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [menuAccount, setMenuAccount] = useState<AccountWithBalance | null>(null);
   const { accounts, error, setArchived } = useAccounts({ includeArchived: true });
@@ -90,8 +93,13 @@ export default function AccountsScreen() {
           <>
             <View style={styles.heroCard}>
               <View>
-                <Text style={styles.heroLabel}>{showArchived ? 'Archived balance' : 'Net worth'}</Text>
-                <Text style={styles.heroAmount}>{formatCurrency(netWorth)}</Text>
+                <View style={styles.heroLabelRow}>
+                  <Text style={styles.heroLabel}>{showArchived ? 'Archived balance' : 'Net worth'}</Text>
+                  <Pressable onPress={() => setHideAmounts((value) => !value)} hitSlop={8}>
+                    <Text style={styles.eyeIcon}>{hideAmounts ? '🙈' : '👁️'}</Text>
+                  </Pressable>
+                </View>
+                <Text style={styles.heroAmount}>{hideAmounts ? AMOUNT_MASK : formatCurrency(netWorth)}</Text>
               </View>
               <View style={styles.heroIconWrap}>
                 <Text style={styles.heroIcon}>💰</Text>
@@ -155,7 +163,7 @@ export default function AccountsScreen() {
               <Text style={styles.sectionTitle}>{section.title}</Text>
             </View>
             <Text style={[styles.sectionTotal, section.total < 0 && styles.negative]}>
-              {formatCurrency(section.total)}
+              {hideAmounts ? AMOUNT_MASK : formatCurrency(section.total)}
             </Text>
           </View>
         )}
@@ -175,7 +183,9 @@ export default function AccountsScreen() {
                 </Text>
                 {subtitle ? <Text style={styles.cardSubtitle}>•••• {subtitle}</Text> : null}
               </View>
-              <Text style={[styles.cardBalance, item.balance < 0 && styles.negative]}>{formatCurrency(item.balance)}</Text>
+              <Text style={[styles.cardBalance, item.balance < 0 && styles.negative]}>
+                {hideAmounts ? AMOUNT_MASK : formatCurrency(item.balance)}
+              </Text>
               <Pressable onPress={() => setMenuAccount(item)} hitSlop={8} style={styles.moreButton}>
                 <Text style={styles.moreButtonText}>⋯</Text>
               </Pressable>
@@ -230,6 +240,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginBottom: 12,
   },
+  heroLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   heroLabel: {
     fontSize: 12,
     fontWeight: '700',
@@ -237,6 +248,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.6,
   },
+  eyeIcon: { fontSize: 13 },
   heroAmount: { fontSize: 28, fontWeight: '800', color: '#fff', marginTop: 4 },
   heroIconWrap: {
     width: 48,
