@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { FlatList, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 
 import { EmptyState } from '../components/EmptyState';
+import { DEFAULT_ACCOUNT_ICON } from '../constants/accountIcons';
 import { PALETTE } from '../constants/colors';
+import { useAccountCategories } from '../hooks/useAccountCategories';
+import { useAccounts } from '../hooks/useAccounts';
 import { useRecurringTransactions } from '../hooks/useRecurringTransactions';
 import { formatCurrency } from '../utils/currency';
 import { formatDisplayDate } from '../utils/dateRanges';
@@ -13,6 +16,18 @@ const FREQUENCY_UNIT: Record<'weekly' | 'monthly', string> = { weekly: 'week', m
 export default function RecurringTransactionsScreen() {
   const navigation = useNavigation();
   const { rules, setActive } = useRecurringTransactions();
+  const { accounts } = useAccounts();
+  const { accountCategories } = useAccountCategories();
+
+  const loanAccounts = useMemo(
+    () =>
+      accounts.filter((account) => {
+        if (account.monthlyAmountDue == null) return false;
+        const category = accountCategories.find((item) => item.id === account.categoryId);
+        return category?.kind === 'credit_card';
+      }),
+    [accounts, accountCategories],
+  );
 
   return (
     <View style={styles.screen}>
@@ -22,7 +37,35 @@ export default function RecurringTransactionsScreen() {
       <FlatList
         data={rules}
         keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={rules.length === 0 ? styles.emptyContainer : styles.listContent}
+        contentContainerStyle={
+          rules.length === 0 && loanAccounts.length === 0 ? styles.emptyContainer : styles.listContent
+        }
+        ListHeaderComponent={
+          loanAccounts.length > 0 ? (
+            <View style={styles.loanSection}>
+              <Text style={styles.sectionTitle}>Loan & credit card dues</Text>
+              {loanAccounts.map((account) => (
+                <Pressable
+                  key={account.id}
+                  style={styles.card}
+                  onPress={() => navigation.navigate('AddEditAccount', { accountId: account.id })}
+                >
+                  <View style={[styles.avatar, { backgroundColor: `${account.color}1A` }]}>
+                    <Text style={styles.avatarIcon}>{account.icon ?? DEFAULT_ACCOUNT_ICON}</Text>
+                  </View>
+                  <View style={styles.cardMain}>
+                    <Text style={styles.cardTitle}>{account.name}</Text>
+                    <Text style={styles.cardSubtitle}>Due every month</Text>
+                  </View>
+                  <Text style={[styles.cardAmount, { color: PALETTE.expense }]}>
+                    {formatCurrency(account.monthlyAmountDue!)}
+                  </Text>
+                </Pressable>
+              ))}
+              <Text style={styles.sectionTitle}>Recurring transactions</Text>
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
           <EmptyState
             icon="↻"
@@ -83,6 +126,22 @@ const styles = StyleSheet.create({
   },
   listContent: { padding: 16, gap: 10 },
   emptyContainer: { flexGrow: 1, justifyContent: 'center' },
+  loanSection: { gap: 10 },
+  sectionTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: PALETTE.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  avatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarIcon: { fontSize: 18 },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
