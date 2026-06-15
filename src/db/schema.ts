@@ -51,6 +51,10 @@ export const accounts = sqliteTable(
     includeInNetWorth: integer('include_in_net_worth', { mode: 'boolean' }).notNull().default(true),
     /** Minimum/recurring amount due each month — shown for credit-card-kind accounts (credit cards, loans). */
     monthlyAmountDue: integer('monthly_amount_due'),
+    /** Number of monthly payments left — shown for credit-card-kind accounts (credit cards, loans). */
+    remainingMonths: integer('remaining_months'),
+    /** 'YYYY-MM' of the month whose monthly due was last marked as paid. */
+    monthlyDueLastPaidMonth: text('monthly_due_last_paid_month'),
     createdAt: text('created_at')
       .notNull()
       .default(sql`(datetime('now'))`),

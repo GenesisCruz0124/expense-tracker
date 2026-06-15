@@ -5,6 +5,8 @@ import { useDatabase } from '../context/DatabaseProvider';
 import {
   createAccount as createAccountQuery,
   listAccounts,
+  markMonthlyDuePaid as markMonthlyDuePaidQuery,
+  markMonthlyDueUnpaid as markMonthlyDueUnpaidQuery,
   setAccountArchived as setAccountArchivedQuery,
   updateAccount as updateAccountQuery,
   type AccountInput,
@@ -69,5 +71,33 @@ export function useAccounts(options: ListAccountsOptions = {}) {
     [db, notifyDataChanged, refresh],
   );
 
-  return { accounts, loading, error, refresh, createAccount, updateAccount, setArchived };
+  const markMonthlyDuePaid = useCallback(
+    async (id: number, monthKey: string) => {
+      await markMonthlyDuePaidQuery(db, id, monthKey);
+      notifyDataChanged();
+      await refresh();
+    },
+    [db, notifyDataChanged, refresh],
+  );
+
+  const markMonthlyDueUnpaid = useCallback(
+    async (id: number) => {
+      await markMonthlyDueUnpaidQuery(db, id);
+      notifyDataChanged();
+      await refresh();
+    },
+    [db, notifyDataChanged, refresh],
+  );
+
+  return {
+    accounts,
+    loading,
+    error,
+    refresh,
+    createAccount,
+    updateAccount,
+    setArchived,
+    markMonthlyDuePaid,
+    markMonthlyDueUnpaid,
+  };
 }

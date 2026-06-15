@@ -1,33 +1,48 @@
 import React, { useMemo } from 'react';
-import { FlatList, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, FlatList, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 
 import { EmptyState } from '../components/EmptyState';
 import { DEFAULT_ACCOUNT_ICON } from '../constants/accountIcons';
 import { PALETTE } from '../constants/colors';
+import type { AccountWithBalance } from '../db/queries/accounts';
 import { useAccountCategories } from '../hooks/useAccountCategories';
 import { useAccounts } from '../hooks/useAccounts';
 import { useRecurringTransactions } from '../hooks/useRecurringTransactions';
 import { formatCurrency } from '../utils/currency';
-import { formatDisplayDate } from '../utils/dateRanges';
+import { formatDisplayDate, monthKeyFor } from '../utils/dateRanges';
 
 const FREQUENCY_UNIT: Record<'weekly' | 'monthly', string> = { weekly: 'week', monthly: 'month' };
 
 export default function RecurringTransactionsScreen() {
   const navigation = useNavigation();
   const { rules, setActive } = useRecurringTransactions();
-  const { accounts } = useAccounts();
+  const { accounts, markMonthlyDuePaid } = useAccounts();
   const { accountCategories } = useAccountCategories();
+  const currentMonthKey = monthKeyFor(new Date());
 
   const loanAccounts = useMemo(
     () =>
       accounts.filter((account) => {
         if (account.monthlyAmountDue == null) return false;
+        if (account.monthlyDueLastPaidMonth === currentMonthKey) return false;
         const category = accountCategories.find((item) => item.id === account.categoryId);
         return category?.kind === 'credit_card';
       }),
-    [accounts, accountCategories],
+    [accounts, accountCategories, currentMonthKey],
   );
+
+  const totalLoanDue = useMemo(
+    () => loanAccounts.reduce((sum, account) => sum + (account.monthlyAmountDue ?? 0), 0),
+    [loanAccounts],
+  );
+
+  function handleMarkPaid(account: AccountWithBalance) {
+    Alert.alert('Mark as paid?', `This hides "${account.name}" from Recurring until next month.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Mark paid', onPress: () => markMonthlyDuePaid(account.id, currentMonthKey) },
+    ]);
+  }
 
   return (
     <View style={styles.screen}>
@@ -43,7 +58,10 @@ export default function RecurringTransactionsScreen() {
         ListHeaderComponent={
           loanAccounts.length > 0 ? (
             <View style={styles.loanSection}>
-              <Text style={styles.sectionTitle}>Loan & credit card dues</Text>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionTitle}>Loan & credit card dues</Text>
+                <Text style={styles.sectionTotal}>Total {formatCurrency(totalLoanDue)}</Text>
+              </View>
               {loanAccounts.map((account) => (
                 <Pressable
                   key={account.id}
@@ -57,9 +75,20 @@ export default function RecurringTransactionsScreen() {
                     <Text style={styles.cardTitle}>{account.name}</Text>
                     <Text style={styles.cardSubtitle}>Due every month</Text>
                   </View>
-                  <Text style={[styles.cardAmount, { color: PALETTE.expense }]}>
-                    {formatCurrency(account.monthlyAmountDue!)}
-                  </Text>
+                  <View style={styles.loanAmountColumn}>
+                    <Text style={[styles.cardAmount, { color: PALETTE.expense }]}>
+                      {formatCurrency(account.monthlyAmountDue!)}
+                    </Text>
+                    <Pressable
+                      style={styles.markPaidButton}
+                      onPress={(event) => {
+                        event.stopPropagation();
+                        handleMarkPaid(account);
+                      }}
+                    >
+                      <Text style={styles.markPaidText}>Mark paid</Text>
+                    </Pressable>
+                  </View>
                 </Pressable>
               ))}
               <Text style={styles.sectionTitle}>Recurring transactions</Text>
@@ -127,6 +156,7 @@ const styles = StyleSheet.create({
   listContent: { padding: 16, gap: 10 },
   emptyContainer: { flexGrow: 1, justifyContent: 'center' },
   loanSection: { gap: 10 },
+  sectionHeaderRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
   sectionTitle: {
     fontSize: 12,
     fontWeight: '700',
@@ -134,6 +164,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
+  sectionTotal: { fontSize: 12, fontWeight: '700', color: PALETTE.expense },
   avatar: {
     width: 38,
     height: 38,
@@ -158,6 +189,14 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 14, fontWeight: '700', color: PALETTE.textPrimary },
   cardSubtitle: { fontSize: 12, color: PALETTE.textSecondary },
   cardAmount: { fontSize: 14, fontWeight: '700' },
+  loanAmountColumn: { alignItems: 'flex-end', gap: 6 },
+  markPaidButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: `${PALETTE.net}1A`,
+  },
+  markPaidText: { fontSize: 11, fontWeight: '700', color: PALETTE.net },
   fab: {
     position: 'absolute',
     right: 20,

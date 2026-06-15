@@ -13,6 +13,7 @@ import { getAccountWithBalance } from '../db/queries/accounts';
 import { useAccountCategories } from '../hooks/useAccountCategories';
 import { useAccounts } from '../hooks/useAccounts';
 import { fromMinorUnits, toMinorUnits } from '../utils/currency';
+import { monthKeyFor } from '../utils/dateRanges';
 import type { RootStackParamList } from '../navigation/types';
 
 export default function AddEditAccountScreen() {
@@ -22,8 +23,9 @@ export default function AddEditAccountScreen() {
   const isEditing = accountId != null;
 
   const { db } = useDatabase();
-  const { createAccount, updateAccount } = useAccounts({ includeArchived: true });
+  const { createAccount, updateAccount, markMonthlyDueUnpaid } = useAccounts({ includeArchived: true });
   const { accountCategories } = useAccountCategories({ includeArchived: true });
+  const currentMonthKey = monthKeyFor(new Date());
 
   const [name, setName] = useState('');
   const [categoryId, setCategoryId] = useState<number | null>(null);
@@ -34,6 +36,8 @@ export default function AddEditAccountScreen() {
   const [balanceText, setBalanceText] = useState('0');
   const [includeInNetWorth, setIncludeInNetWorth] = useState(true);
   const [monthlyAmountDueText, setMonthlyAmountDueText] = useState('');
+  const [remainingMonths, setRemainingMonths] = useState(0);
+  const [monthlyDueLastPaidMonth, setMonthlyDueLastPaidMonth] = useState<string | null>(null);
   const [transactionEffect, setTransactionEffect] = useState(0);
   const [loading, setLoading] = useState(isEditing);
   const [saving, setSaving] = useState(false);
@@ -58,6 +62,8 @@ export default function AddEditAccountScreen() {
       setBalanceText(String(fromMinorUnits(existing.balance)));
       setIncludeInNetWorth(existing.includeInNetWorth);
       setMonthlyAmountDueText(existing.monthlyAmountDue != null ? String(fromMinorUnits(existing.monthlyAmountDue)) : '');
+      setRemainingMonths(existing.remainingMonths ?? 0);
+      setMonthlyDueLastPaidMonth(existing.monthlyDueLastPaidMonth ?? null);
       setTransactionEffect(existing.balance - existing.startingBalance);
       setLoading(false);
     })();
@@ -108,6 +114,7 @@ export default function AddEditAccountScreen() {
         startingBalance,
         includeInNetWorth,
         monthlyAmountDue,
+        remainingMonths: isCreditCardKind ? remainingMonths : null,
       };
       if (isEditing) {
         await updateAccount(accountId, input);
@@ -120,6 +127,13 @@ export default function AddEditAccountScreen() {
     } finally {
       setSaving(false);
     }
+  }
+
+  async function handleMarkDueUnpaid() {
+    if (!isEditing) return;
+    await markMonthlyDueUnpaid(accountId);
+    setMonthlyDueLastPaidMonth(null);
+    setRemainingMonths((value) => value + 1);
   }
 
   async function handleCopyAccountNumber() {
@@ -166,6 +180,29 @@ export default function AddEditAccountScreen() {
           <Text style={styles.label}>Monthly amount due (optional)</Text>
           <AmountInput value={monthlyAmountDueText} onChangeText={setMonthlyAmountDueText} />
         </View>
+      ) : null}
+
+      {isCreditCardKind ? (
+        <View style={styles.field}>
+          <Text style={styles.label}>Remaining months (optional)</Text>
+          <View style={styles.stepperRow}>
+            <Pressable style={styles.stepperButton} onPress={() => setRemainingMonths((value) => Math.max(0, value - 1))}>
+              <Text style={styles.stepperButtonText}>−</Text>
+            </Pressable>
+            <Text style={styles.stepperValue}>{remainingMonths}</Text>
+            <Pressable style={styles.stepperButton} onPress={() => setRemainingMonths((value) => value + 1)}>
+              <Text style={styles.stepperButtonText}>+</Text>
+            </Pressable>
+            <Text style={styles.stepperUnit}>{remainingMonths === 1 ? 'month left' : 'months left'}</Text>
+          </View>
+        </View>
+      ) : null}
+
+      {isCreditCardKind && monthlyDueLastPaidMonth === currentMonthKey ? (
+        <Pressable style={styles.undoRow} onPress={handleMarkDueUnpaid}>
+          <Text style={styles.undoText}>This month's due is marked as paid</Text>
+          <Text style={styles.undoAction}>Undo</Text>
+        </Pressable>
       ) : null}
 
       <View style={styles.toggleRow}>
@@ -263,6 +300,32 @@ const styles = StyleSheet.create({
   },
   toggleTextGroup: { flex: 1, gap: 4 },
   helperText: { fontSize: 12, color: PALETTE.textSecondary, lineHeight: 16 },
+  stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  stepperButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: PALETTE.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.border,
+  },
+  stepperButtonText: { fontSize: 20, fontWeight: '700', color: PALETTE.textPrimary },
+  stepperValue: { fontSize: 18, fontWeight: '700', color: PALETTE.textPrimary, minWidth: 28, textAlign: 'center' },
+  stepperUnit: { fontSize: 13, color: PALETTE.textSecondary },
+  undoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    backgroundColor: `${PALETTE.net}1A`,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  undoText: { flex: 1, fontSize: 13, fontWeight: '600', color: PALETTE.textPrimary },
+  undoAction: { fontSize: 13, fontWeight: '700', color: PALETTE.net },
   input: {
     backgroundColor: PALETTE.surface,
     borderWidth: StyleSheet.hairlineWidth,

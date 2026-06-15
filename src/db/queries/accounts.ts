@@ -43,6 +43,8 @@ export async function listAccounts(db: Database, options: ListAccountsOptions = 
       isArchived: accounts.isArchived,
       includeInNetWorth: accounts.includeInNetWorth,
       monthlyAmountDue: accounts.monthlyAmountDue,
+      remainingMonths: accounts.remainingMonths,
+      monthlyDueLastPaidMonth: accounts.monthlyDueLastPaidMonth,
       createdAt: accounts.createdAt,
       balance: balanceExpr,
     })
@@ -70,6 +72,8 @@ export async function getAccountWithBalance(db: Database, id: number): Promise<A
       isArchived: accounts.isArchived,
       includeInNetWorth: accounts.includeInNetWorth,
       monthlyAmountDue: accounts.monthlyAmountDue,
+      remainingMonths: accounts.remainingMonths,
+      monthlyDueLastPaidMonth: accounts.monthlyDueLastPaidMonth,
       createdAt: accounts.createdAt,
       balance: balanceExpr,
     })
@@ -94,6 +98,8 @@ export interface AccountInput {
   includeInNetWorth?: boolean;
   /** Minimum/recurring amount due each month, in minor units (centavos) — for credit-card-kind accounts. */
   monthlyAmountDue?: number | null;
+  /** Number of monthly payments left — for credit-card-kind accounts. */
+  remainingMonths?: number | null;
 }
 
 export async function createAccount(db: Database, input: AccountInput): Promise<Account> {
@@ -107,6 +113,7 @@ export async function createAccount(db: Database, input: AccountInput): Promise<
     startingBalance: input.startingBalance,
     includeInNetWorth: input.includeInNetWorth ?? true,
     monthlyAmountDue: input.monthlyAmountDue ?? null,
+    remainingMonths: input.remainingMonths ?? null,
   };
   const [row] = await db.insert(accounts).values(values).returning();
   return row;
@@ -125,10 +132,44 @@ export async function updateAccount(db: Database, id: number, input: AccountInpu
       startingBalance: input.startingBalance,
       includeInNetWorth: input.includeInNetWorth ?? true,
       monthlyAmountDue: input.monthlyAmountDue ?? null,
+      remainingMonths: input.remainingMonths ?? null,
     })
     .where(eq(accounts.id, id));
 }
 
 export async function setAccountArchived(db: Database, id: number, isArchived: boolean): Promise<void> {
   await db.update(accounts).set({ isArchived }).where(eq(accounts.id, id));
+}
+
+/**
+ * Marks an account's monthly amount due as paid for `monthKey` ('YYYY-MM'), hiding it from the
+ * Recurring screen until the next month, and decrements `remainingMonths` if set and above zero.
+ */
+export async function markMonthlyDuePaid(db: Database, id: number, monthKey: string): Promise<void> {
+  const [account] = await db.select({ remainingMonths: accounts.remainingMonths }).from(accounts).where(eq(accounts.id, id)).limit(1);
+  await db
+    .update(accounts)
+    .set({
+      monthlyDueLastPaidMonth: monthKey,
+      remainingMonths:
+        account?.remainingMonths != null && account.remainingMonths > 0 ? account.remainingMonths - 1 : account?.remainingMonths ?? null,
+    })
+    .where(eq(accounts.id, id));
+}
+
+/** Reverses `markMonthlyDuePaid`, restoring the account's monthly due to the Recurring screen. */
+export async function markMonthlyDueUnpaid(db: Database, id: number): Promise<void> {
+  const [account] = await db
+    .select({ remainingMonths: accounts.remainingMonths, monthlyDueLastPaidMonth: accounts.monthlyDueLastPaidMonth })
+    .from(accounts)
+    .where(eq(accounts.id, id))
+    .limit(1);
+  if (!account?.monthlyDueLastPaidMonth) return;
+  await db
+    .update(accounts)
+    .set({
+      monthlyDueLastPaidMonth: null,
+      remainingMonths: account.remainingMonths != null ? account.remainingMonths + 1 : null,
+    })
+    .where(eq(accounts.id, id));
 }
