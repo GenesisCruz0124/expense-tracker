@@ -6,10 +6,18 @@ import { differenceInCalendarDays, parseISO } from 'date-fns';
 import { CategoryBadge, UncategorizedBadge } from '../components/CategoryBadge';
 import { EmptyState } from '../components/EmptyState';
 import { PALETTE } from '../constants/colors';
-import type { BillWithDetails } from '../db/queries/bills';
+import type { BillFrequency, BillWithDetails } from '../db/queries/bills';
 import { useBills } from '../hooks/useBills';
 import { formatCurrency } from '../utils/currency';
 import { formatDisplayDate, formatIsoDate } from '../utils/dateRanges';
+
+const FREQUENCY_LABELS: Record<BillFrequency, string | null> = {
+  once: null,
+  weekly: 'Repeats weekly',
+  semi_monthly: 'Repeats semi-monthly',
+  monthly: 'Repeats monthly',
+  yearly: 'Repeats yearly',
+};
 
 export default function UnpaidBillsScreen() {
   const navigation = useNavigation();
@@ -58,6 +66,7 @@ export default function UnpaidBillsScreen() {
             : isOverdue
               ? `Overdue · due ${formatDisplayDate(item.dueDate)}`
               : `Due ${formatDisplayDate(item.dueDate)}`;
+          const frequencyLabel = FREQUENCY_LABELS[item.frequency];
           return (
             <Pressable
               style={[styles.card, item.isPaid && styles.cardPaid]}
@@ -71,6 +80,7 @@ export default function UnpaidBillsScreen() {
                   <UncategorizedBadge />
                 )}
                 <Text style={[styles.cardSubtitle, isOverdue && styles.cardSubtitleOverdue]}>{dueLabel}</Text>
+                {frequencyLabel ? <Text style={styles.cardFrequency}>{frequencyLabel}</Text> : null}
               </View>
               <View style={styles.cardTrailing}>
                 <Text style={styles.cardAmount}>{formatCurrency(item.amount)}</Text>
@@ -115,6 +125,7 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 14, fontWeight: '700', color: PALETTE.textPrimary },
   cardSubtitle: { fontSize: 12, color: PALETTE.textSecondary },
   cardSubtitleOverdue: { color: PALETTE.danger, fontWeight: '700' },
+  cardFrequency: { fontSize: 11, fontWeight: '600', color: PALETTE.net },
   cardTrailing: { alignItems: 'flex-end', gap: 8 },
   cardAmount: { fontSize: 14, fontWeight: '700', color: PALETTE.textPrimary },
   payButton: {

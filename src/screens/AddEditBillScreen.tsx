@@ -8,7 +8,7 @@ import { CategoryPicker } from '../components/CategoryPicker';
 import { DateField } from '../components/DateField';
 import { PALETTE } from '../constants/colors';
 import { useDatabase } from '../context/DatabaseProvider';
-import { getBill } from '../db/queries/bills';
+import { getBill, type BillFrequency } from '../db/queries/bills';
 import { useBills } from '../hooks/useBills';
 import { fromMinorUnits, toMinorUnits } from '../utils/currency';
 import { formatIsoDate } from '../utils/dateRanges';
@@ -27,6 +27,19 @@ const REMINDER_PRESETS: ReminderPreset[] = [
   { key: '1-week', label: '1 week before', days: 7 },
 ];
 
+interface FrequencyOption {
+  value: BillFrequency;
+  label: string;
+}
+
+const FREQUENCY_OPTIONS: FrequencyOption[] = [
+  { value: 'once', label: 'One-time' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'semi_monthly', label: 'Semi-monthly' },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'yearly', label: 'Yearly' },
+];
+
 export default function AddEditBillScreen() {
   const navigation = useNavigation();
   const route = useRoute<RouteProp<RootStackParamList, 'AddEditBill'>>();
@@ -41,6 +54,7 @@ export default function AddEditBillScreen() {
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [accountId, setAccountId] = useState<number | null>(null);
   const [dueDate, setDueDate] = useState(() => formatIsoDate(new Date()));
+  const [frequency, setFrequency] = useState<BillFrequency>('once');
   const [reminderDays, setReminderDays] = useState(1);
   const [isPaid, setIsPaid] = useState(false);
   const [loading, setLoading] = useState(isEditing);
@@ -58,6 +72,7 @@ export default function AddEditBillScreen() {
       setCategoryId(existing.categoryId);
       setAccountId(existing.accountId);
       setDueDate(existing.dueDate);
+      setFrequency(existing.frequency);
       setReminderDays(existing.reminderDaysBefore);
       setIsPaid(existing.isPaid);
       setLoading(false);
@@ -95,6 +110,7 @@ export default function AddEditBillScreen() {
         categoryId,
         accountId,
         dueDate,
+        frequency,
         reminderDaysBefore: reminderDays,
       };
       if (isEditing) {
@@ -197,6 +213,24 @@ export default function AddEditBillScreen() {
 
       <View style={styles.field}>
         <DateField label="Due date" value={dueDate} onChangeText={setDueDate} />
+      </View>
+
+      <View style={styles.field}>
+        <Text style={styles.label}>Repeat</Text>
+        <View style={styles.optionRow}>
+          {FREQUENCY_OPTIONS.map((option) => {
+            const selected = option.value === frequency;
+            return (
+              <Pressable
+                key={option.value}
+                onPress={() => setFrequency(option.value)}
+                style={[styles.optionChip, selected && styles.optionChipSelected]}
+              >
+                <Text style={[styles.optionChipText, selected && styles.optionChipTextSelected]}>{option.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
 
       <View style={styles.field}>

@@ -11,6 +11,7 @@ import m0006 from './0006_account_category_kind.sql';
 import m0007 from './0007_transaction_transfer.sql';
 import m0008 from './0008_bills.sql';
 import m0009 from './0009_empty_ultimo.sql';
+import m0010 from './0010_melodic_spencer_smythe.sql';
 
   export default {
     journal,
@@ -24,7 +25,8 @@ m0005,
 m0006,
 m0007,
 m0008,
-m0009
+m0009,
+m0010
     }
   }
   
