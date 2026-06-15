@@ -52,6 +52,7 @@ export default function AddEditBillScreen() {
   const [name, setName] = useState('');
   const [amountText, setAmountText] = useState('');
   const [categoryId, setCategoryId] = useState<number | null>(null);
+  const [billerId, setBillerId] = useState<number | null>(null);
   const [accountId, setAccountId] = useState<number | null>(null);
   const [dueDate, setDueDate] = useState(() => formatIsoDate(new Date()));
   const [frequency, setFrequency] = useState<BillFrequency>('once');
@@ -70,6 +71,7 @@ export default function AddEditBillScreen() {
       setName(existing.name);
       setAmountText(String(fromMinorUnits(existing.amount)));
       setCategoryId(existing.categoryId);
+      setBillerId(existing.billerId);
       setAccountId(existing.accountId);
       setDueDate(existing.dueDate);
       setFrequency(existing.frequency);
@@ -108,6 +110,7 @@ export default function AddEditBillScreen() {
         name,
         amount,
         categoryId,
+        billerId,
         accountId,
         dueDate,
         frequency,
@@ -197,13 +200,13 @@ export default function AddEditBillScreen() {
       </View>
 
       <View style={styles.field}>
-        <View style={styles.labelRow}>
-          <Text style={styles.label}>Category</Text>
-          <Pressable onPress={() => navigation.navigate('Billers')} hitSlop={8}>
-            <Text style={styles.manageLink}>Manage billers</Text>
-          </Pressable>
-        </View>
-        <CategoryPicker forType="expense" selectedCategoryId={categoryId} onSelect={setCategoryId} billersOnly />
+        <Text style={styles.label}>Category</Text>
+        <CategoryPicker forType="expense" selectedCategoryId={categoryId} onSelect={setCategoryId} />
+      </View>
+
+      <View style={styles.field}>
+        <Text style={styles.label}>Biller (optional)</Text>
+        <CategoryPicker forType="expense" selectedCategoryId={billerId} onSelect={setBillerId} billersOnly />
       </View>
 
       <View style={styles.field}>
@@ -281,8 +284,6 @@ const styles = StyleSheet.create({
   loadingText: { color: PALETTE.textSecondary, fontSize: 14 },
   field: { gap: 8 },
   label: { fontSize: 13, fontWeight: '600', color: PALETTE.textSecondary },
-  labelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  manageLink: { fontSize: 13, fontWeight: '600', color: PALETTE.net },
   nameInput: {
     backgroundColor: PALETTE.surface,
     borderWidth: StyleSheet.hairlineWidth,

@@ -137,6 +137,7 @@ export const bills = sqliteTable(
     name: text('name').notNull(),
     amount: integer('amount').notNull(),
     categoryId: integer('category_id').references(() => categories.id, { onDelete: 'set null' }),
+    billerId: integer('biller_id').references(() => categories.id, { onDelete: 'set null' }),
     accountId: integer('account_id').references(() => accounts.id, { onDelete: 'set null' }),
     dueDate: text('due_date').notNull(),
     frequency: text('frequency', { enum: ['once', 'weekly', 'semi_monthly', 'monthly', 'yearly'] })

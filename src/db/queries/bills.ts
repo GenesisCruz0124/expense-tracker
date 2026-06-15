@@ -1,5 +1,6 @@
 import { addDays, addMonths, addYears, parseISO } from 'date-fns';
 import { asc, eq } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/sqlite-core';
 
 import type { Database } from '../client';
 import { accounts, bills, categories, transactions, type Bill, type NewBill } from '../schema';
@@ -11,10 +12,15 @@ export interface BillWithDetails extends Bill {
   categoryName: string | null;
   categoryColor: string | null;
   categoryIcon: string | null;
+  billerName: string | null;
+  billerColor: string | null;
+  billerIcon: string | null;
   accountName: string | null;
   accountColor: string | null;
   accountIcon: string | null;
 }
+
+const billers = alias(categories, 'billers');
 
 export async function listBills(db: Database): Promise<BillWithDetails[]> {
   return db
@@ -23,6 +29,7 @@ export async function listBills(db: Database): Promise<BillWithDetails[]> {
       name: bills.name,
       amount: bills.amount,
       categoryId: bills.categoryId,
+      billerId: bills.billerId,
       accountId: bills.accountId,
       dueDate: bills.dueDate,
       frequency: bills.frequency,
@@ -34,12 +41,16 @@ export async function listBills(db: Database): Promise<BillWithDetails[]> {
       categoryName: categories.name,
       categoryColor: categories.color,
       categoryIcon: categories.icon,
+      billerName: billers.name,
+      billerColor: billers.color,
+      billerIcon: billers.icon,
       accountName: accounts.name,
       accountColor: accounts.color,
       accountIcon: accounts.icon,
     })
     .from(bills)
     .leftJoin(categories, eq(bills.categoryId, categories.id))
+    .leftJoin(billers, eq(bills.billerId, billers.id))
     .leftJoin(accounts, eq(bills.accountId, accounts.id))
     .orderBy(asc(bills.isPaid), asc(bills.dueDate));
 }
@@ -54,6 +65,7 @@ export interface BillInput {
   /** Integer amount in minor units (cents) */
   amount: number;
   categoryId?: number | null;
+  billerId?: number | null;
   accountId?: number | null;
   dueDate: string;
   frequency: BillFrequency;
@@ -65,6 +77,7 @@ function toNewBillValues(input: BillInput): NewBill {
     name: input.name.trim(),
     amount: input.amount,
     categoryId: input.categoryId ?? null,
+    billerId: input.billerId ?? null,
     accountId: input.accountId ?? null,
     dueDate: input.dueDate,
     frequency: input.frequency,
@@ -113,6 +126,12 @@ export async function markBillPaid(db: Database, id: number, occurredAt: string)
   if (!bill || bill.isPaid) return;
 
   await db.transaction(async (tx) => {
+    let billerName: string | null = null;
+    if (bill.billerId != null) {
+      const [biller] = await tx.select({ name: categories.name }).from(categories).where(eq(categories.id, bill.billerId)).limit(1);
+      billerName = biller?.name ?? null;
+    }
+
     const [transaction] = await tx
       .insert(transactions)
       .values({
@@ -120,6 +139,7 @@ export async function markBillPaid(db: Database, id: number, occurredAt: string)
         amount: bill.amount,
         occurredAt,
         note: bill.name,
+        establishment: billerName,
         categoryId: bill.categoryId,
         accountId: bill.accountId,
       })

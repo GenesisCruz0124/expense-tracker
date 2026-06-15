@@ -1,0 +1,1 @@
+ALTER TABLE `bills` ADD `biller_id` integer REFERENCES categories(id);
