@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 
+import { ActionSheet, type ActionSheetOption } from './ActionSheet';
 import { PALETTE } from '../constants/colors';
 
 interface Props {
@@ -17,6 +18,8 @@ const PICKER_OPTIONS: ImagePicker.ImagePickerOptions = {
 
 /** Lets the user attach a receipt photo by capturing one or picking from the library. */
 export function ReceiptImagePicker({ uri, onChange }: Props) {
+  const [sheetVisible, setSheetVisible] = useState(false);
+
   async function captureFromCamera() {
     const permission = await ImagePicker.requestCameraPermissionsAsync();
     if (!permission.granted) {
@@ -37,32 +40,44 @@ export function ReceiptImagePicker({ uri, onChange }: Props) {
     if (!result.canceled && result.assets[0]) onChange(result.assets[0].uri);
   }
 
-  function handlePress() {
-    const options: Array<{ text: string; style?: 'cancel' | 'destructive'; onPress?: () => void }> = [
-      { text: 'Take photo', onPress: captureFromCamera },
-      { text: 'Choose from library', onPress: pickFromLibrary },
-    ];
-    if (uri) options.push({ text: 'Remove photo', style: 'destructive', onPress: () => onChange(null) });
-    options.push({ text: 'Cancel', style: 'cancel' });
-    Alert.alert('Receipt photo', uri ? 'Replace or remove the attached photo.' : 'Attach a photo of your receipt.', options);
-  }
+  const sheetOptions: ActionSheetOption[] = [
+    { label: 'Take photo', onPress: captureFromCamera },
+    { label: 'Choose from library', onPress: pickFromLibrary },
+  ];
+  if (uri) sheetOptions.push({ label: 'Remove photo', destructive: true, onPress: () => onChange(null) });
+
+  const sheet = (
+    <ActionSheet
+      visible={sheetVisible}
+      onClose={() => setSheetVisible(false)}
+      title="Receipt photo"
+      message={uri ? 'Replace or remove the attached photo.' : 'Attach a photo of your receipt.'}
+      options={sheetOptions}
+    />
+  );
 
   if (uri) {
     return (
-      <Pressable onPress={handlePress} style={styles.previewWrap}>
-        <Image source={{ uri }} style={styles.preview} />
-        <View style={styles.previewOverlay}>
-          <Text style={styles.previewOverlayText}>Change photo</Text>
-        </View>
-      </Pressable>
+      <>
+        <Pressable onPress={() => setSheetVisible(true)} style={styles.previewWrap}>
+          <Image source={{ uri }} style={styles.preview} />
+          <View style={styles.previewOverlay}>
+            <Text style={styles.previewOverlayText}>Change photo</Text>
+          </View>
+        </Pressable>
+        {sheet}
+      </>
     );
   }
 
   return (
-    <Pressable onPress={handlePress} style={({ pressed }) => [styles.placeholder, pressed && styles.placeholderPressed]}>
-      <Text style={styles.placeholderIcon}>📷</Text>
-      <Text style={styles.placeholderText}>Add receipt photo</Text>
-    </Pressable>
+    <>
+      <Pressable onPress={() => setSheetVisible(true)} style={({ pressed }) => [styles.placeholder, pressed && styles.placeholderPressed]}>
+        <Text style={styles.placeholderIcon}>📷</Text>
+        <Text style={styles.placeholderText}>Add receipt photo</Text>
+      </Pressable>
+      {sheet}
+    </>
   );
 }
 

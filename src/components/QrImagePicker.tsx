@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 
+import { ActionSheet, type ActionSheetOption } from './ActionSheet';
 import { PALETTE } from '../constants/colors';
 
 interface Props {
@@ -18,6 +19,7 @@ const PICKER_OPTIONS: ImagePicker.ImagePickerOptions = {
 /** Lets the user attach a "received payment" QR code image by picking one from the gallery or capturing it. */
 export function QrImagePicker({ uri, onChange }: Props) {
   const [zoomVisible, setZoomVisible] = useState(false);
+  const [sheetVisible, setSheetVisible] = useState(false);
   const { width, height } = useWindowDimensions();
 
   async function captureFromCamera() {
@@ -40,20 +42,26 @@ export function QrImagePicker({ uri, onChange }: Props) {
     if (!result.canceled && result.assets[0]) onChange(result.assets[0].uri);
   }
 
-  function handlePress() {
-    const options: Array<{ text: string; style?: 'cancel' | 'destructive'; onPress?: () => void }> = [
-      { text: 'Choose from gallery', onPress: pickFromLibrary },
-      { text: 'Take photo', onPress: captureFromCamera },
-    ];
-    if (uri) options.push({ text: 'Remove image', style: 'destructive', onPress: () => onChange(null) });
-    options.push({ text: 'Cancel', style: 'cancel' });
-    Alert.alert('Payment QR image', uri ? 'Replace or remove the QR image.' : 'Add an image of your payment QR code.', options);
-  }
+  const sheetOptions: ActionSheetOption[] = [
+    { label: 'Choose from gallery', onPress: pickFromLibrary },
+    { label: 'Take photo', onPress: captureFromCamera },
+  ];
+  if (uri) sheetOptions.push({ label: 'Remove image', destructive: true, onPress: () => onChange(null) });
+
+  const sheet = (
+    <ActionSheet
+      visible={sheetVisible}
+      onClose={() => setSheetVisible(false)}
+      title="Payment QR image"
+      message={uri ? 'Replace or remove the QR image.' : 'Add an image of your payment QR code.'}
+      options={sheetOptions}
+    />
+  );
 
   if (uri) {
     return (
       <>
-        <Pressable onPress={handlePress} style={styles.previewWrap}>
+        <Pressable onPress={() => setSheetVisible(true)} style={styles.previewWrap}>
           <Image source={{ uri }} style={styles.preview} resizeMode="contain" />
           <Pressable onPress={() => setZoomVisible(true)} style={styles.zoomButton} hitSlop={8}>
             <Text style={styles.zoomButtonText}>🔍</Text>
@@ -81,15 +89,20 @@ export function QrImagePicker({ uri, onChange }: Props) {
             </Pressable>
           </View>
         </Modal>
+
+        {sheet}
       </>
     );
   }
 
   return (
-    <Pressable onPress={handlePress} style={({ pressed }) => [styles.placeholder, pressed && styles.placeholderPressed]}>
-      <Text style={styles.placeholderIcon}>🖼️</Text>
-      <Text style={styles.placeholderText}>Add QR image</Text>
-    </Pressable>
+    <>
+      <Pressable onPress={() => setSheetVisible(true)} style={({ pressed }) => [styles.placeholder, pressed && styles.placeholderPressed]}>
+        <Text style={styles.placeholderIcon}>🖼️</Text>
+        <Text style={styles.placeholderText}>Add QR image</Text>
+      </Pressable>
+      {sheet}
+    </>
   );
 }
 
