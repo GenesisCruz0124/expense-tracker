@@ -4,7 +4,7 @@ import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
 
 import { db, type Database } from '../db/client';
 import migrations from '../db/migrations/migrations';
-import { seedDefaultCategories } from '../db/seed';
+import { seedAdditionalCategories, seedDefaultCategories } from '../db/seed';
 import { generateDueRecurringTransactions } from '../db/queries/recurring';
 import { checkBudgetAlerts } from '../db/budgetAlerts';
 import { checkBillReminders } from '../db/billReminders';
@@ -28,11 +28,11 @@ export function useDatabase(): DatabaseContextValue {
 
 /**
  * Opens the on-device SQLite database, runs pending migrations, then performs the
- * launch-time bootstrap in order: seed default categories (first run only), generate any
- * recurring transactions that came due since the last open, check budgets for newly
- * crossed alert thresholds, and notify about bills entering their reminder window — in
- * that order, so a freshly generated rent/salary entry is reflected in this same session's
- * budget evaluation.
+ * launch-time bootstrap in order: seed default categories (first run only), add any
+ * newly-introduced categories that don't exist yet, generate any recurring transactions
+ * that came due since the last open, check budgets for newly crossed alert thresholds,
+ * and notify about bills entering their reminder window — in that order, so a freshly
+ * generated rent/salary entry is reflected in this same session's budget evaluation.
  */
 export function DatabaseProvider({ children }: { children: React.ReactNode }) {
   const { success, error } = useMigrations(db, migrations);
@@ -50,6 +50,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
         await configureNotificationChannel();
         await requestNotificationPermissions();
         await seedDefaultCategories(db);
+        await seedAdditionalCategories(db);
         await generateDueRecurringTransactions(db, new Date());
         await checkBudgetAlerts(db, new Date());
         await checkBillReminders(db, new Date());

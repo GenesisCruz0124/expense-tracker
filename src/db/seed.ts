@@ -20,3 +20,28 @@ export async function seedDefaultCategories(db: Database): Promise<void> {
 
   await db.insert(categories).values(DEFAULT_CATEGORIES);
 }
+
+const ADDITIONAL_CATEGORIES: NewCategory[] = [
+  // Income
+  { name: 'Clothing Allowance for Officers', type: 'income', color: '#6366F1', icon: '💼' },
+  { name: '1st Tranche of Rice Subsidy for Officers', type: 'income', color: '#84CC16', icon: '🎁' },
+  { name: 'Monetization of Excess Unused Leave Credits', type: 'income', color: '#F59E0B', icon: '💰' },
+  { name: '13th Month Pay', type: 'income', color: '#22C55E', icon: '💰' },
+  { name: 'Reimbursement - Bus.', type: 'income', color: '#06B6D4', icon: '🧾' },
+  { name: '2nd Tranche of Rice Subsidy for Officers', type: 'income', color: '#14B8A6', icon: '🎁' },
+  { name: '14th Month Pay', type: 'income', color: '#3B82F6', icon: '💰' },
+  { name: '15th Month Pay', type: 'income', color: '#A855F7', icon: '💰' },
+  { name: '16th Month Pay', type: 'income', color: '#EC4899', icon: '💰' },
+  // Billers
+  { name: 'SPayLater', type: 'expense', color: '#EF4444', icon: '📱' },
+  { name: 'Spotify', type: 'expense', color: '#22C55E', icon: '🎬' },
+  { name: 'PNB Parking', type: 'expense', color: '#3B82F6', icon: '🚗' },
+  { name: 'Netflix', type: 'expense', color: '#F59E0B', icon: '🎬' },
+  { name: 'Claude', type: 'expense', color: '#A855F7', icon: '💼' },
+  { name: 'Mothe', type: 'expense', color: '#EC4899', icon: '🎁' },
+];
+
+/** Adds the requested income/biller categories on every launch, skipping any that already exist. */
+export async function seedAdditionalCategories(db: Database): Promise<void> {
+  await db.insert(categories).values(ADDITIONAL_CATEGORIES).onConflictDoNothing({ target: categories.name });
+}
