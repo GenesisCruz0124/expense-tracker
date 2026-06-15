@@ -44,10 +44,13 @@ export function TransactionListItem({ transaction, onPress }: Props) {
           </Text>
         ) : null}
       </View>
-      <Text style={[styles.amount, { color: amountColor }]}>
-        {sign}
-        {formatCurrency(transaction.amount)}
-      </Text>
+      <View style={styles.amountGroup}>
+        <Text style={[styles.amount, { color: amountColor }]}>
+          {sign}
+          {formatCurrency(transaction.amount)}
+        </Text>
+        {transaction.fee ? <Text style={styles.fee}>+{formatCurrency(transaction.fee)} fee</Text> : null}
+      </View>
     </Pressable>
   );
 }
@@ -72,5 +75,7 @@ const styles = StyleSheet.create({
   recurringBadge: { fontSize: 11, color: PALETTE.textSecondary, fontStyle: 'italic' },
   establishment: { fontSize: 13, fontWeight: '600', color: PALETTE.textPrimary },
   note: { fontSize: 13, color: PALETTE.textPrimary },
+  amountGroup: { alignItems: 'flex-end', gap: 2 },
   amount: { fontSize: 15, fontWeight: '700' },
+  fee: { fontSize: 11, color: PALETTE.textSecondary },
 });

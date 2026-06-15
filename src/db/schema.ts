@@ -83,6 +83,7 @@ export const transactions = sqliteTable(
     id: integer('id').primaryKey({ autoIncrement: true }),
     type: text('type', { enum: ['expense', 'income'] }).notNull(),
     amount: integer('amount').notNull(),
+    fee: integer('fee').notNull().default(0),
     occurredAt: text('occurred_at').notNull(),
     note: text('note'),
     establishment: text('establishment'),

@@ -29,6 +29,7 @@ export default function AddEditTransactionScreen() {
 
   const [type, setType] = useState<TransactionType>('expense');
   const [amountText, setAmountText] = useState('');
+  const [feeText, setFeeText] = useState('');
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [accountId, setAccountId] = useState<number | null>(null);
   const [toAccountId, setToAccountId] = useState<number | null>(null);
@@ -66,6 +67,7 @@ export default function AddEditTransactionScreen() {
 
       setType(existing.type);
       setAmountText(String(fromMinorUnits(existing.amount)));
+      setFeeText(existing.fee ? String(fromMinorUnits(existing.fee)) : '');
       setCategoryId(existing.categoryId);
       setAccountId(existing.accountId);
       setOccurredAt(existing.occurredAt);
@@ -91,6 +93,7 @@ export default function AddEditTransactionScreen() {
     if (nextType === 'transfer') {
       setExcludeFromExpense(false);
       setToAccountId(null);
+      setFeeText('');
     }
   }
 
@@ -99,6 +102,11 @@ export default function AddEditTransactionScreen() {
     const amount = toMinorUnits(amountText);
     if (amount == null || amount <= 0) {
       setError('Enter a valid amount greater than zero.');
+      return;
+    }
+    const fee = feeText.trim() ? toMinorUnits(feeText) : 0;
+    if (fee == null) {
+      setError('Enter a valid fee amount.');
       return;
     }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(occurredAt)) {
@@ -145,6 +153,7 @@ export default function AddEditTransactionScreen() {
       const input = {
         type,
         amount,
+        fee,
         occurredAt,
         note: note.trim() || null,
         establishment: establishment.trim() || null,
@@ -217,6 +226,13 @@ export default function AddEditTransactionScreen() {
         <Text style={styles.label}>Amount</Text>
         <AmountInput value={amountText} onChangeText={setAmountText} />
       </View>
+
+      {type !== 'transfer' ? (
+        <View style={styles.field}>
+          <Text style={styles.label}>Fee (optional)</Text>
+          <AmountInput value={feeText} onChangeText={setFeeText} />
+        </View>
+      ) : null}
 
       {type !== 'transfer' ? (
         <View style={styles.field}>

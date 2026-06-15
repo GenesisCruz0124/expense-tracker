@@ -18,13 +18,13 @@ export interface ListAccountsOptions {
 
 const balanceExpr = sql<number>`${accounts.startingBalance} + coalesce(sum(case
   when ${accountCategories.kind} = 'credit_card' then
-    case when ${transactions.type} = 'expense' then ${transactions.amount}
+    (case when ${transactions.type} = 'expense' then ${transactions.amount}
       when ${transactions.type} = 'income' then -${transactions.amount}
-      else 0 end
+      else 0 end) + ${transactions.fee}
   else
-    case when ${transactions.type} = 'income' then ${transactions.amount}
+    (case when ${transactions.type} = 'income' then ${transactions.amount}
       when ${transactions.type} = 'expense' then -${transactions.amount}
-      else 0 end
+      else 0 end) - ${transactions.fee}
   end), 0)`;
 
 export async function listAccounts(db: Database, options: ListAccountsOptions = {}): Promise<AccountWithBalance[]> {

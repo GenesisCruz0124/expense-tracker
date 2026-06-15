@@ -54,6 +54,7 @@ export async function listTransactions(
       id: transactions.id,
       type: transactions.type,
       amount: transactions.amount,
+      fee: transactions.fee,
       occurredAt: transactions.occurredAt,
       note: transactions.note,
       establishment: transactions.establishment,
@@ -88,6 +89,8 @@ export interface TransactionInput {
   type: 'expense' | 'income';
   /** Integer amount in minor units (cents) */
   amount: number;
+  /** Optional transaction fee in minor units (cents), e.g. a transfer or withdrawal fee */
+  fee?: number;
   occurredAt: string;
   note?: string | null;
   establishment?: string | null;
@@ -101,6 +104,7 @@ function toNewTransactionValues(input: TransactionInput): NewTransaction {
   return {
     type: input.type,
     amount: input.amount,
+    fee: input.fee ?? 0,
     occurredAt: input.occurredAt,
     note: input.note?.trim() || null,
     establishment: input.establishment?.trim() || null,
