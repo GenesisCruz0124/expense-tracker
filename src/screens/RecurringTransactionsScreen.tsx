@@ -10,14 +10,14 @@ import { useAccountCategories } from '../hooks/useAccountCategories';
 import { useAccounts } from '../hooks/useAccounts';
 import { useRecurringTransactions } from '../hooks/useRecurringTransactions';
 import { formatCurrency } from '../utils/currency';
-import { formatDisplayDate, monthKeyFor } from '../utils/dateRanges';
+import { formatDisplayDate, monthKeyFor, parseIsoDate } from '../utils/dateRanges';
 
 const FREQUENCY_UNIT: Record<'weekly' | 'monthly', string> = { weekly: 'week', monthly: 'month' };
 
 export default function RecurringTransactionsScreen() {
   const navigation = useNavigation();
   const { rules, setActive } = useRecurringTransactions();
-  const { accounts, markMonthlyDuePaid } = useAccounts();
+  const { accounts, markMonthlyDuePaid, incrementBalance } = useAccounts();
   const { accountCategories } = useAccountCategories();
   const currentMonthKey = monthKeyFor(new Date());
 
@@ -37,11 +37,39 @@ export default function RecurringTransactionsScreen() {
     [loanAccounts],
   );
 
+  const investmentAccounts = useMemo(
+    () =>
+      accounts.filter((account) => {
+        if (account.monthlyContribution == null) return false;
+        const category = accountCategories.find((item) => item.id === account.categoryId);
+        if (category?.kind !== 'investment') return false;
+        if (!account.balanceLastUpdatedAt) return true;
+        return monthKeyFor(parseIsoDate(account.balanceLastUpdatedAt)) !== currentMonthKey;
+      }),
+    [accounts, accountCategories, currentMonthKey],
+  );
+
+  const totalInvestmentDue = useMemo(
+    () => investmentAccounts.reduce((sum, account) => sum + (account.monthlyContribution ?? 0), 0),
+    [investmentAccounts],
+  );
+
   function handleMarkPaid(account: AccountWithBalance) {
     Alert.alert('Mark as paid?', `This hides "${account.name}" from Recurring until next month.`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Mark paid', onPress: () => markMonthlyDuePaid(account.id, currentMonthKey) },
     ]);
+  }
+
+  function handleAddContribution(account: AccountWithBalance) {
+    Alert.alert(
+      'Add this month’s contribution?',
+      `This adds ${formatCurrency(account.monthlyContribution!)} to "${account.name}"'s balance.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Add', onPress: () => incrementBalance(account.id) },
+      ],
+    );
   }
 
   return (
@@ -53,44 +81,91 @@ export default function RecurringTransactionsScreen() {
         data={rules}
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={
-          rules.length === 0 && loanAccounts.length === 0 ? styles.emptyContainer : styles.listContent
+          rules.length === 0 && loanAccounts.length === 0 && investmentAccounts.length === 0
+            ? styles.emptyContainer
+            : styles.listContent
         }
         ListHeaderComponent={
-          loanAccounts.length > 0 ? (
+          loanAccounts.length > 0 || investmentAccounts.length > 0 ? (
             <View style={styles.loanSection}>
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.sectionTitle}>Loan & credit card dues</Text>
-                <Text style={styles.sectionTotal}>Total {formatCurrency(totalLoanDue)}</Text>
-              </View>
-              {loanAccounts.map((account) => (
-                <Pressable
-                  key={account.id}
-                  style={styles.card}
-                  onPress={() => navigation.navigate('AddEditAccount', { accountId: account.id })}
-                >
-                  <View style={[styles.avatar, { backgroundColor: `${account.color}1A` }]}>
-                    <Text style={styles.avatarIcon}>{account.icon ?? DEFAULT_ACCOUNT_ICON}</Text>
+              {loanAccounts.length > 0 ? (
+                <>
+                  <View style={styles.sectionHeaderRow}>
+                    <Text style={styles.sectionTitle}>Loan & credit card dues</Text>
+                    <Text style={styles.sectionTotal}>Total {formatCurrency(totalLoanDue)}</Text>
                   </View>
-                  <View style={styles.cardMain}>
-                    <Text style={styles.cardTitle}>{account.name}</Text>
-                    <Text style={styles.cardSubtitle}>Due every month</Text>
-                  </View>
-                  <View style={styles.loanAmountColumn}>
-                    <Text style={[styles.cardAmount, { color: PALETTE.expense }]}>
-                      {formatCurrency(account.monthlyAmountDue!)}
-                    </Text>
+                  {loanAccounts.map((account) => (
                     <Pressable
-                      style={styles.markPaidButton}
-                      onPress={(event) => {
-                        event.stopPropagation();
-                        handleMarkPaid(account);
-                      }}
+                      key={account.id}
+                      style={styles.card}
+                      onPress={() => navigation.navigate('AddEditAccount', { accountId: account.id })}
                     >
-                      <Text style={styles.markPaidText}>Mark paid</Text>
+                      <View style={[styles.avatar, { backgroundColor: `${account.color}1A` }]}>
+                        <Text style={styles.avatarIcon}>{account.icon ?? DEFAULT_ACCOUNT_ICON}</Text>
+                      </View>
+                      <View style={styles.cardMain}>
+                        <Text style={styles.cardTitle}>{account.name}</Text>
+                        <Text style={styles.cardSubtitle}>Due every month</Text>
+                      </View>
+                      <View style={styles.amountColumn}>
+                        <Text style={[styles.cardAmount, { color: PALETTE.expense }]}>
+                          {formatCurrency(account.monthlyAmountDue!)}
+                        </Text>
+                        <Pressable
+                          style={styles.actionButton}
+                          onPress={(event) => {
+                            event.stopPropagation();
+                            handleMarkPaid(account);
+                          }}
+                        >
+                          <Text style={styles.actionButtonText}>Mark paid</Text>
+                        </Pressable>
+                      </View>
                     </Pressable>
+                  ))}
+                </>
+              ) : null}
+
+              {investmentAccounts.length > 0 ? (
+                <>
+                  <View style={styles.sectionHeaderRow}>
+                    <Text style={styles.sectionTitle}>Investment contributions</Text>
+                    <Text style={[styles.sectionTotal, styles.sectionTotalIncome]}>
+                      Total {formatCurrency(totalInvestmentDue)}
+                    </Text>
                   </View>
-                </Pressable>
-              ))}
+                  {investmentAccounts.map((account) => (
+                    <Pressable
+                      key={account.id}
+                      style={styles.card}
+                      onPress={() => navigation.navigate('AddEditAccount', { accountId: account.id })}
+                    >
+                      <View style={[styles.avatar, { backgroundColor: `${account.color}1A` }]}>
+                        <Text style={styles.avatarIcon}>{account.icon ?? DEFAULT_ACCOUNT_ICON}</Text>
+                      </View>
+                      <View style={styles.cardMain}>
+                        <Text style={styles.cardTitle}>{account.name}</Text>
+                        <Text style={styles.cardSubtitle}>Add monthly amount</Text>
+                      </View>
+                      <View style={styles.amountColumn}>
+                        <Text style={[styles.cardAmount, { color: PALETTE.income }]}>
+                          +{formatCurrency(account.monthlyContribution!)}
+                        </Text>
+                        <Pressable
+                          style={styles.actionButton}
+                          onPress={(event) => {
+                            event.stopPropagation();
+                            handleAddContribution(account);
+                          }}
+                        >
+                          <Text style={styles.actionButtonText}>Add to balance</Text>
+                        </Pressable>
+                      </View>
+                    </Pressable>
+                  ))}
+                </>
+              ) : null}
+
               <Text style={styles.sectionTitle}>Recurring transactions</Text>
             </View>
           ) : null
@@ -165,6 +240,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   sectionTotal: { fontSize: 12, fontWeight: '700', color: PALETTE.expense },
+  sectionTotalIncome: { color: PALETTE.income },
   avatar: {
     width: 38,
     height: 38,
@@ -189,14 +265,14 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 14, fontWeight: '700', color: PALETTE.textPrimary },
   cardSubtitle: { fontSize: 12, color: PALETTE.textSecondary },
   cardAmount: { fontSize: 14, fontWeight: '700' },
-  loanAmountColumn: { alignItems: 'flex-end', gap: 6 },
-  markPaidButton: {
+  amountColumn: { alignItems: 'flex-end', gap: 6 },
+  actionButton: {
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
     backgroundColor: `${PALETTE.net}1A`,
   },
-  markPaidText: { fontSize: 11, fontWeight: '700', color: PALETTE.net },
+  actionButtonText: { fontSize: 11, fontWeight: '700', color: PALETTE.net },
   fab: {
     position: 'absolute',
     right: 20,

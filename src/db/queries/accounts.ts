@@ -2,6 +2,7 @@ import { asc, eq, sql } from 'drizzle-orm';
 
 import type { Database } from '../client';
 import { accountCategories, accounts, transactions, type Account, type NewAccount } from '../schema';
+import { formatIsoDate } from '../../utils/dateRanges';
 
 export interface AccountWithBalance extends Account {
   /**
@@ -182,6 +183,26 @@ export async function markMonthlyDueUnpaid(db: Database, id: number): Promise<vo
     .set({
       monthlyDueLastPaidMonth: null,
       remainingMonths: account.remainingMonths != null ? account.remainingMonths + 1 : null,
+    })
+    .where(eq(accounts.id, id));
+}
+
+/**
+ * Adds an investment-kind account's `monthlyContribution` to its starting balance and records
+ * today's date as `balanceLastUpdatedAt`.
+ */
+export async function incrementAccountBalance(db: Database, id: number): Promise<void> {
+  const [account] = await db
+    .select({ startingBalance: accounts.startingBalance, monthlyContribution: accounts.monthlyContribution })
+    .from(accounts)
+    .where(eq(accounts.id, id))
+    .limit(1);
+  if (!account?.monthlyContribution) return;
+  await db
+    .update(accounts)
+    .set({
+      startingBalance: account.startingBalance + account.monthlyContribution,
+      balanceLastUpdatedAt: formatIsoDate(new Date()),
     })
     .where(eq(accounts.id, id));
 }
