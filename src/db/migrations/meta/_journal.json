@@ -148,6 +148,34 @@
       "when": 1782200000000,
       "tag": "0020_account_loan_progress",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1782300000000,
+      "tag": "0021_account_due_last_paid_month",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "6",
+      "when": 1782400000000,
+      "tag": "0022_investment_account_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1782500000000,
+      "tag": "0023_account_balance_last_updated",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1782600000000,
+      "tag": "0024_investment_account_category_kind",
+      "breakpoints": true
     }
   ]
 }

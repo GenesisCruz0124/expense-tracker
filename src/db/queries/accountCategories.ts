@@ -27,8 +27,11 @@ export interface AccountCategoryInput {
   name: string;
   color: string;
   icon?: string | null;
-  /** 'credit_card' accounts track a balance owed: expenses increase it, income/payments decrease it. */
-  kind?: 'standard' | 'credit_card';
+  /**
+   * 'credit_card' accounts track a balance owed: expenses increase it, income/payments decrease it.
+   * 'investment' accounts support a monthly contribution amount and a balance-update button.
+   */
+  kind?: 'standard' | 'credit_card' | 'investment';
 }
 
 export async function createAccountCategory(db: Database, input: AccountCategoryInput): Promise<AccountCategory> {

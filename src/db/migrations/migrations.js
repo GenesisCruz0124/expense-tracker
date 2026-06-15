@@ -22,6 +22,10 @@ import m0017 from './0017_loan_account_category.sql';
 import m0018 from './0018_account_monthly_amount_due.sql';
 import m0019 from './0019_bill_exclude_from_expense.sql';
 import m0020 from './0020_account_loan_progress.sql';
+import m0021 from './0021_account_due_last_paid_month.sql';
+import m0022 from './0022_investment_account_fields.sql';
+import m0023 from './0023_account_balance_last_updated.sql';
+import m0024 from './0024_investment_account_category_kind.sql';
 
   export default {
     journal,
@@ -46,7 +50,11 @@ m0016,
 m0017,
 m0018,
 m0019,
-m0020
+m0020,
+m0021,
+m0022,
+m0023,
+m0024
     }
   }
   

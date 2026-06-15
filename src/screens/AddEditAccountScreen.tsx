@@ -12,8 +12,8 @@ import { useDatabase } from '../context/DatabaseProvider';
 import { getAccountWithBalance } from '../db/queries/accounts';
 import { useAccountCategories } from '../hooks/useAccountCategories';
 import { useAccounts } from '../hooks/useAccounts';
-import { fromMinorUnits, toMinorUnits } from '../utils/currency';
-import { monthKeyFor } from '../utils/dateRanges';
+import { formatCurrency, fromMinorUnits, toMinorUnits } from '../utils/currency';
+import { formatDisplayDate, monthKeyFor } from '../utils/dateRanges';
 import type { RootStackParamList } from '../navigation/types';
 
 export default function AddEditAccountScreen() {
@@ -23,7 +23,7 @@ export default function AddEditAccountScreen() {
   const isEditing = accountId != null;
 
   const { db } = useDatabase();
-  const { createAccount, updateAccount, markMonthlyDueUnpaid } = useAccounts({ includeArchived: true });
+  const { createAccount, updateAccount, markMonthlyDueUnpaid, incrementBalance } = useAccounts({ includeArchived: true });
   const { accountCategories } = useAccountCategories({ includeArchived: true });
   const currentMonthKey = monthKeyFor(new Date());
 
@@ -38,6 +38,8 @@ export default function AddEditAccountScreen() {
   const [monthlyAmountDueText, setMonthlyAmountDueText] = useState('');
   const [remainingMonths, setRemainingMonths] = useState(0);
   const [monthlyDueLastPaidMonth, setMonthlyDueLastPaidMonth] = useState<string | null>(null);
+  const [monthlyContributionText, setMonthlyContributionText] = useState('');
+  const [balanceLastUpdatedAt, setBalanceLastUpdatedAt] = useState<string | null>(null);
   const [transactionEffect, setTransactionEffect] = useState(0);
   const [loading, setLoading] = useState(isEditing);
   const [saving, setSaving] = useState(false);
@@ -46,6 +48,7 @@ export default function AddEditAccountScreen() {
 
   const selectedCategory = accountCategories.find((c) => c.id === categoryId);
   const isCreditCardKind = selectedCategory?.kind === 'credit_card';
+  const isInvestmentKind = selectedCategory?.kind === 'investment';
 
   useEffect(() => {
     if (!isEditing) return;
@@ -64,6 +67,8 @@ export default function AddEditAccountScreen() {
       setMonthlyAmountDueText(existing.monthlyAmountDue != null ? String(fromMinorUnits(existing.monthlyAmountDue)) : '');
       setRemainingMonths(existing.remainingMonths ?? 0);
       setMonthlyDueLastPaidMonth(existing.monthlyDueLastPaidMonth ?? null);
+      setMonthlyContributionText(existing.monthlyContribution != null ? String(fromMinorUnits(existing.monthlyContribution)) : '');
+      setBalanceLastUpdatedAt(existing.balanceLastUpdatedAt ?? null);
       setTransactionEffect(existing.balance - existing.startingBalance);
       setLoading(false);
     })();
@@ -101,6 +106,14 @@ export default function AddEditAccountScreen() {
         return;
       }
     }
+    let monthlyContribution: number | null = null;
+    if (isInvestmentKind && monthlyContributionText.trim()) {
+      monthlyContribution = toMinorUnits(monthlyContributionText);
+      if (monthlyContribution == null) {
+        setError('Enter a valid monthly amount.');
+        return;
+      }
+    }
 
     setSaving(true);
     try {
@@ -115,6 +128,7 @@ export default function AddEditAccountScreen() {
         includeInNetWorth,
         monthlyAmountDue,
         remainingMonths: isCreditCardKind ? remainingMonths : null,
+        monthlyContribution,
       };
       if (isEditing) {
         await updateAccount(accountId, input);
@@ -134,6 +148,15 @@ export default function AddEditAccountScreen() {
     await markMonthlyDueUnpaid(accountId);
     setMonthlyDueLastPaidMonth(null);
     setRemainingMonths((value) => value + 1);
+  }
+
+  async function handleIncrementBalance() {
+    if (!isEditing) return;
+    await incrementBalance(accountId);
+    const updated = await getAccountWithBalance(db, accountId);
+    if (!updated) return;
+    setBalanceText(String(fromMinorUnits(updated.balance)));
+    setBalanceLastUpdatedAt(updated.balanceLastUpdatedAt ?? null);
   }
 
   async function handleCopyAccountNumber() {
@@ -202,6 +225,25 @@ export default function AddEditAccountScreen() {
         <Pressable style={styles.undoRow} onPress={handleMarkDueUnpaid}>
           <Text style={styles.undoText}>This month's due is marked as paid</Text>
           <Text style={styles.undoAction}>Undo</Text>
+        </Pressable>
+      ) : null}
+
+      {isInvestmentKind ? (
+        <View style={styles.field}>
+          <Text style={styles.label}>Monthly amount (optional)</Text>
+          <AmountInput value={monthlyContributionText} onChangeText={setMonthlyContributionText} />
+        </View>
+      ) : null}
+
+      {isInvestmentKind && isEditing && toMinorUnits(monthlyContributionText) != null ? (
+        <Pressable style={styles.undoRow} onPress={handleIncrementBalance}>
+          <View style={styles.toggleTextGroup}>
+            <Text style={styles.undoText}>Add this month's amount to the balance</Text>
+            {balanceLastUpdatedAt ? (
+              <Text style={styles.helperText}>Last updated {formatDisplayDate(balanceLastUpdatedAt)}</Text>
+            ) : null}
+          </View>
+          <Text style={styles.undoAction}>+{formatCurrency(toMinorUnits(monthlyContributionText)!)}</Text>
         </Pressable>
       ) : null}
 

@@ -25,7 +25,7 @@ export const accountCategories = sqliteTable(
     name: text('name').notNull(),
     color: text('color').notNull(),
     icon: text('icon'),
-    kind: text('kind', { enum: ['standard', 'credit_card'] }).notNull().default('standard'),
+    kind: text('kind', { enum: ['standard', 'credit_card', 'investment'] }).notNull().default('standard'),
     isArchived: integer('is_archived', { mode: 'boolean' }).notNull().default(false),
     createdAt: text('created_at')
       .notNull()
@@ -55,6 +55,10 @@ export const accounts = sqliteTable(
     remainingMonths: integer('remaining_months'),
     /** 'YYYY-MM' of the month whose monthly due was last marked as paid. */
     monthlyDueLastPaidMonth: text('monthly_due_last_paid_month'),
+    /** Amount added to the balance on each manual update — shown for investment-kind accounts. */
+    monthlyContribution: integer('monthly_contribution'),
+    /** ISO date ('YYYY-MM-DD') the balance was last updated via the increment button — for investment-kind accounts. */
+    balanceLastUpdatedAt: text('balance_last_updated_at'),
     createdAt: text('created_at')
       .notNull()
       .default(sql`(datetime('now'))`),

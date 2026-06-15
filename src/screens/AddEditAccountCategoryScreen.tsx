@@ -1,13 +1,34 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 
 import { ACCOUNT_ICON_OPTIONS, DEFAULT_ACCOUNT_ICON } from '../constants/accountIcons';
 import { CATEGORY_COLOR_PALETTE, PALETTE } from '../constants/colors';
 import { useDatabase } from '../context/DatabaseProvider';
-import { getAccountCategory } from '../db/queries/accountCategories';
+import { getAccountCategory, type AccountCategoryInput } from '../db/queries/accountCategories';
 import { useAccountCategories } from '../hooks/useAccountCategories';
 import type { RootStackParamList } from '../navigation/types';
+
+type AccountCategoryKind = NonNullable<AccountCategoryInput['kind']>;
+
+const KIND_OPTIONS: { value: AccountCategoryKind; label: string; helperText: string }[] = [
+  {
+    value: 'standard',
+    label: 'Standard',
+    helperText: 'Income adds to the balance, expenses subtract from it.',
+  },
+  {
+    value: 'credit_card',
+    label: 'Credit card',
+    helperText:
+      "For accounts in this category, the balance tracks what's owed — expenses increase it and income or payments decrease it.",
+  },
+  {
+    value: 'investment',
+    label: 'Investment',
+    helperText: 'Accounts in this category can track a monthly contribution and a balance last-updated date.',
+  },
+];
 
 export default function AddEditAccountCategoryScreen() {
   const navigation = useNavigation();
@@ -21,7 +42,7 @@ export default function AddEditAccountCategoryScreen() {
   const [name, setName] = useState('');
   const [color, setColor] = useState<string>(CATEGORY_COLOR_PALETTE[0]);
   const [icon, setIcon] = useState<string>(DEFAULT_ACCOUNT_ICON);
-  const [isCreditCard, setIsCreditCard] = useState(false);
+  const [kind, setKind] = useState<AccountCategoryKind>('standard');
   const [loading, setLoading] = useState(isEditing);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,7 +56,7 @@ export default function AddEditAccountCategoryScreen() {
       setName(existing.name);
       setColor(existing.color);
       setIcon(existing.icon ?? DEFAULT_ACCOUNT_ICON);
-      setIsCreditCard(existing.kind === 'credit_card');
+      setKind(existing.kind);
       setLoading(false);
     })();
     return () => {
@@ -57,7 +78,6 @@ export default function AddEditAccountCategoryScreen() {
 
     setSaving(true);
     try {
-      const kind: 'standard' | 'credit_card' = isCreditCard ? 'credit_card' : 'standard';
       const input = { name: trimmed, color, icon, kind };
       if (isEditing) {
         await updateAccountCategory(accountCategoryId, input);
@@ -123,15 +143,22 @@ export default function AddEditAccountCategoryScreen() {
         </View>
       </View>
 
-      <View style={styles.toggleRow}>
-        <View style={styles.toggleTextGroup}>
-          <Text style={styles.label}>Credit card</Text>
-          <Text style={styles.helperText}>
-            For accounts in this category, the balance tracks what's owed — expenses increase it and
-            income or payments decrease it.
-          </Text>
+      <View style={styles.field}>
+        <Text style={styles.label}>Account type</Text>
+        <View style={styles.kindRow}>
+          {KIND_OPTIONS.map((option) => (
+            <Pressable
+              key={option.value}
+              onPress={() => setKind(option.value)}
+              style={[styles.kindOption, option.value === kind && styles.kindOptionSelected]}
+            >
+              <Text style={[styles.kindOptionText, option.value === kind && styles.kindOptionTextSelected]}>
+                {option.label}
+              </Text>
+            </Pressable>
+          ))}
         </View>
-        <Switch value={isCreditCard} onValueChange={setIsCreditCard} trackColor={{ true: PALETTE.net }} />
+        <Text style={styles.helperText}>{KIND_OPTIONS.find((option) => option.value === kind)?.helperText}</Text>
       </View>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -177,19 +204,18 @@ const styles = StyleSheet.create({
   },
   iconOptionSelected: { borderColor: PALETTE.net, backgroundColor: `${PALETTE.net}1A` },
   iconOptionText: { fontSize: 20 },
-  toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    backgroundColor: PALETTE.surface,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: PALETTE.border,
-    borderRadius: 10,
+  kindRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  kindOption: {
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: PALETTE.surface,
+    borderWidth: 1.5,
+    borderColor: PALETTE.border,
   },
-  toggleTextGroup: { flex: 1, gap: 4 },
+  kindOptionSelected: { borderColor: PALETTE.net, backgroundColor: `${PALETTE.net}1A` },
+  kindOptionText: { fontSize: 13, fontWeight: '600', color: PALETTE.textSecondary },
+  kindOptionTextSelected: { color: PALETTE.net },
   helperText: { fontSize: 12, color: PALETTE.textSecondary, lineHeight: 16 },
   error: { fontSize: 13, color: PALETTE.danger, textAlign: 'center' },
   saveButton: { backgroundColor: PALETTE.net, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },

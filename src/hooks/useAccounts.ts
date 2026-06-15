@@ -4,6 +4,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useDatabase } from '../context/DatabaseProvider';
 import {
   createAccount as createAccountQuery,
+  incrementAccountBalance as incrementAccountBalanceQuery,
   listAccounts,
   markMonthlyDuePaid as markMonthlyDuePaidQuery,
   markMonthlyDueUnpaid as markMonthlyDueUnpaidQuery,
@@ -89,6 +90,15 @@ export function useAccounts(options: ListAccountsOptions = {}) {
     [db, notifyDataChanged, refresh],
   );
 
+  const incrementBalance = useCallback(
+    async (id: number) => {
+      await incrementAccountBalanceQuery(db, id);
+      notifyDataChanged();
+      await refresh();
+    },
+    [db, notifyDataChanged, refresh],
+  );
+
   return {
     accounts,
     loading,
@@ -99,5 +109,6 @@ export function useAccounts(options: ListAccountsOptions = {}) {
     setArchived,
     markMonthlyDuePaid,
     markMonthlyDueUnpaid,
+    incrementBalance,
   };
 }

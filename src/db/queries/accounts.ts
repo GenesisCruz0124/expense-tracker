@@ -2,6 +2,7 @@ import { asc, eq, sql } from 'drizzle-orm';
 
 import type { Database } from '../client';
 import { accountCategories, accounts, transactions, type Account, type NewAccount } from '../schema';
+import { formatIsoDate } from '../../utils/dateRanges';
 
 export interface AccountWithBalance extends Account {
   /**
@@ -45,6 +46,8 @@ export async function listAccounts(db: Database, options: ListAccountsOptions = 
       monthlyAmountDue: accounts.monthlyAmountDue,
       remainingMonths: accounts.remainingMonths,
       monthlyDueLastPaidMonth: accounts.monthlyDueLastPaidMonth,
+      monthlyContribution: accounts.monthlyContribution,
+      balanceLastUpdatedAt: accounts.balanceLastUpdatedAt,
       createdAt: accounts.createdAt,
       balance: balanceExpr,
     })
@@ -74,6 +77,8 @@ export async function getAccountWithBalance(db: Database, id: number): Promise<A
       monthlyAmountDue: accounts.monthlyAmountDue,
       remainingMonths: accounts.remainingMonths,
       monthlyDueLastPaidMonth: accounts.monthlyDueLastPaidMonth,
+      monthlyContribution: accounts.monthlyContribution,
+      balanceLastUpdatedAt: accounts.balanceLastUpdatedAt,
       createdAt: accounts.createdAt,
       balance: balanceExpr,
     })
@@ -100,6 +105,8 @@ export interface AccountInput {
   monthlyAmountDue?: number | null;
   /** Number of monthly payments left — for credit-card-kind accounts. */
   remainingMonths?: number | null;
+  /** Amount added to the balance on each manual update, in minor units (centavos) — for investment-kind accounts. */
+  monthlyContribution?: number | null;
 }
 
 export async function createAccount(db: Database, input: AccountInput): Promise<Account> {
@@ -114,6 +121,7 @@ export async function createAccount(db: Database, input: AccountInput): Promise<
     includeInNetWorth: input.includeInNetWorth ?? true,
     monthlyAmountDue: input.monthlyAmountDue ?? null,
     remainingMonths: input.remainingMonths ?? null,
+    monthlyContribution: input.monthlyContribution ?? null,
   };
   const [row] = await db.insert(accounts).values(values).returning();
   return row;
@@ -133,6 +141,7 @@ export async function updateAccount(db: Database, id: number, input: AccountInpu
       includeInNetWorth: input.includeInNetWorth ?? true,
       monthlyAmountDue: input.monthlyAmountDue ?? null,
       remainingMonths: input.remainingMonths ?? null,
+      monthlyContribution: input.monthlyContribution ?? null,
     })
     .where(eq(accounts.id, id));
 }
@@ -170,6 +179,26 @@ export async function markMonthlyDueUnpaid(db: Database, id: number): Promise<vo
     .set({
       monthlyDueLastPaidMonth: null,
       remainingMonths: account.remainingMonths != null ? account.remainingMonths + 1 : null,
+    })
+    .where(eq(accounts.id, id));
+}
+
+/**
+ * Adds an investment-kind account's `monthlyContribution` to its starting balance and records
+ * today's date as `balanceLastUpdatedAt`.
+ */
+export async function incrementAccountBalance(db: Database, id: number): Promise<void> {
+  const [account] = await db
+    .select({ startingBalance: accounts.startingBalance, monthlyContribution: accounts.monthlyContribution })
+    .from(accounts)
+    .where(eq(accounts.id, id))
+    .limit(1);
+  if (!account?.monthlyContribution) return;
+  await db
+    .update(accounts)
+    .set({
+      startingBalance: account.startingBalance + account.monthlyContribution,
+      balanceLastUpdatedAt: formatIsoDate(new Date()),
     })
     .where(eq(accounts.id, id));
 }
