@@ -41,6 +41,7 @@ export async function listAccounts(db: Database, options: ListAccountsOptions = 
       qrImageUri: accounts.qrImageUri,
       startingBalance: accounts.startingBalance,
       isArchived: accounts.isArchived,
+      includeInNetWorth: accounts.includeInNetWorth,
       createdAt: accounts.createdAt,
       balance: balanceExpr,
     })
@@ -66,6 +67,7 @@ export async function getAccountWithBalance(db: Database, id: number): Promise<A
       qrImageUri: accounts.qrImageUri,
       startingBalance: accounts.startingBalance,
       isArchived: accounts.isArchived,
+      includeInNetWorth: accounts.includeInNetWorth,
       createdAt: accounts.createdAt,
       balance: balanceExpr,
     })
@@ -87,6 +89,7 @@ export interface AccountInput {
   qrImageUri?: string | null;
   /** Integer amount in minor units (centavos) */
   startingBalance: number;
+  includeInNetWorth?: boolean;
 }
 
 export async function createAccount(db: Database, input: AccountInput): Promise<Account> {
@@ -98,6 +101,7 @@ export async function createAccount(db: Database, input: AccountInput): Promise<
     accountNumber: input.accountNumber?.trim() || null,
     qrImageUri: input.qrImageUri ?? null,
     startingBalance: input.startingBalance,
+    includeInNetWorth: input.includeInNetWorth ?? true,
   };
   const [row] = await db.insert(accounts).values(values).returning();
   return row;
@@ -114,6 +118,7 @@ export async function updateAccount(db: Database, id: number, input: AccountInpu
       accountNumber: input.accountNumber?.trim() || null,
       qrImageUri: input.qrImageUri ?? null,
       startingBalance: input.startingBalance,
+      includeInNetWorth: input.includeInNetWorth ?? true,
     })
     .where(eq(accounts.id, id));
 }

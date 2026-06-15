@@ -113,6 +113,13 @@
       "when": 1781700000000,
       "tag": "0015_transaction_fee",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1781800000000,
+      "tag": "0016_account_net_worth_flag",
+      "breakpoints": true
     }
   ]
 }

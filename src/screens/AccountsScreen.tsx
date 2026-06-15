@@ -43,6 +43,7 @@ export default function AccountsScreen() {
 
   const netWorth = useMemo(() => {
     return visible.reduce((sum, account) => {
+      if (!account.includeInNetWorth) return sum;
       const category = accountCategories.find((item) => item.id === account.categoryId);
       return sum + (category?.kind === 'credit_card' ? -account.balance : account.balance);
     }, 0);

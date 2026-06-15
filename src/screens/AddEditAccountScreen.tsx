@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import * as Clipboard from 'expo-clipboard';
 
@@ -30,6 +30,7 @@ export default function AddEditAccountScreen() {
   const [accountNumber, setAccountNumber] = useState('');
   const [qrImageUri, setQrImageUri] = useState<string | null>(null);
   const [balanceText, setBalanceText] = useState('0');
+  const [includeInNetWorth, setIncludeInNetWorth] = useState(true);
   const [transactionEffect, setTransactionEffect] = useState(0);
   const [loading, setLoading] = useState(isEditing);
   const [saving, setSaving] = useState(false);
@@ -49,6 +50,7 @@ export default function AddEditAccountScreen() {
       setAccountNumber(existing.accountNumber ?? '');
       setQrImageUri(existing.qrImageUri ?? null);
       setBalanceText(String(fromMinorUnits(existing.balance)));
+      setIncludeInNetWorth(existing.includeInNetWorth);
       setTransactionEffect(existing.balance - existing.startingBalance);
       setLoading(false);
     })();
@@ -81,7 +83,7 @@ export default function AddEditAccountScreen() {
 
     setSaving(true);
     try {
-      const input = { name: trimmed, categoryId, color, icon, accountNumber, qrImageUri, startingBalance };
+      const input = { name: trimmed, categoryId, color, icon, accountNumber, qrImageUri, startingBalance, includeInNetWorth };
       if (isEditing) {
         await updateAccount(accountId, input);
       } else {
@@ -132,6 +134,16 @@ export default function AddEditAccountScreen() {
       <View style={styles.field}>
         <Text style={styles.label}>Balance</Text>
         <AmountInput value={balanceText} onChangeText={setBalanceText} />
+      </View>
+
+      <View style={styles.toggleRow}>
+        <View style={styles.toggleTextGroup}>
+          <Text style={styles.label}>Include in net worth</Text>
+          <Text style={styles.helperText}>
+            Turn off to exclude this account's balance from the net worth total — useful for loans owed to you or accounts you're just tracking.
+          </Text>
+        </View>
+        <Switch value={includeInNetWorth} onValueChange={setIncludeInNetWorth} trackColor={{ true: PALETTE.net }} />
       </View>
 
       <View style={styles.field}>
@@ -205,6 +217,20 @@ const styles = StyleSheet.create({
   loadingText: { color: PALETTE.textSecondary, fontSize: 14 },
   field: { gap: 8 },
   label: { fontSize: 13, fontWeight: '600', color: PALETTE.textSecondary },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    backgroundColor: PALETTE.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.border,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  toggleTextGroup: { flex: 1, gap: 4 },
+  helperText: { fontSize: 12, color: PALETTE.textSecondary, lineHeight: 16 },
   input: {
     backgroundColor: PALETTE.surface,
     borderWidth: StyleSheet.hairlineWidth,
