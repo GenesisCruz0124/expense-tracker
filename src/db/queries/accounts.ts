@@ -54,8 +54,27 @@ export async function listAccounts(db: Database, options: ListAccountsOptions = 
   return query.where(eq(accounts.isArchived, false));
 }
 
-export async function getAccount(db: Database, id: number): Promise<Account | undefined> {
-  const [row] = await db.select().from(accounts).where(eq(accounts.id, id)).limit(1);
+export async function getAccountWithBalance(db: Database, id: number): Promise<AccountWithBalance | undefined> {
+  const [row] = await db
+    .select({
+      id: accounts.id,
+      name: accounts.name,
+      categoryId: accounts.categoryId,
+      color: accounts.color,
+      icon: accounts.icon,
+      accountNumber: accounts.accountNumber,
+      qrImageUri: accounts.qrImageUri,
+      startingBalance: accounts.startingBalance,
+      isArchived: accounts.isArchived,
+      createdAt: accounts.createdAt,
+      balance: balanceExpr,
+    })
+    .from(accounts)
+    .leftJoin(transactions, eq(transactions.accountId, accounts.id))
+    .leftJoin(accountCategories, eq(accountCategories.id, accounts.categoryId))
+    .where(eq(accounts.id, id))
+    .groupBy(accounts.id)
+    .limit(1);
   return row;
 }
 

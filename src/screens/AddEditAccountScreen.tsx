@@ -9,7 +9,7 @@ import { QrImagePicker } from '../components/QrImagePicker';
 import { ACCOUNT_ICON_OPTIONS, DEFAULT_ACCOUNT_ICON } from '../constants/accountIcons';
 import { CATEGORY_COLOR_PALETTE, PALETTE } from '../constants/colors';
 import { useDatabase } from '../context/DatabaseProvider';
-import { getAccount } from '../db/queries/accounts';
+import { getAccountWithBalance } from '../db/queries/accounts';
 import { useAccounts } from '../hooks/useAccounts';
 import { fromMinorUnits, toMinorUnits } from '../utils/currency';
 import type { RootStackParamList } from '../navigation/types';
@@ -30,6 +30,7 @@ export default function AddEditAccountScreen() {
   const [accountNumber, setAccountNumber] = useState('');
   const [qrImageUri, setQrImageUri] = useState<string | null>(null);
   const [balanceText, setBalanceText] = useState('0');
+  const [transactionEffect, setTransactionEffect] = useState(0);
   const [loading, setLoading] = useState(isEditing);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +40,7 @@ export default function AddEditAccountScreen() {
     if (!isEditing) return;
     let cancelled = false;
     (async () => {
-      const existing = await getAccount(db, accountId);
+      const existing = await getAccountWithBalance(db, accountId);
       if (!existing || cancelled) return;
       setName(existing.name);
       setCategoryId(existing.categoryId);
@@ -47,7 +48,8 @@ export default function AddEditAccountScreen() {
       setIcon(existing.icon ?? DEFAULT_ACCOUNT_ICON);
       setAccountNumber(existing.accountNumber ?? '');
       setQrImageUri(existing.qrImageUri ?? null);
-      setBalanceText(String(fromMinorUnits(existing.startingBalance)));
+      setBalanceText(String(fromMinorUnits(existing.balance)));
+      setTransactionEffect(existing.balance - existing.startingBalance);
       setLoading(false);
     })();
     return () => {
@@ -66,11 +68,12 @@ export default function AddEditAccountScreen() {
       setError('Give the account a name.');
       return;
     }
-    const startingBalance = toMinorUnits(balanceText);
-    if (startingBalance == null) {
-      setError('Enter a valid starting balance.');
+    const enteredBalance = toMinorUnits(balanceText);
+    if (enteredBalance == null) {
+      setError('Enter a valid balance.');
       return;
     }
+    const startingBalance = enteredBalance - transactionEffect;
     if (categoryId == null) {
       setError('Choose an account category.');
       return;
@@ -127,7 +130,7 @@ export default function AddEditAccountScreen() {
       </View>
 
       <View style={styles.field}>
-        <Text style={styles.label}>Starting balance</Text>
+        <Text style={styles.label}>Balance</Text>
         <AmountInput value={balanceText} onChangeText={setBalanceText} />
       </View>
 
