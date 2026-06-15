@@ -120,6 +120,13 @@
       "when": 1781800000000,
       "tag": "0016_account_net_worth_flag",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1781900000000,
+      "tag": "0017_loan_account_category",
+      "breakpoints": true
     }
   ]
 }
