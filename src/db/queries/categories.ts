@@ -9,14 +9,17 @@ export interface ListCategoriesOptions {
   /** Only categories usable for this transaction type (matches `type` or 'both'). Omit for all. */
   forType?: 'expense' | 'income';
   includeArchived?: boolean;
+  /** Only categories flagged as billers (shown in the Billers tab). */
+  billersOnly?: boolean;
 }
 
 export async function listCategories(db: Database, options: ListCategoriesOptions = {}): Promise<Category[]> {
-  const { forType, includeArchived = false } = options;
+  const { forType, includeArchived = false, billersOnly = false } = options;
 
   const conditions = [];
   if (!includeArchived) conditions.push(eq(categories.isArchived, false));
   if (forType) conditions.push(or(eq(categories.type, forType), eq(categories.type, 'both')));
+  if (billersOnly) conditions.push(eq(categories.isBiller, true));
 
   const query = db.select().from(categories).orderBy(asc(categories.name));
   if (conditions.length === 0) return query;
@@ -33,6 +36,7 @@ export interface CategoryInput {
   type: CategoryType;
   color: string;
   icon?: string | null;
+  isBiller?: boolean;
 }
 
 export async function createCategory(db: Database, input: CategoryInput): Promise<Category> {
@@ -41,6 +45,7 @@ export async function createCategory(db: Database, input: CategoryInput): Promis
     type: input.type,
     color: input.color,
     icon: input.icon ?? null,
+    isBiller: input.isBiller ?? false,
   };
   const [row] = await db.insert(categories).values(values).returning();
   return row;
@@ -54,6 +59,7 @@ export async function updateCategory(db: Database, id: number, input: CategoryIn
       type: input.type,
       color: input.color,
       icon: input.icon ?? null,
+      isBiller: input.isBiller ?? false,
     })
     .where(eq(categories.id, id));
 }

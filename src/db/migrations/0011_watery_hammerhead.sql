@@ -1,0 +1,1 @@
+ALTER TABLE `categories` ADD `is_biller` integer DEFAULT false NOT NULL;

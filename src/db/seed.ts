@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import type { Database } from './client';
 import { categories, type NewCategory } from './schema';
 
@@ -36,15 +36,16 @@ const ADDITIONAL_CATEGORIES: NewCategory[] = [
   // Billers
   { name: 'SPayLater', type: 'expense', color: '#EF4444', icon: '📱' },
   { name: 'Spotify', type: 'expense', color: '#22C55E', icon: '🎬' },
-  { name: 'PNB Parking', type: 'expense', color: '#3B82F6', icon: '🚗' },
-  { name: 'Netflix', type: 'expense', color: '#F59E0B', icon: '🎬' },
+  { name: 'PNB Parking', type: 'expense', color: '#3B82F6', icon: '🚗', isBiller: true },
+  { name: 'Netflix', type: 'expense', color: '#F59E0B', icon: '🎬', isBiller: true },
   { name: 'Claude', type: 'expense', color: '#A855F7', icon: '💼' },
-  { name: 'Mother', type: 'expense', color: '#EC4899', icon: '🎁' },
-  { name: 'Meralco', type: 'expense', color: '#EAB308', icon: '💡' },
-  { name: 'Manila Water', type: 'expense', color: '#06B6D4', icon: '🧾' },
-  { name: 'St. Peter Plan', type: 'expense', color: '#F97316', icon: '🏥' },
-  { name: 'Disney+', type: 'expense', color: '#3B82F6', icon: '🎬' },
-  { name: 'Google Play', type: 'expense', color: '#22C55E', icon: '📱' },
+  { name: 'Mother', type: 'expense', color: '#EC4899', icon: '🎁', isBiller: true },
+  { name: 'Meralco', type: 'expense', color: '#EAB308', icon: '💡', isBiller: true },
+  { name: 'Maynilad', type: 'expense', color: '#14B8A6', icon: '🧾', isBiller: true },
+  { name: 'Manila Water', type: 'expense', color: '#06B6D4', icon: '🧾', isBiller: true },
+  { name: 'St. Peter Plan', type: 'expense', color: '#F97316', icon: '🏥', isBiller: true },
+  { name: 'Disney+', type: 'expense', color: '#3B82F6', icon: '🎬', isBiller: true },
+  { name: 'Google Play', type: 'expense', color: '#22C55E', icon: '📱', isBiller: true },
   // Food
   { name: 'Dine-In', type: 'expense', color: '#14B8A6', icon: '🍔' },
   { name: 'Fast Food', type: 'expense', color: '#EF4444', icon: '🍔' },
@@ -54,9 +55,23 @@ const ADDITIONAL_CATEGORIES: NewCategory[] = [
   { name: 'Parcel Delivery', type: 'expense', color: '#6366F1', icon: '🎁' },
 ];
 
+const BILLER_NAMES = [
+  'Meralco',
+  'Maynilad',
+  'Manila Water',
+  'St. Peter Plan',
+  'Disney+',
+  'Google Play',
+  'Mother',
+  'Netflix',
+  'PNB Parking',
+];
+
 /** Adds the requested income/biller categories on every launch, skipping any that already exist. */
 export async function seedAdditionalCategories(db: Database): Promise<void> {
   // Fix up the earlier "Mothe" typo for installs that already seeded it.
   await db.update(categories).set({ name: 'Mother' }).where(eq(categories.name, 'Mothe'));
   await db.insert(categories).values(ADDITIONAL_CATEGORIES).onConflictDoNothing({ target: categories.name });
+  // Flag the curated biller set, including for categories seeded before `isBiller` existed.
+  await db.update(categories).set({ isBiller: true }).where(inArray(categories.name, BILLER_NAMES));
 }

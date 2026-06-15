@@ -30,6 +30,7 @@ export default function AddEditCategoryScreen() {
   const [type, setType] = useState<CategoryType>(lockType ?? 'expense');
   const [color, setColor] = useState<string>(CATEGORY_COLOR_PALETTE[0]);
   const [icon, setIcon] = useState<string>(DEFAULT_CATEGORY_ICON);
+  const [isBiller, setIsBiller] = useState<boolean>(!!lockType);
   const [loading, setLoading] = useState(isEditing);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +45,7 @@ export default function AddEditCategoryScreen() {
       setType(existing.type);
       setColor(existing.color);
       setIcon(existing.icon ?? DEFAULT_CATEGORY_ICON);
+      setIsBiller(lockType ? true : existing.isBiller);
       setLoading(false);
     })();
     return () => {
@@ -65,7 +67,7 @@ export default function AddEditCategoryScreen() {
 
     setSaving(true);
     try {
-      const input = { name: trimmed, type, color, icon };
+      const input = { name: trimmed, type, color, icon, isBiller };
       if (isEditing) {
         await updateCategory(categoryId, input);
       } else {

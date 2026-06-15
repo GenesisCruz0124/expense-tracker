@@ -11,7 +11,7 @@ import { useCategories } from '../hooks/useCategories';
 export default function BillersScreen() {
   const navigation = useNavigation();
   const [showArchived, setShowArchived] = useState(false);
-  const { categories, setArchived } = useCategories({ forType: 'expense', includeArchived: true });
+  const { categories, setArchived } = useCategories({ forType: 'expense', includeArchived: true, billersOnly: true });
 
   const visible = categories.filter((category) => (showArchived ? category.isArchived : !category.isArchived));
 

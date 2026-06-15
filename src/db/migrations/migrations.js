@@ -12,6 +12,7 @@ import m0007 from './0007_transaction_transfer.sql';
 import m0008 from './0008_bills.sql';
 import m0009 from './0009_empty_ultimo.sql';
 import m0010 from './0010_melodic_spencer_smythe.sql';
+import m0011 from './0011_watery_hammerhead.sql';
 
   export default {
     journal,
@@ -26,7 +27,8 @@ m0006,
 m0007,
 m0008,
 m0009,
-m0010
+m0010,
+m0011
     }
   }
   

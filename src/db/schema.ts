@@ -10,6 +10,7 @@ export const categories = sqliteTable(
     color: text('color').notNull(),
     icon: text('icon'),
     isArchived: integer('is_archived', { mode: 'boolean' }).notNull().default(false),
+    isBiller: integer('is_biller', { mode: 'boolean' }).notNull().default(false),
     createdAt: text('created_at')
       .notNull()
       .default(sql`(datetime('now'))`),
