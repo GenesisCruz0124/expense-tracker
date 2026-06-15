@@ -34,6 +34,7 @@ export type RootStackParamList = {
   AddEditRecurring: { recurringId?: number } | undefined;
   AddEditAccount: { accountId?: number } | undefined;
   AddEditBill: { billId?: number } | undefined;
+  Billers: undefined;
 };
 
 declare global {

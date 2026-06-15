@@ -181,7 +181,12 @@ export default function AddEditBillScreen() {
       </View>
 
       <View style={styles.field}>
-        <Text style={styles.label}>Category</Text>
+        <View style={styles.labelRow}>
+          <Text style={styles.label}>Category</Text>
+          <Pressable onPress={() => navigation.navigate('Billers')} hitSlop={8}>
+            <Text style={styles.manageLink}>Manage billers</Text>
+          </Pressable>
+        </View>
         <CategoryPicker forType="expense" selectedCategoryId={categoryId} onSelect={setCategoryId} />
       </View>
 
@@ -242,6 +247,8 @@ const styles = StyleSheet.create({
   loadingText: { color: PALETTE.textSecondary, fontSize: 14 },
   field: { gap: 8 },
   label: { fontSize: 13, fontWeight: '600', color: PALETTE.textSecondary },
+  labelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  manageLink: { fontSize: 13, fontWeight: '600', color: PALETTE.net },
   nameInput: {
     backgroundColor: PALETTE.surface,
     borderWidth: StyleSheet.hairlineWidth,

@@ -34,6 +34,7 @@ export default function AddEditTransactionScreen() {
   const [toAccountId, setToAccountId] = useState<number | null>(null);
   const [transferId, setTransferId] = useState<number | null>(null);
   const [occurredAt, setOccurredAt] = useState(() => formatIsoDate(new Date()));
+  const [establishment, setEstablishment] = useState('');
   const [note, setNote] = useState('');
   const [receiptImageUri, setReceiptImageUri] = useState<string | null>(null);
   const [excludeFromExpense, setExcludeFromExpense] = useState(false);
@@ -68,6 +69,7 @@ export default function AddEditTransactionScreen() {
       setCategoryId(existing.categoryId);
       setAccountId(existing.accountId);
       setOccurredAt(existing.occurredAt);
+      setEstablishment(existing.establishment ?? '');
       setNote(existing.note ?? '');
       setReceiptImageUri(existing.receiptImageUri);
       setExcludeFromExpense(existing.excludeFromExpense);
@@ -147,6 +149,7 @@ export default function AddEditTransactionScreen() {
         amount,
         occurredAt,
         note: note.trim() || null,
+        establishment: establishment.trim() || null,
         categoryId,
         accountId,
         receiptImageUri,
@@ -246,6 +249,19 @@ export default function AddEditTransactionScreen() {
         <DateField label="Date" value={occurredAt} onChangeText={setOccurredAt} />
       </View>
 
+      {type !== 'transfer' ? (
+        <View style={styles.field}>
+          <Text style={styles.label}>Establishment</Text>
+          <TextInput
+            style={styles.input}
+            value={establishment}
+            onChangeText={setEstablishment}
+            placeholder="e.g. Jollibee, SM Mall"
+            placeholderTextColor={PALETTE.textSecondary}
+          />
+        </View>
+      ) : null}
+
       <View style={styles.field}>
         <Text style={styles.label}>Note</Text>
         <TextInput
@@ -309,6 +325,16 @@ const styles = StyleSheet.create({
   typeOptionTextSelected: { color: '#fff' },
   field: { gap: 8 },
   label: { fontSize: 13, fontWeight: '600', color: PALETTE.textSecondary },
+  input: {
+    backgroundColor: PALETTE.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.border,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: PALETTE.textPrimary,
+  },
   noteInput: {
     backgroundColor: PALETTE.surface,
     borderWidth: StyleSheet.hairlineWidth,

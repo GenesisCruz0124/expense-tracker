@@ -50,7 +50,7 @@ export default function TransactionsListScreen() {
             style={styles.searchInput}
             value={searchText}
             onChangeText={setSearchText}
-            placeholder="Search notes"
+            placeholder="Search notes & establishments"
             placeholderTextColor={PALETTE.textSecondary}
           />
         </View>

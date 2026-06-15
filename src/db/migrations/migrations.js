@@ -10,6 +10,7 @@ import m0005 from './0005_qr_image.sql';
 import m0006 from './0006_account_category_kind.sql';
 import m0007 from './0007_transaction_transfer.sql';
 import m0008 from './0008_bills.sql';
+import m0009 from './0009_empty_ultimo.sql';
 
   export default {
     journal,
@@ -22,7 +23,8 @@ m0004,
 m0005,
 m0006,
 m0007,
-m0008
+m0008,
+m0009
     }
   }
   

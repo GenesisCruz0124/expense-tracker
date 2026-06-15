@@ -1,4 +1,4 @@
-import { and, between, desc, eq, inArray, like, sql, type SQL } from 'drizzle-orm';
+import { and, between, desc, eq, inArray, like, or, sql, type SQL } from 'drizzle-orm';
 
 import type { Database } from '../client';
 import { accounts, categories, transactions, type NewTransaction, type Transaction } from '../schema';
@@ -35,7 +35,11 @@ function buildFilterConditions(filter: ListTransactionsFilter): SQL[] {
     conditions.push(between(transactions.occurredAt, filter.start, filter.end));
   }
   const search = filter.searchText?.trim();
-  if (search) conditions.push(like(transactions.note, `%${search}%`));
+  if (search) {
+    conditions.push(
+      or(like(transactions.note, `%${search}%`), like(transactions.establishment, `%${search}%`))!,
+    );
+  }
   return conditions;
 }
 
@@ -52,6 +56,7 @@ export async function listTransactions(
       amount: transactions.amount,
       occurredAt: transactions.occurredAt,
       note: transactions.note,
+      establishment: transactions.establishment,
       categoryId: transactions.categoryId,
       accountId: transactions.accountId,
       receiptImageUri: transactions.receiptImageUri,
@@ -85,6 +90,7 @@ export interface TransactionInput {
   amount: number;
   occurredAt: string;
   note?: string | null;
+  establishment?: string | null;
   categoryId?: number | null;
   accountId?: number | null;
   receiptImageUri?: string | null;
@@ -97,6 +103,7 @@ function toNewTransactionValues(input: TransactionInput): NewTransaction {
     amount: input.amount,
     occurredAt: input.occurredAt,
     note: input.note?.trim() || null,
+    establishment: input.establishment?.trim() || null,
     categoryId: input.categoryId ?? null,
     accountId: input.accountId ?? null,
     receiptImageUri: input.receiptImageUri ?? null,

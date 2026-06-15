@@ -8,6 +8,7 @@ import AddEditBudgetScreen from '../screens/AddEditBudgetScreen';
 import AddEditCategoryScreen from '../screens/AddEditCategoryScreen';
 import AddEditRecurringScreen from '../screens/AddEditRecurringScreen';
 import AddEditTransactionScreen from '../screens/AddEditTransactionScreen';
+import BillersScreen from '../screens/BillersScreen';
 import { TabNavigator } from './TabNavigator';
 import type { RootStackParamList } from './types';
 
@@ -35,6 +36,7 @@ export function RootNavigator() {
           options={{ title: 'Recurring transaction' }}
         />
         <Stack.Screen name="AddEditBill" component={AddEditBillScreen} options={{ title: 'Bill' }} />
+        <Stack.Screen name="Billers" component={BillersScreen} options={{ title: 'Manage billers' }} />
       </Stack.Group>
     </Stack.Navigator>
   );

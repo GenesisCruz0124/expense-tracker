@@ -33,6 +33,11 @@ export function TransactionListItem({ transaction, onPress }: Props) {
           {transaction.accountName ? <Text style={styles.accountLabel}>· {transaction.accountName}</Text> : null}
           {transaction.recurringId ? <Text style={styles.recurringBadge}>↻ recurring</Text> : null}
         </View>
+        {transaction.establishment ? (
+          <Text style={styles.establishment} numberOfLines={1}>
+            {transaction.establishment}
+          </Text>
+        ) : null}
         {transaction.note ? (
           <Text style={styles.note} numberOfLines={1}>
             {transaction.note}
@@ -65,6 +70,7 @@ const styles = StyleSheet.create({
   date: { fontSize: 12, color: PALETTE.textSecondary },
   accountLabel: { fontSize: 12, color: PALETTE.textSecondary },
   recurringBadge: { fontSize: 11, color: PALETTE.textSecondary, fontStyle: 'italic' },
+  establishment: { fontSize: 13, fontWeight: '600', color: PALETTE.textPrimary },
   note: { fontSize: 13, color: PALETTE.textPrimary },
   amount: { fontSize: 15, fontWeight: '700' },
 });

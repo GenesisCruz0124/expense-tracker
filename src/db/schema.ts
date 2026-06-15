@@ -83,6 +83,7 @@ export const transactions = sqliteTable(
     amount: integer('amount').notNull(),
     occurredAt: text('occurred_at').notNull(),
     note: text('note'),
+    establishment: text('establishment'),
     categoryId: integer('category_id').references(() => categories.id, { onDelete: 'set null' }),
     accountId: integer('account_id').references(() => accounts.id, { onDelete: 'set null' }),
     recurringId: integer('recurring_id').references(() => recurringTransactions.id, {
