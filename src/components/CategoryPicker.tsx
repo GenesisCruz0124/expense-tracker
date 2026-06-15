@@ -2,7 +2,8 @@ import React, { useMemo, useState } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { PALETTE } from '../constants/colors';
+import { CATEGORY_COLOR_PALETTE, PALETTE } from '../constants/colors';
+import { DEFAULT_CATEGORY_ICON } from '../constants/categoryIcons';
 import { useCategories } from '../hooks/useCategories';
 import { CategoryBadge } from './CategoryBadge';
 import { EmptyState } from './EmptyState';
@@ -18,9 +19,10 @@ interface Props {
 /** Filters its options to categories matching `forType` (or 'both') so a user logging an
  * expense never sees income-only categories like "Salary", and vice versa. */
 export function CategoryPicker({ forType, selectedCategoryId, onSelect, billersOnly }: Props) {
-  const { categories, loading } = useCategories({ forType, billersOnly });
+  const { categories, loading, createCategory } = useCategories({ forType, billersOnly });
   const [visible, setVisible] = useState(false);
   const [query, setQuery] = useState('');
+  const [creating, setCreating] = useState(false);
 
   const selected = categories.find((category) => category.id === selectedCategoryId) ?? null;
 
@@ -43,6 +45,26 @@ export function CategoryPicker({ forType, selectedCategoryId, onSelect, billersO
   function handleSelect(categoryId: number) {
     onSelect(categoryId);
     close();
+  }
+
+  const trimmedQuery = query.trim();
+
+  async function handleQuickAdd() {
+    if (!trimmedQuery || creating) return;
+    setCreating(true);
+    try {
+      const created = await createCategory({
+        name: trimmedQuery,
+        type: forType,
+        color: CATEGORY_COLOR_PALETTE[categories.length % CATEGORY_COLOR_PALETTE.length],
+        icon: DEFAULT_CATEGORY_ICON,
+        isBiller: billersOnly ?? false,
+      });
+      onSelect(created.id);
+      close();
+    } finally {
+      setCreating(false);
+    }
   }
 
   return (
@@ -90,17 +112,26 @@ export function CategoryPicker({ forType, selectedCategoryId, onSelect, billersO
             contentContainerStyle={filtered.length === 0 ? styles.emptyContainer : styles.listContainer}
             ListEmptyComponent={
               !loading ? (
-                <EmptyState
-                  icon="🏷️"
-                  title={query ? `No matching ${billersOnly ? 'billers' : 'categories'}` : `No ${billersOnly ? 'billers' : 'categories'} yet`}
-                  message={
-                    query
-                      ? `Nothing matches "${query}". Try a different search.`
-                      : billersOnly
-                        ? 'Add billers from More > Billers to track recurring payments.'
-                        : 'Add categories from the More tab to start organizing transactions.'
-                  }
-                />
+                <View style={styles.emptyContent}>
+                  <EmptyState
+                    icon="🏷️"
+                    title={query ? `No matching ${billersOnly ? 'billers' : 'categories'}` : `No ${billersOnly ? 'billers' : 'categories'} yet`}
+                    message={
+                      query
+                        ? `Nothing matches "${query}". Try a different search.`
+                        : billersOnly
+                          ? 'Add billers from More > Billers to track recurring payments.'
+                          : 'Add categories from the More tab to start organizing transactions.'
+                    }
+                  />
+                  {trimmedQuery ? (
+                    <Pressable style={styles.quickAddButton} onPress={handleQuickAdd} disabled={creating}>
+                      <Text style={styles.quickAddButtonText}>
+                        {creating ? 'Adding…' : `+ Add "${trimmedQuery}" as ${billersOnly ? 'a biller' : 'a category'}`}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </View>
               ) : null
             }
             renderItem={({ item }) => (
@@ -177,6 +208,15 @@ const styles = StyleSheet.create({
   clearButtonText: { fontSize: 14, color: PALETTE.textSecondary, fontWeight: '600' },
   listContainer: { padding: 16, gap: 8 },
   emptyContainer: { flexGrow: 1, justifyContent: 'center' },
+  emptyContent: { alignItems: 'stretch', gap: 16 },
+  quickAddButton: {
+    alignSelf: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: `${PALETTE.net}1A`,
+  },
+  quickAddButtonText: { fontSize: 13, fontWeight: '700', color: PALETTE.net },
   optionRow: {
     flexDirection: 'row',
     alignItems: 'center',
