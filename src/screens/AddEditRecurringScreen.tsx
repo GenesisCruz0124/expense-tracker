@@ -81,12 +81,6 @@ export default function AddEditRecurringScreen() {
     navigation.setOptions({ title: isEditing ? 'Edit recurring transaction' : 'Add recurring transaction' });
   }, [navigation, isEditing]);
 
-  function handleTypeChange(nextType: TransactionType) {
-    if (nextType === type) return;
-    setType(nextType);
-    setCategoryId(null);
-  }
-
   async function handleSave() {
     setError(null);
     const amount = toMinorUnits(amountText);
@@ -173,24 +167,6 @@ export default function AddEditRecurringScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-      <View style={styles.typeToggle}>
-        {(['expense', 'income'] as const).map((option) => {
-          const selected = option === type;
-          const tone = option === 'expense' ? PALETTE.expense : PALETTE.income;
-          return (
-            <Pressable
-              key={option}
-              onPress={() => handleTypeChange(option)}
-              style={[styles.typeOption, selected && { backgroundColor: tone, borderColor: tone }]}
-            >
-              <Text style={[styles.typeOptionText, selected && styles.typeOptionTextSelected]}>
-                {option === 'expense' ? 'Expense' : 'Income'}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
       <View style={styles.field}>
         <Text style={styles.label}>Amount</Text>
         <AmountInput value={amountText} onChangeText={setAmountText} />
@@ -303,18 +279,6 @@ const styles = StyleSheet.create({
   content: { padding: 20, gap: 18, paddingBottom: 40 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: PALETTE.background },
   loadingText: { color: PALETTE.textSecondary, fontSize: 14 },
-  typeToggle: { flexDirection: 'row', gap: 10 },
-  typeOption: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: PALETTE.border,
-    backgroundColor: PALETTE.surface,
-  },
-  typeOptionText: { fontSize: 14, fontWeight: '700', color: PALETTE.textSecondary },
-  typeOptionTextSelected: { color: '#fff' },
   field: { gap: 8 },
   label: { fontSize: 13, fontWeight: '600', color: PALETTE.textSecondary },
   optionRow: { flexDirection: 'row', gap: 10 },
