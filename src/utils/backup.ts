@@ -7,12 +7,14 @@ import type { Database } from '../db/client';
 import {
   accountCategories,
   accounts,
+  bills,
   budgets,
   categories,
   recurringTransactions,
   transactions,
   type Account,
   type AccountCategory,
+  type Bill,
   type Budget,
   type Category,
   type RecurringTransaction,
@@ -36,6 +38,8 @@ interface BackupFile {
     recurringTransactions: RecurringTransaction[];
     transactions: Transaction[];
     budgets: Budget[];
+    /** Optional for backups created before bills were included. */
+    bills?: Bill[];
   };
   images: Record<string, BackupImage>;
 }
@@ -58,7 +62,7 @@ async function readImageAsBackupEntry(uri: string): Promise<BackupImage | null> 
 
 /** Gathers every table and referenced image into a single JSON backup file and returns its local URI. */
 export async function createBackupFile(db: Database): Promise<string> {
-  const [categoryRows, accountCategoryRows, accountRows, recurringRows, transactionRows, budgetRows] =
+  const [categoryRows, accountCategoryRows, accountRows, recurringRows, transactionRows, budgetRows, billRows] =
     await Promise.all([
       db.select().from(categories),
       db.select().from(accountCategories),
@@ -66,6 +70,7 @@ export async function createBackupFile(db: Database): Promise<string> {
       db.select().from(recurringTransactions),
       db.select().from(transactions),
       db.select().from(budgets),
+      db.select().from(bills),
     ]);
 
   const imageUris = new Set<string>();
@@ -92,6 +97,7 @@ export async function createBackupFile(db: Database): Promise<string> {
       recurringTransactions: recurringRows,
       transactions: transactionRows,
       budgets: budgetRows,
+      bills: billRows,
     },
     images,
   };
@@ -173,6 +179,7 @@ export async function restoreBackupFromFile(db: Database, fileUri: string): Prom
 
   await db.transaction(async (tx) => {
     // Delete children before parents so foreign key constraints stay satisfied.
+    await tx.delete(bills);
     await tx.delete(transactions);
     await tx.delete(budgets);
     await tx.delete(recurringTransactions);
@@ -248,6 +255,16 @@ export async function restoreBackupFromFile(db: Database, fileUri: string): Prom
       if (newTransferId != null) {
         await tx.update(transactions).set({ transferId: newTransferId }).where(eq(transactions.id, newId));
       }
+    }
+
+    for (const { id, categoryId, billerId, accountId, paidTransactionId, ...rest } of backup.tables.bills ?? []) {
+      await tx.insert(bills).values({
+        ...rest,
+        categoryId: categoryId != null ? categoryIdMap.get(categoryId) ?? null : null,
+        billerId: billerId != null ? categoryIdMap.get(billerId) ?? null : null,
+        accountId: accountId != null ? accountIdMap.get(accountId) ?? null : null,
+        paidTransactionId: paidTransactionId != null ? transactionIdMap.get(paidTransactionId) ?? null : null,
+      });
     }
   });
 }
