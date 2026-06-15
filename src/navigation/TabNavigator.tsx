@@ -7,6 +7,7 @@ import { PALETTE } from '../constants/colors';
 import AccountCategoriesScreen from '../screens/AccountCategoriesScreen';
 import AccountsScreen from '../screens/AccountsScreen';
 import AccountTransactionsScreen from '../screens/AccountTransactionsScreen';
+import BillersScreen from '../screens/BillersScreen';
 import BillsScreen from '../screens/BillsScreen';
 import BudgetsScreen from '../screens/BudgetsScreen';
 import CategoriesScreen from '../screens/CategoriesScreen';
@@ -46,7 +47,7 @@ function AccountsNavigator() {
   );
 }
 
-// Hosts Settings plus the management screens (Transaction Categories, Account Types) as
+// Hosts Settings plus the management screens (Transaction Categories, Account Types, Billers) as
 // pushes, keeping the bottom tab bar lean instead of one-per-screen. Recurring and Budgets
 // live in their own tabs.
 function MoreNavigator() {
@@ -63,6 +64,7 @@ function MoreNavigator() {
         component={AccountCategoriesScreen}
         options={{ title: 'Account Types' }}
       />
+      <MoreStack.Screen name="Billers" component={BillersScreen} options={{ title: 'Billers' }} />
     </MoreStack.Navigator>
   );
 }

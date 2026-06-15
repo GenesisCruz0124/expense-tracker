@@ -2,19 +2,17 @@ import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { PALETTE } from '../constants/colors';
-import BillersScreen from './BillersScreen';
 import RecurringTransactionsScreen from './RecurringTransactionsScreen';
 import UnpaidBillsScreen from './UnpaidBillsScreen';
 
-type Segment = 'upcoming' | 'recurring' | 'billers';
+type Segment = 'upcoming' | 'recurring';
 
 const SEGMENTS: { key: Segment; label: string }[] = [
   { key: 'upcoming', label: 'Upcoming bills' },
   { key: 'recurring', label: 'Recurring' },
-  { key: 'billers', label: 'Billers' },
 ];
 
-/** Hosts the unpaid-bill tracker, recurring-transaction rules, and biller management under one "Bills" tab. */
+/** Hosts the unpaid-bill tracker and recurring-transaction rules under one "Bills" tab. */
 export default function BillsScreen() {
   const [segment, setSegment] = useState<Segment>('upcoming');
 
@@ -34,13 +32,7 @@ export default function BillsScreen() {
           );
         })}
       </View>
-      {segment === 'upcoming' ? (
-        <UnpaidBillsScreen />
-      ) : segment === 'recurring' ? (
-        <RecurringTransactionsScreen />
-      ) : (
-        <BillersScreen />
-      )}
+      {segment === 'upcoming' ? <UnpaidBillsScreen /> : <RecurringTransactionsScreen />}
     </View>
   );
 }

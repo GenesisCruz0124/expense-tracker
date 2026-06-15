@@ -13,6 +13,7 @@ export type MoreStackParamList = {
   Settings: undefined;
   Categories: undefined;
   AccountCategories: undefined;
+  Billers: undefined;
 };
 
 export type TabParamList = {
@@ -34,7 +35,6 @@ export type RootStackParamList = {
   AddEditRecurring: { recurringId?: number } | undefined;
   AddEditAccount: { accountId?: number } | undefined;
   AddEditBill: { billId?: number } | undefined;
-  Billers: undefined;
 };
 
 declare global {
