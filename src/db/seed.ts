@@ -33,6 +33,7 @@ const ADDITIONAL_CATEGORIES: NewCategory[] = [
   { name: '14th Month Pay', type: 'income', color: '#3B82F6', icon: '💰' },
   { name: '15th Month Pay', type: 'income', color: '#A855F7', icon: '💰' },
   { name: '16th Month Pay', type: 'income', color: '#EC4899', icon: '💰' },
+  { name: 'Side Hustle', type: 'income', color: '#F97316', icon: '📈' },
   // Billers
   { name: 'SPayLater', type: 'expense', color: '#EF4444', icon: '📱' },
   { name: 'Spotify', type: 'expense', color: '#22C55E', icon: '🎬' },
