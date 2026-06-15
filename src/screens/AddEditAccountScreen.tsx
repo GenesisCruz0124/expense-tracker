@@ -10,6 +10,7 @@ import { ACCOUNT_ICON_OPTIONS, DEFAULT_ACCOUNT_ICON } from '../constants/account
 import { CATEGORY_COLOR_PALETTE, PALETTE } from '../constants/colors';
 import { useDatabase } from '../context/DatabaseProvider';
 import { getAccountWithBalance } from '../db/queries/accounts';
+import { useAccountCategories } from '../hooks/useAccountCategories';
 import { useAccounts } from '../hooks/useAccounts';
 import { fromMinorUnits, toMinorUnits } from '../utils/currency';
 import type { RootStackParamList } from '../navigation/types';
@@ -22,6 +23,7 @@ export default function AddEditAccountScreen() {
 
   const { db } = useDatabase();
   const { createAccount, updateAccount } = useAccounts({ includeArchived: true });
+  const { accountCategories } = useAccountCategories({ includeArchived: true });
 
   const [name, setName] = useState('');
   const [categoryId, setCategoryId] = useState<number | null>(null);
@@ -31,11 +33,15 @@ export default function AddEditAccountScreen() {
   const [qrImageUri, setQrImageUri] = useState<string | null>(null);
   const [balanceText, setBalanceText] = useState('0');
   const [includeInNetWorth, setIncludeInNetWorth] = useState(true);
+  const [monthlyAmountDueText, setMonthlyAmountDueText] = useState('');
   const [transactionEffect, setTransactionEffect] = useState(0);
   const [loading, setLoading] = useState(isEditing);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+
+  const selectedCategory = accountCategories.find((c) => c.id === categoryId);
+  const isCreditCardKind = selectedCategory?.kind === 'credit_card';
 
   useEffect(() => {
     if (!isEditing) return;
@@ -51,6 +57,7 @@ export default function AddEditAccountScreen() {
       setQrImageUri(existing.qrImageUri ?? null);
       setBalanceText(String(fromMinorUnits(existing.balance)));
       setIncludeInNetWorth(existing.includeInNetWorth);
+      setMonthlyAmountDueText(existing.monthlyAmountDue != null ? String(fromMinorUnits(existing.monthlyAmountDue)) : '');
       setTransactionEffect(existing.balance - existing.startingBalance);
       setLoading(false);
     })();
@@ -80,10 +87,28 @@ export default function AddEditAccountScreen() {
       setError('Choose an account category.');
       return;
     }
+    let monthlyAmountDue: number | null = null;
+    if (isCreditCardKind && monthlyAmountDueText.trim()) {
+      monthlyAmountDue = toMinorUnits(monthlyAmountDueText);
+      if (monthlyAmountDue == null) {
+        setError('Enter a valid monthly amount due.');
+        return;
+      }
+    }
 
     setSaving(true);
     try {
-      const input = { name: trimmed, categoryId, color, icon, accountNumber, qrImageUri, startingBalance, includeInNetWorth };
+      const input = {
+        name: trimmed,
+        categoryId,
+        color,
+        icon,
+        accountNumber,
+        qrImageUri,
+        startingBalance,
+        includeInNetWorth,
+        monthlyAmountDue,
+      };
       if (isEditing) {
         await updateAccount(accountId, input);
       } else {
@@ -135,6 +160,13 @@ export default function AddEditAccountScreen() {
         <Text style={styles.label}>Balance</Text>
         <AmountInput value={balanceText} onChangeText={setBalanceText} />
       </View>
+
+      {isCreditCardKind ? (
+        <View style={styles.field}>
+          <Text style={styles.label}>Monthly amount due (optional)</Text>
+          <AmountInput value={monthlyAmountDueText} onChangeText={setMonthlyAmountDueText} />
+        </View>
+      ) : null}
 
       <View style={styles.toggleRow}>
         <View style={styles.toggleTextGroup}>

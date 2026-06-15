@@ -42,6 +42,7 @@ export async function listAccounts(db: Database, options: ListAccountsOptions = 
       startingBalance: accounts.startingBalance,
       isArchived: accounts.isArchived,
       includeInNetWorth: accounts.includeInNetWorth,
+      monthlyAmountDue: accounts.monthlyAmountDue,
       createdAt: accounts.createdAt,
       balance: balanceExpr,
     })
@@ -68,6 +69,7 @@ export async function getAccountWithBalance(db: Database, id: number): Promise<A
       startingBalance: accounts.startingBalance,
       isArchived: accounts.isArchived,
       includeInNetWorth: accounts.includeInNetWorth,
+      monthlyAmountDue: accounts.monthlyAmountDue,
       createdAt: accounts.createdAt,
       balance: balanceExpr,
     })
@@ -90,6 +92,8 @@ export interface AccountInput {
   /** Integer amount in minor units (centavos) */
   startingBalance: number;
   includeInNetWorth?: boolean;
+  /** Minimum/recurring amount due each month, in minor units (centavos) — for credit-card-kind accounts. */
+  monthlyAmountDue?: number | null;
 }
 
 export async function createAccount(db: Database, input: AccountInput): Promise<Account> {
@@ -102,6 +106,7 @@ export async function createAccount(db: Database, input: AccountInput): Promise<
     qrImageUri: input.qrImageUri ?? null,
     startingBalance: input.startingBalance,
     includeInNetWorth: input.includeInNetWorth ?? true,
+    monthlyAmountDue: input.monthlyAmountDue ?? null,
   };
   const [row] = await db.insert(accounts).values(values).returning();
   return row;
@@ -119,6 +124,7 @@ export async function updateAccount(db: Database, id: number, input: AccountInpu
       qrImageUri: input.qrImageUri ?? null,
       startingBalance: input.startingBalance,
       includeInNetWorth: input.includeInNetWorth ?? true,
+      monthlyAmountDue: input.monthlyAmountDue ?? null,
     })
     .where(eq(accounts.id, id));
 }

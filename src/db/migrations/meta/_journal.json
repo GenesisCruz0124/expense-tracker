@@ -127,6 +127,13 @@
       "when": 1781900000000,
       "tag": "0017_loan_account_category",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1782000000000,
+      "tag": "0018_account_monthly_amount_due",
+      "breakpoints": true
     }
   ]
 }

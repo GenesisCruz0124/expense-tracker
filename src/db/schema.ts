@@ -49,6 +49,8 @@ export const accounts = sqliteTable(
     startingBalance: integer('starting_balance').notNull().default(0),
     isArchived: integer('is_archived', { mode: 'boolean' }).notNull().default(false),
     includeInNetWorth: integer('include_in_net_worth', { mode: 'boolean' }).notNull().default(true),
+    /** Minimum/recurring amount due each month — shown for credit-card-kind accounts (credit cards, loans). */
+    monthlyAmountDue: integer('monthly_amount_due'),
     createdAt: text('created_at')
       .notNull()
       .default(sql`(datetime('now'))`),
