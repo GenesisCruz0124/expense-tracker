@@ -91,8 +91,6 @@ export default function AddEditTransactionScreen() {
     if (nextType === 'transfer') {
       setExcludeFromExpense(false);
       setToAccountId(null);
-    } else if (nextType === 'income') {
-      setExcludeFromExpense(false);
     }
   }
 
@@ -279,12 +277,12 @@ export default function AddEditTransactionScreen() {
         <ReceiptImagePicker uri={receiptImageUri} onChange={setReceiptImageUri} />
       </View>
 
-      {type === 'expense' ? (
+      {type !== 'transfer' ? (
         <View style={styles.toggleRow}>
           <View style={styles.toggleTextGroup}>
             <Text style={styles.label}>Exclude from reports</Text>
             <Text style={styles.helperText}>
-              Skip this transaction in spending reports and totals — useful for transfers or reimbursements.
+              Skip this transaction in reports and totals — useful for transfers, refunds, or reimbursements.
             </Text>
           </View>
           <Switch value={excludeFromExpense} onValueChange={setExcludeFromExpense} trackColor={{ true: PALETTE.net }} />
