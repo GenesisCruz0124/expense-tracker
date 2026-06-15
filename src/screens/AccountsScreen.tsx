@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, SectionList, StyleSheet, Switch, Text, View } from 'react-native';
+import { Pressable, ScrollView, SectionList, StyleSheet, Switch, Text, View } from 'react-native';
 import { useNavigation, type CompositeNavigationProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -35,11 +35,20 @@ function lastFourDigits(accountNumber: string | null): string | null {
 export default function AccountsScreen() {
   const navigation = useNavigation<AccountsScreenNavigationProp>();
   const [showArchived, setShowArchived] = useState(false);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [menuAccount, setMenuAccount] = useState<AccountWithBalance | null>(null);
   const { accounts, error, setArchived } = useAccounts({ includeArchived: true });
   const { accountCategories } = useAccountCategories({ includeArchived: true });
 
   const visible = accounts.filter((account) => (showArchived ? account.isArchived : !account.isArchived));
+
+  const filterableCategories = useMemo(
+    () => accountCategories.filter((category) => visible.some((account) => account.categoryId === category.id)),
+    [accountCategories, visible],
+  );
+
+  const filtered =
+    selectedCategoryId == null ? visible : visible.filter((account) => account.categoryId === selectedCategoryId);
 
   const netWorth = useMemo(() => {
     return visible.reduce((sum, account) => {
@@ -52,7 +61,7 @@ export default function AccountsScreen() {
   const sections = useMemo<AccountSection[]>(() => {
     return accountCategories
       .map((category) => {
-        const data = visible.filter((account) => account.categoryId === category.id);
+        const data = filtered.filter((account) => account.categoryId === category.id);
         return {
           title: category.name,
           icon: category.icon ?? DEFAULT_ACCOUNT_ICON,
@@ -62,7 +71,7 @@ export default function AccountsScreen() {
         };
       })
       .filter((section) => section.data.length > 0);
-  }, [accountCategories, visible]);
+  }, [accountCategories, filtered]);
 
   return (
     <View style={styles.screen}>
@@ -88,6 +97,41 @@ export default function AccountsScreen() {
                 <Text style={styles.heroIcon}>💰</Text>
               </View>
             </View>
+
+            {filterableCategories.length > 0 ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.filterRow}
+              >
+                <Pressable
+                  onPress={() => setSelectedCategoryId(null)}
+                  style={[styles.filterChip, selectedCategoryId == null && styles.filterChipAllSelected]}
+                >
+                  <Text style={[styles.filterChipText, selectedCategoryId == null && styles.filterChipTextSelected]}>
+                    All
+                  </Text>
+                </Pressable>
+                {filterableCategories.map((category) => {
+                  const selected = category.id === selectedCategoryId;
+                  return (
+                    <Pressable
+                      key={category.id}
+                      onPress={() => setSelectedCategoryId(selected ? null : category.id)}
+                      style={[
+                        styles.filterChip,
+                        { borderColor: category.color },
+                        selected && { backgroundColor: category.color },
+                      ]}
+                    >
+                      <Text style={[styles.filterChipText, { color: selected ? '#fff' : category.color }]}>
+                        {category.icon ?? DEFAULT_ACCOUNT_ICON} {category.name}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            ) : null}
 
             <View style={styles.toggleRow}>
               <Text style={styles.toggleLabel}>Show archived</Text>
@@ -203,6 +247,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   heroIcon: { fontSize: 22 },
+  filterRow: { gap: 8, paddingBottom: 12 },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: PALETTE.border,
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    backgroundColor: PALETTE.surface,
+  },
+  filterChipAllSelected: { borderColor: PALETTE.net, backgroundColor: PALETTE.net },
+  filterChipText: { fontSize: 13, fontWeight: '600', color: PALETTE.textSecondary },
+  filterChipTextSelected: { color: '#fff' },
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
