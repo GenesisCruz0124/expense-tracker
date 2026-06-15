@@ -2,7 +2,6 @@ import { asc, eq, sql } from 'drizzle-orm';
 
 import type { Database } from '../client';
 import { accountCategories, accounts, transactions, type Account, type NewAccount } from '../schema';
-import { formatIsoDate } from '../../utils/dateRanges';
 
 export interface AccountWithBalance extends Account {
   /**
@@ -107,6 +106,8 @@ export interface AccountInput {
   remainingMonths?: number | null;
   /** Amount added to the balance on each manual update, in minor units (centavos) — for investment-kind accounts. */
   monthlyContribution?: number | null;
+  /** ISO date ('YYYY-MM-DD') the balance was last updated via the increment button — for investment-kind accounts. */
+  balanceLastUpdatedAt?: string | null;
 }
 
 export async function createAccount(db: Database, input: AccountInput): Promise<Account> {
@@ -122,6 +123,7 @@ export async function createAccount(db: Database, input: AccountInput): Promise<
     monthlyAmountDue: input.monthlyAmountDue ?? null,
     remainingMonths: input.remainingMonths ?? null,
     monthlyContribution: input.monthlyContribution ?? null,
+    balanceLastUpdatedAt: input.balanceLastUpdatedAt ?? null,
   };
   const [row] = await db.insert(accounts).values(values).returning();
   return row;
@@ -142,6 +144,7 @@ export async function updateAccount(db: Database, id: number, input: AccountInpu
       monthlyAmountDue: input.monthlyAmountDue ?? null,
       remainingMonths: input.remainingMonths ?? null,
       monthlyContribution: input.monthlyContribution ?? null,
+      balanceLastUpdatedAt: input.balanceLastUpdatedAt ?? null,
     })
     .where(eq(accounts.id, id));
 }
@@ -179,26 +182,6 @@ export async function markMonthlyDueUnpaid(db: Database, id: number): Promise<vo
     .set({
       monthlyDueLastPaidMonth: null,
       remainingMonths: account.remainingMonths != null ? account.remainingMonths + 1 : null,
-    })
-    .where(eq(accounts.id, id));
-}
-
-/**
- * Adds an investment-kind account's `monthlyContribution` to its starting balance and records
- * today's date as `balanceLastUpdatedAt`.
- */
-export async function incrementAccountBalance(db: Database, id: number): Promise<void> {
-  const [account] = await db
-    .select({ startingBalance: accounts.startingBalance, monthlyContribution: accounts.monthlyContribution })
-    .from(accounts)
-    .where(eq(accounts.id, id))
-    .limit(1);
-  if (!account?.monthlyContribution) return;
-  await db
-    .update(accounts)
-    .set({
-      startingBalance: account.startingBalance + account.monthlyContribution,
-      balanceLastUpdatedAt: formatIsoDate(new Date()),
     })
     .where(eq(accounts.id, id));
 }

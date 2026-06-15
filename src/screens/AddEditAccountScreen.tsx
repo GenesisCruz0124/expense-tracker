@@ -13,7 +13,7 @@ import { getAccountWithBalance } from '../db/queries/accounts';
 import { useAccountCategories } from '../hooks/useAccountCategories';
 import { useAccounts } from '../hooks/useAccounts';
 import { formatCurrency, fromMinorUnits, toMinorUnits } from '../utils/currency';
-import { formatDisplayDate, monthKeyFor } from '../utils/dateRanges';
+import { formatDisplayDate, formatIsoDate, monthKeyFor } from '../utils/dateRanges';
 import type { RootStackParamList } from '../navigation/types';
 
 export default function AddEditAccountScreen() {
@@ -23,7 +23,7 @@ export default function AddEditAccountScreen() {
   const isEditing = accountId != null;
 
   const { db } = useDatabase();
-  const { createAccount, updateAccount, markMonthlyDueUnpaid, incrementBalance } = useAccounts({ includeArchived: true });
+  const { createAccount, updateAccount, markMonthlyDueUnpaid } = useAccounts({ includeArchived: true });
   const { accountCategories } = useAccountCategories({ includeArchived: true });
   const currentMonthKey = monthKeyFor(new Date());
 
@@ -129,6 +129,7 @@ export default function AddEditAccountScreen() {
         monthlyAmountDue,
         remainingMonths: isCreditCardKind ? remainingMonths : null,
         monthlyContribution,
+        balanceLastUpdatedAt,
       };
       if (isEditing) {
         await updateAccount(accountId, input);
@@ -150,13 +151,12 @@ export default function AddEditAccountScreen() {
     setRemainingMonths((value) => value + 1);
   }
 
-  async function handleIncrementBalance() {
-    if (!isEditing) return;
-    await incrementBalance(accountId);
-    const updated = await getAccountWithBalance(db, accountId);
-    if (!updated) return;
-    setBalanceText(String(fromMinorUnits(updated.balance)));
-    setBalanceLastUpdatedAt(updated.balanceLastUpdatedAt ?? null);
+  function handleIncrementBalance() {
+    const contribution = toMinorUnits(monthlyContributionText);
+    const currentBalance = toMinorUnits(balanceText);
+    if (contribution == null || currentBalance == null) return;
+    setBalanceText(String(fromMinorUnits(currentBalance + contribution)));
+    setBalanceLastUpdatedAt(formatIsoDate(new Date()));
   }
 
   async function handleCopyAccountNumber() {
