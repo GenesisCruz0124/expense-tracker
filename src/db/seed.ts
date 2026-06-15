@@ -54,6 +54,8 @@ const ADDITIONAL_CATEGORIES: NewCategory[] = [
   { name: 'Cafe', type: 'expense', color: '#F59E0B', icon: '☕' },
   { name: 'Grocery', type: 'expense', color: '#22C55E', icon: '🛍️' },
   { name: 'Parcel Delivery', type: 'expense', color: '#6366F1', icon: '🎁' },
+  // Transport
+  { name: 'Fuel', type: 'expense', color: '#F97316', icon: '🚗' },
 ];
 
 const BILLER_NAMES = [
