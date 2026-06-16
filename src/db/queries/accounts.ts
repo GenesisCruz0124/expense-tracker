@@ -50,6 +50,7 @@ export async function listAccounts(db: Database, options: ListAccountsOptions = 
       balanceLastUpdatedAt: accounts.balanceLastUpdatedAt,
       totalMonths: accounts.totalMonths,
       creditLimit: accounts.creditLimit,
+      linkedCreditCardId: accounts.linkedCreditCardId,
       createdAt: accounts.createdAt,
       balance: balanceExpr,
     })
@@ -83,6 +84,7 @@ export async function getAccountWithBalance(db: Database, id: number): Promise<A
       balanceLastUpdatedAt: accounts.balanceLastUpdatedAt,
       totalMonths: accounts.totalMonths,
       creditLimit: accounts.creditLimit,
+      linkedCreditCardId: accounts.linkedCreditCardId,
       createdAt: accounts.createdAt,
       balance: balanceExpr,
     })
@@ -117,6 +119,8 @@ export interface AccountInput {
   totalMonths?: number;
   /** Credit limit in minor units — for credit-card-kind accounts. */
   creditLimit?: number | null;
+  /** For loan accounts: the credit card account ID this loan is charged against. */
+  linkedCreditCardId?: number | null;
 }
 
 export async function createAccount(db: Database, input: AccountInput): Promise<Account> {
@@ -135,6 +139,7 @@ export async function createAccount(db: Database, input: AccountInput): Promise<
     balanceLastUpdatedAt: input.balanceLastUpdatedAt ?? null,
     totalMonths: input.totalMonths ?? 0,
     creditLimit: input.creditLimit ?? null,
+    linkedCreditCardId: input.linkedCreditCardId ?? null,
   };
   const [row] = await db.insert(accounts).values(values).returning();
   return row;
@@ -158,6 +163,7 @@ export async function updateAccount(db: Database, id: number, input: AccountInpu
       balanceLastUpdatedAt: input.balanceLastUpdatedAt ?? null,
       ...(input.totalMonths != null ? { totalMonths: input.totalMonths } : {}),
       creditLimit: input.creditLimit ?? null,
+      linkedCreditCardId: input.linkedCreditCardId ?? null,
     })
     .where(eq(accounts.id, id));
 }

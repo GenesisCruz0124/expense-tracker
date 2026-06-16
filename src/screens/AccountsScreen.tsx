@@ -61,6 +61,16 @@ export default function AccountsScreen() {
     }, 0);
   }, [visible, accountCategories]);
 
+  const linkedLoanTotals = useMemo(() => {
+    const totals: Record<number, number> = {};
+    for (const acc of visible) {
+      if (acc.linkedCreditCardId != null) {
+        totals[acc.linkedCreditCardId] = (totals[acc.linkedCreditCardId] ?? 0) + acc.balance;
+      }
+    }
+    return totals;
+  }, [visible]);
+
   const sections = useMemo<AccountSection[]>(() => {
     return accountCategories
       .map((category) => {
@@ -193,7 +203,11 @@ export default function AccountsScreen() {
                 ) : null}
                 {isLoan && item.creditLimit != null ? (
                   <Text style={styles.cardMetaLimit}>
-                    {hideAmounts ? '••••••' : `${formatCurrency(item.creditLimit)} limit · ${formatCurrency(Math.max(0, item.creditLimit - item.balance))} avail.`}
+                    {hideAmounts ? '••••••' : (() => {
+                      const used = item.balance + (linkedLoanTotals[item.id] ?? 0);
+                      const avail = Math.max(0, item.creditLimit - used);
+                      return `${formatCurrency(item.creditLimit)} limit · ${formatCurrency(avail)} avail.`;
+                    })()}
                   </Text>
                 ) : null}
               </View>

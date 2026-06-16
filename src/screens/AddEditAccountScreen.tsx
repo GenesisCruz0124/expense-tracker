@@ -4,6 +4,7 @@ import { useNavigation, useRoute, type RouteProp } from '@react-navigation/nativ
 import * as Clipboard from 'expo-clipboard';
 
 import { AccountCategoryPicker } from '../components/AccountCategoryPicker';
+import { ActionSheet } from '../components/ActionSheet';
 import { AmountInput } from '../components/AmountInput';
 import { QrImagePicker } from '../components/QrImagePicker';
 import { ACCOUNT_ICON_OPTIONS, DEFAULT_ACCOUNT_ICON } from '../constants/accountIcons';
@@ -23,7 +24,7 @@ export default function AddEditAccountScreen() {
   const isEditing = accountId != null;
 
   const { db } = useDatabase();
-  const { createAccount, updateAccount, markMonthlyDuePaid, markMonthlyDueUnpaid } = useAccounts({
+  const { accounts, createAccount, updateAccount, markMonthlyDuePaid, markMonthlyDueUnpaid } = useAccounts({
     includeArchived: true,
   });
   const { accountCategories } = useAccountCategories({ includeArchived: true });
@@ -39,6 +40,8 @@ export default function AddEditAccountScreen() {
   const [includeInNetWorth, setIncludeInNetWorth] = useState(true);
   const [monthlyAmountDueText, setMonthlyAmountDueText] = useState('');
   const [creditLimitText, setCreditLimitText] = useState('');
+  const [linkedCreditCardId, setLinkedCreditCardId] = useState<number | null>(null);
+  const [showCreditCardPicker, setShowCreditCardPicker] = useState(false);
   const [remainingMonths, setRemainingMonths] = useState(0);
   const [monthlyDueLastPaidMonth, setMonthlyDueLastPaidMonth] = useState<string | null>(null);
   const [monthlyContributionText, setMonthlyContributionText] = useState('');
@@ -70,6 +73,7 @@ export default function AddEditAccountScreen() {
       setIncludeInNetWorth(existing.includeInNetWorth);
       setMonthlyAmountDueText(existing.monthlyAmountDue != null ? String(fromMinorUnits(existing.monthlyAmountDue)) : '');
       setCreditLimitText(existing.creditLimit != null ? String(fromMinorUnits(existing.creditLimit)) : '');
+      setLinkedCreditCardId(existing.linkedCreditCardId ?? null);
       setRemainingMonths(existing.remainingMonths ?? 0);
       setMonthlyDueLastPaidMonth(existing.monthlyDueLastPaidMonth ?? null);
       setMonthlyContributionText(existing.monthlyContribution != null ? String(fromMinorUnits(existing.monthlyContribution)) : '');
@@ -142,6 +146,7 @@ export default function AddEditAccountScreen() {
         includeInNetWorth,
         monthlyAmountDue,
         creditLimit,
+        linkedCreditCardId: isCreditCardKind ? linkedCreditCardId : null,
         remainingMonths: isCreditCardKind ? remainingMonths : null,
         monthlyContribution,
         balanceLastUpdatedAt,
@@ -246,6 +251,45 @@ export default function AddEditAccountScreen() {
           <AmountInput value={creditLimitText} onChangeText={setCreditLimitText} />
         </View>
       ) : null}
+
+      {isCreditCardKind ? (() => {
+        const creditCardAccounts = accounts.filter(
+          (a) => {
+            const cat = accountCategories.find((c) => c.id === a.categoryId);
+            return cat?.kind === 'credit_card' && a.creditLimit != null && a.id !== accountId;
+          }
+        );
+        const linked = accounts.find((a) => a.id === linkedCreditCardId);
+        return (
+          <View style={styles.field}>
+            <Text style={styles.label}>Linked credit card (optional)</Text>
+            <Pressable style={styles.pickerRow} onPress={() => setShowCreditCardPicker(true)}>
+              <Text style={[styles.pickerRowText, !linked && styles.pickerRowPlaceholder]}>
+                {linked ? linked.name : 'None — tap to select'}
+              </Text>
+              {linked ? (
+                <Pressable
+                  onPress={(e) => { e.stopPropagation(); setLinkedCreditCardId(null); }}
+                  hitSlop={8}
+                >
+                  <Text style={styles.pickerRowClear}>✕</Text>
+                </Pressable>
+              ) : (
+                <Text style={styles.pickerRowChevron}>›</Text>
+              )}
+            </Pressable>
+            <ActionSheet
+              visible={showCreditCardPicker}
+              onClose={() => setShowCreditCardPicker(false)}
+              title="Select credit card"
+              options={creditCardAccounts.map((a) => ({
+                label: a.name,
+                onPress: () => { setLinkedCreditCardId(a.id); setShowCreditCardPicker(false); },
+              }))}
+            />
+          </View>
+        );
+      })() : null}
 
       {isCreditCardKind ? (
         <View style={styles.field}>
@@ -494,6 +538,21 @@ const styles = StyleSheet.create({
   },
   totalMonthsLabel: { fontSize: 13, color: PALETTE.textSecondary, fontWeight: '600' },
   totalMonthsValue: { fontSize: 13, fontWeight: '700', color: PALETTE.textPrimary },
+  pickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: PALETTE.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.border,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+  },
+  pickerRowText: { fontSize: 15, color: PALETTE.textPrimary, flex: 1 },
+  pickerRowPlaceholder: { color: PALETTE.textSecondary },
+  pickerRowChevron: { fontSize: 20, color: PALETTE.textSecondary },
+  pickerRowClear: { fontSize: 14, color: PALETTE.textSecondary, fontWeight: '700', paddingLeft: 8 },
   error: { fontSize: 13, color: PALETTE.danger, textAlign: 'center' },
   saveButton: { backgroundColor: PALETTE.net, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   saveButtonDisabled: { opacity: 0.6 },
