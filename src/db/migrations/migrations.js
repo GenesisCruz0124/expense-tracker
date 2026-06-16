@@ -26,6 +26,7 @@ import m0021 from './0021_account_due_last_paid_month.sql';
 import m0022 from './0022_investment_account_fields.sql';
 import m0023 from './0023_account_balance_last_updated.sql';
 import m0024 from './0024_investment_account_category_kind.sql';
+import m0025 from './0025_account_total_months.sql';
 
   export default {
     journal,
@@ -54,7 +55,8 @@ m0020,
 m0021,
 m0022,
 m0023,
-m0024
+m0024,
+m0025
     }
   }
   
