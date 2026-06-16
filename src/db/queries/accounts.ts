@@ -111,6 +111,8 @@ export interface AccountInput {
   monthlyContribution?: number | null;
   /** ISO date ('YYYY-MM-DD') the balance was last updated via the increment button — for investment-kind accounts. */
   balanceLastUpdatedAt?: string | null;
+  /** Running count of months contributed (investment) or months paid (credit_card). */
+  totalMonths?: number;
 }
 
 export async function createAccount(db: Database, input: AccountInput): Promise<Account> {
@@ -127,6 +129,7 @@ export async function createAccount(db: Database, input: AccountInput): Promise<
     remainingMonths: input.remainingMonths ?? null,
     monthlyContribution: input.monthlyContribution ?? null,
     balanceLastUpdatedAt: input.balanceLastUpdatedAt ?? null,
+    totalMonths: input.totalMonths ?? 0,
   };
   const [row] = await db.insert(accounts).values(values).returning();
   return row;
@@ -148,6 +151,7 @@ export async function updateAccount(db: Database, id: number, input: AccountInpu
       remainingMonths: input.remainingMonths ?? null,
       monthlyContribution: input.monthlyContribution ?? null,
       balanceLastUpdatedAt: input.balanceLastUpdatedAt ?? null,
+      ...(input.totalMonths != null ? { totalMonths: input.totalMonths } : {}),
     })
     .where(eq(accounts.id, id));
 }

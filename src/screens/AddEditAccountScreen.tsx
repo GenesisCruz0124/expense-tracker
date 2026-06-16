@@ -136,7 +136,7 @@ export default function AddEditAccountScreen() {
         balanceLastUpdatedAt,
       };
       if (isEditing) {
-        await updateAccount(accountId, input);
+        await updateAccount(accountId, { ...input, totalMonths });
       } else {
         await createAccount(input);
       }
@@ -276,6 +276,22 @@ export default function AddEditAccountScreen() {
         </View>
       ) : null}
 
+      {isInvestmentKind ? (
+        <View style={styles.field}>
+          <Text style={styles.label}>Total months contributed</Text>
+          <View style={styles.stepperRow}>
+            <Pressable style={styles.stepperButton} onPress={() => setTotalMonths((v) => Math.max(0, v - 1))}>
+              <Text style={styles.stepperButtonText}>−</Text>
+            </Pressable>
+            <Text style={styles.stepperValue}>{totalMonths}</Text>
+            <Pressable style={styles.stepperButton} onPress={() => setTotalMonths((v) => v + 1)}>
+              <Text style={styles.stepperButtonText}>+</Text>
+            </Pressable>
+            <Text style={styles.stepperUnit}>{totalMonths === 1 ? 'month' : 'months'}</Text>
+          </View>
+        </View>
+      ) : null}
+
       {isInvestmentKind && isEditing && toMinorUnits(monthlyContributionText) != null ? (
         <Pressable style={styles.undoRow} onPress={handleIncrementBalance}>
           <View style={styles.toggleTextGroup}>
@@ -286,13 +302,6 @@ export default function AddEditAccountScreen() {
           </View>
           <Text style={styles.undoAction}>+{formatCurrency(toMinorUnits(monthlyContributionText)!)}</Text>
         </Pressable>
-      ) : null}
-
-      {isInvestmentKind && isEditing && totalMonths > 0 ? (
-        <View style={styles.totalMonthsRow}>
-          <Text style={styles.totalMonthsLabel}>Total months contributed</Text>
-          <Text style={styles.totalMonthsValue}>{totalMonths} {totalMonths === 1 ? 'month' : 'months'}</Text>
-        </View>
       ) : null}
 
       <View style={styles.toggleRow}>
