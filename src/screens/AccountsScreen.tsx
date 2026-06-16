@@ -169,6 +169,9 @@ export default function AccountsScreen() {
         )}
         renderItem={({ item }) => {
           const subtitle = lastFourDigits(item.accountNumber);
+          const categoryKind = accountCategories.find((c) => c.id === item.categoryId)?.kind;
+          const isInvestment = categoryKind === 'investment';
+          const isLoan = categoryKind === 'credit_card';
           return (
             <Pressable
               style={[styles.card, item.isArchived && styles.cardArchived]}
@@ -182,6 +185,12 @@ export default function AccountsScreen() {
                   {item.name}
                 </Text>
                 {subtitle ? <Text style={styles.cardSubtitle}>•••• {subtitle}</Text> : null}
+                {isInvestment && item.totalMonths > 0 ? (
+                  <Text style={styles.cardMeta}>{item.totalMonths} {item.totalMonths === 1 ? 'month' : 'months'} contributed</Text>
+                ) : null}
+                {isLoan && item.remainingMonths != null && item.remainingMonths > 0 ? (
+                  <Text style={styles.cardMeta}>{item.remainingMonths} {item.remainingMonths === 1 ? 'month' : 'months'} remaining</Text>
+                ) : null}
               </View>
               <Text style={[styles.cardBalance, item.balance < 0 && styles.negative]}>
                 {hideAmounts ? AMOUNT_MASK : formatCurrency(item.balance)}
@@ -329,6 +338,7 @@ const styles = StyleSheet.create({
   cardMain: { flex: 1, gap: 2 },
   cardName: { fontSize: 15, fontWeight: '700', color: PALETTE.textPrimary },
   cardSubtitle: { fontSize: 12, color: PALETTE.textSecondary, letterSpacing: 0.5 },
+  cardMeta: { fontSize: 11, fontWeight: '600', color: PALETTE.net, marginTop: 1 },
   cardBalance: { fontSize: 15, fontWeight: '700', color: PALETTE.textPrimary },
   negative: { color: PALETTE.expense },
   moreButton: {
