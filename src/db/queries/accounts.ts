@@ -48,6 +48,7 @@ export async function listAccounts(db: Database, options: ListAccountsOptions = 
       monthlyDueLastPaidMonth: accounts.monthlyDueLastPaidMonth,
       monthlyContribution: accounts.monthlyContribution,
       balanceLastUpdatedAt: accounts.balanceLastUpdatedAt,
+      totalMonths: accounts.totalMonths,
       createdAt: accounts.createdAt,
       balance: balanceExpr,
     })
@@ -79,6 +80,7 @@ export async function getAccountWithBalance(db: Database, id: number): Promise<A
       monthlyDueLastPaidMonth: accounts.monthlyDueLastPaidMonth,
       monthlyContribution: accounts.monthlyContribution,
       balanceLastUpdatedAt: accounts.balanceLastUpdatedAt,
+      totalMonths: accounts.totalMonths,
       createdAt: accounts.createdAt,
       balance: balanceExpr,
     })
@@ -165,6 +167,7 @@ export async function markMonthlyDuePaid(db: Database, id: number, monthKey: str
       remainingMonths: accounts.remainingMonths,
       monthlyAmountDue: accounts.monthlyAmountDue,
       startingBalance: accounts.startingBalance,
+      totalMonths: accounts.totalMonths,
     })
     .from(accounts)
     .where(eq(accounts.id, id))
@@ -177,6 +180,7 @@ export async function markMonthlyDuePaid(db: Database, id: number, monthKey: str
       remainingMonths:
         account.remainingMonths != null && account.remainingMonths > 0 ? account.remainingMonths - 1 : account.remainingMonths,
       startingBalance: account.startingBalance - (account.monthlyAmountDue ?? 0),
+      totalMonths: account.totalMonths + 1,
     })
     .where(eq(accounts.id, id));
 }
@@ -213,7 +217,7 @@ export async function markMonthlyDueUnpaid(db: Database, id: number): Promise<vo
  */
 export async function incrementAccountBalance(db: Database, id: number): Promise<void> {
   const [account] = await db
-    .select({ startingBalance: accounts.startingBalance, monthlyContribution: accounts.monthlyContribution })
+    .select({ startingBalance: accounts.startingBalance, monthlyContribution: accounts.monthlyContribution, totalMonths: accounts.totalMonths })
     .from(accounts)
     .where(eq(accounts.id, id))
     .limit(1);
@@ -223,6 +227,7 @@ export async function incrementAccountBalance(db: Database, id: number): Promise
     .set({
       startingBalance: account.startingBalance + account.monthlyContribution,
       balanceLastUpdatedAt: formatIsoDate(new Date()),
+      totalMonths: account.totalMonths + 1,
     })
     .where(eq(accounts.id, id));
 }

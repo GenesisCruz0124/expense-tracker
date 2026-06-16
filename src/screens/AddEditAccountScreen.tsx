@@ -42,6 +42,7 @@ export default function AddEditAccountScreen() {
   const [monthlyDueLastPaidMonth, setMonthlyDueLastPaidMonth] = useState<string | null>(null);
   const [monthlyContributionText, setMonthlyContributionText] = useState('');
   const [balanceLastUpdatedAt, setBalanceLastUpdatedAt] = useState<string | null>(null);
+  const [totalMonths, setTotalMonths] = useState(0);
   const [transactionEffect, setTransactionEffect] = useState(0);
   const [loading, setLoading] = useState(isEditing);
   const [saving, setSaving] = useState(false);
@@ -71,6 +72,7 @@ export default function AddEditAccountScreen() {
       setMonthlyDueLastPaidMonth(existing.monthlyDueLastPaidMonth ?? null);
       setMonthlyContributionText(existing.monthlyContribution != null ? String(fromMinorUnits(existing.monthlyContribution)) : '');
       setBalanceLastUpdatedAt(existing.balanceLastUpdatedAt ?? null);
+      setTotalMonths(existing.totalMonths ?? 0);
       setTransactionEffect(existing.balance - existing.startingBalance);
       setLoading(false);
     })();
@@ -151,6 +153,7 @@ export default function AddEditAccountScreen() {
     await markMonthlyDuePaid(accountId, currentMonthKey);
     setMonthlyDueLastPaidMonth(currentMonthKey);
     setRemainingMonths((value) => (value > 0 ? value - 1 : value));
+    setTotalMonths((value) => value + 1);
     const amountDue = toMinorUnits(monthlyAmountDueText);
     const currentBalance = toMinorUnits(balanceText);
     if (amountDue != null && currentBalance != null) {
@@ -177,6 +180,7 @@ export default function AddEditAccountScreen() {
     if (contribution == null || currentBalance == null) return;
     setBalanceText(String(fromMinorUnits(currentBalance + contribution)));
     setBalanceLastUpdatedAt(formatIsoDate(new Date()));
+    setTotalMonths((value) => value + 1);
   }
 
   async function handleCopyAccountNumber() {
@@ -258,6 +262,13 @@ export default function AddEditAccountScreen() {
         )
       ) : null}
 
+      {isCreditCardKind && isEditing && totalMonths > 0 ? (
+        <View style={styles.totalMonthsRow}>
+          <Text style={styles.totalMonthsLabel}>Total months paid</Text>
+          <Text style={styles.totalMonthsValue}>{totalMonths} {totalMonths === 1 ? 'month' : 'months'}</Text>
+        </View>
+      ) : null}
+
       {isInvestmentKind ? (
         <View style={styles.field}>
           <Text style={styles.label}>Monthly amount (optional)</Text>
@@ -275,6 +286,13 @@ export default function AddEditAccountScreen() {
           </View>
           <Text style={styles.undoAction}>+{formatCurrency(toMinorUnits(monthlyContributionText)!)}</Text>
         </Pressable>
+      ) : null}
+
+      {isInvestmentKind && isEditing && totalMonths > 0 ? (
+        <View style={styles.totalMonthsRow}>
+          <Text style={styles.totalMonthsLabel}>Total months contributed</Text>
+          <Text style={styles.totalMonthsValue}>{totalMonths} {totalMonths === 1 ? 'month' : 'months'}</Text>
+        </View>
       ) : null}
 
       <View style={styles.toggleRow}>
@@ -436,6 +454,19 @@ const styles = StyleSheet.create({
     borderColor: PALETTE.border,
   },
   copyButtonText: { fontSize: 13, fontWeight: '600', color: PALETTE.net },
+  totalMonthsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: PALETTE.surface,
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.border,
+  },
+  totalMonthsLabel: { fontSize: 13, color: PALETTE.textSecondary, fontWeight: '600' },
+  totalMonthsValue: { fontSize: 13, fontWeight: '700', color: PALETTE.textPrimary },
   error: { fontSize: 13, color: PALETTE.danger, textAlign: 'center' },
   saveButton: { backgroundColor: PALETTE.net, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   saveButtonDisabled: { opacity: 0.6 },

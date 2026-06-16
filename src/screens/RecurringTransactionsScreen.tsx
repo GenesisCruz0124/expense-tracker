@@ -118,6 +118,9 @@ export default function RecurringTransactionsScreen() {
                     <View style={styles.cardMain}>
                       <Text style={styles.cardTitle}>{account.name}</Text>
                       <Text style={styles.cardSubtitle}>Due every month</Text>
+                      {account.totalMonths > 0 ? (
+                        <Text style={styles.totalMonthsBadge}>{account.totalMonths} {account.totalMonths === 1 ? 'month' : 'months'} paid</Text>
+                      ) : null}
                     </View>
                     <View style={styles.amountColumn}>
                       <Text style={[styles.cardAmount, { color: PALETTE.expense }]}>
@@ -153,6 +156,9 @@ export default function RecurringTransactionsScreen() {
                     <View style={styles.cardMain}>
                       <Text style={styles.cardTitle}>{account.name}</Text>
                       <Text style={styles.cardSubtitle}>Add monthly amount</Text>
+                      {account.totalMonths > 0 ? (
+                        <Text style={styles.totalMonthsBadge}>{account.totalMonths} {account.totalMonths === 1 ? 'month' : 'months'} added</Text>
+                      ) : null}
                     </View>
                     <View style={styles.amountColumn}>
                       <Text style={[styles.cardAmount, { color: PALETTE.income }]}>
@@ -279,6 +285,7 @@ const styles = StyleSheet.create({
   cardMain: { flex: 1, gap: 2 },
   cardTitle: { fontSize: 14, fontWeight: '700', color: PALETTE.textPrimary },
   cardSubtitle: { fontSize: 12, color: PALETTE.textSecondary },
+  totalMonthsBadge: { fontSize: 11, fontWeight: '600', color: PALETTE.net, marginTop: 2 },
   cardAmount: { fontSize: 14, fontWeight: '700' },
   amountColumn: { alignItems: 'flex-end', gap: 6 },
   actionButton: {

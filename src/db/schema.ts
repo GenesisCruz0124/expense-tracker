@@ -59,6 +59,8 @@ export const accounts = sqliteTable(
     monthlyContribution: integer('monthly_contribution'),
     /** ISO date ('YYYY-MM-DD') the balance was last updated via the increment button — for investment-kind accounts. */
     balanceLastUpdatedAt: text('balance_last_updated_at'),
+    /** Running count of how many times "Add to balance" or "Mark paid" has been clicked for this account. */
+    totalMonths: integer('total_months').notNull().default(0),
     createdAt: text('created_at')
       .notNull()
       .default(sql`(datetime('now'))`),
