@@ -121,6 +121,9 @@ export default function RecurringTransactionsScreen() {
                       {account.totalMonths > 0 ? (
                         <Text style={styles.totalMonthsBadge}>{account.totalMonths} {account.totalMonths === 1 ? 'month' : 'months'} paid</Text>
                       ) : null}
+                      {account.remainingMonths != null && account.remainingMonths > 0 ? (
+                        <Text style={styles.remainingMonthsBadge}>{account.remainingMonths} {account.remainingMonths === 1 ? 'month' : 'months'} remaining</Text>
+                      ) : null}
                     </View>
                     <View style={styles.amountColumn}>
                       <Text style={[styles.cardAmount, { color: PALETTE.expense }]}>
@@ -286,6 +289,7 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 14, fontWeight: '700', color: PALETTE.textPrimary },
   cardSubtitle: { fontSize: 12, color: PALETTE.textSecondary },
   totalMonthsBadge: { fontSize: 11, fontWeight: '600', color: PALETTE.net, marginTop: 2 },
+  remainingMonthsBadge: { fontSize: 11, fontWeight: '600', color: PALETTE.expense, marginTop: 1 },
   cardAmount: { fontSize: 14, fontWeight: '700' },
   amountColumn: { alignItems: 'flex-end', gap: 6 },
   actionButton: {
