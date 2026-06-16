@@ -38,6 +38,7 @@ export default function AddEditAccountScreen() {
   const [balanceText, setBalanceText] = useState('0');
   const [includeInNetWorth, setIncludeInNetWorth] = useState(true);
   const [monthlyAmountDueText, setMonthlyAmountDueText] = useState('');
+  const [creditLimitText, setCreditLimitText] = useState('');
   const [remainingMonths, setRemainingMonths] = useState(0);
   const [monthlyDueLastPaidMonth, setMonthlyDueLastPaidMonth] = useState<string | null>(null);
   const [monthlyContributionText, setMonthlyContributionText] = useState('');
@@ -68,6 +69,7 @@ export default function AddEditAccountScreen() {
       setBalanceText(String(fromMinorUnits(existing.balance)));
       setIncludeInNetWorth(existing.includeInNetWorth);
       setMonthlyAmountDueText(existing.monthlyAmountDue != null ? String(fromMinorUnits(existing.monthlyAmountDue)) : '');
+      setCreditLimitText(existing.creditLimit != null ? String(fromMinorUnits(existing.creditLimit)) : '');
       setRemainingMonths(existing.remainingMonths ?? 0);
       setMonthlyDueLastPaidMonth(existing.monthlyDueLastPaidMonth ?? null);
       setMonthlyContributionText(existing.monthlyContribution != null ? String(fromMinorUnits(existing.monthlyContribution)) : '');
@@ -110,6 +112,14 @@ export default function AddEditAccountScreen() {
         return;
       }
     }
+    let creditLimit: number | null = null;
+    if (isCreditCardKind && creditLimitText.trim()) {
+      creditLimit = toMinorUnits(creditLimitText);
+      if (creditLimit == null) {
+        setError('Enter a valid credit limit.');
+        return;
+      }
+    }
     let monthlyContribution: number | null = null;
     if (isInvestmentKind && monthlyContributionText.trim()) {
       monthlyContribution = toMinorUnits(monthlyContributionText);
@@ -131,6 +141,7 @@ export default function AddEditAccountScreen() {
         startingBalance,
         includeInNetWorth,
         monthlyAmountDue,
+        creditLimit,
         remainingMonths: isCreditCardKind ? remainingMonths : null,
         monthlyContribution,
         balanceLastUpdatedAt,
@@ -226,6 +237,13 @@ export default function AddEditAccountScreen() {
         <View style={styles.field}>
           <Text style={styles.label}>Monthly amount due (optional)</Text>
           <AmountInput value={monthlyAmountDueText} onChangeText={setMonthlyAmountDueText} />
+        </View>
+      ) : null}
+
+      {isCreditCardKind ? (
+        <View style={styles.field}>
+          <Text style={styles.label}>Credit limit (optional)</Text>
+          <AmountInput value={creditLimitText} onChangeText={setCreditLimitText} />
         </View>
       ) : null}
 

@@ -183,6 +183,13 @@
       "when": 1782700000000,
       "tag": "0025_account_total_months",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1782800000000,
+      "tag": "0026_account_credit_limit",
+      "breakpoints": true
     }
   ]
 }

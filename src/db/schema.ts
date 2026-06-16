@@ -61,6 +61,8 @@ export const accounts = sqliteTable(
     balanceLastUpdatedAt: text('balance_last_updated_at'),
     /** Running count of how many times "Add to balance" or "Mark paid" has been clicked for this account. */
     totalMonths: integer('total_months').notNull().default(0),
+    /** Credit limit for credit-card-kind accounts, in minor units (centavos). */
+    creditLimit: integer('credit_limit'),
     createdAt: text('created_at')
       .notNull()
       .default(sql`(datetime('now'))`),
