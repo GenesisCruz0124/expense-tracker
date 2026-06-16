@@ -99,22 +99,6 @@
     .copy-hint { font-size: 11px; color: #94A3B8; text-align: center; display: none; }
     .copy-hint.visible { display: block; }
 
-    .batch-output {
-      background: #F8FAFC;
-      border: 1.5px solid #E2E8F0;
-      border-radius: 10px;
-      padding: 14px;
-      font-family: 'Courier New', monospace;
-      font-size: 13px;
-      color: #0F172A;
-      max-height: 240px;
-      overflow-y: auto;
-      white-space: pre;
-      display: none;
-      line-height: 1.7;
-    }
-    .batch-output.visible { display: block; }
-
     .validate-result {
       border-radius: 10px;
       padding: 14px 16px;
@@ -134,27 +118,6 @@
       font-weight: 700;
       text-align: center;
     }
-
-    .count-badge {
-      font-size: 11px;
-      font-weight: 600;
-      color: #64748B;
-      background: #F1F5F9;
-      border-radius: 99px;
-      padding: 2px 8px;
-      float: right;
-      margin-top: -2px;
-    }
-
-    .copy-all-btn {
-      background: #F1F5F9;
-      color: #64748B;
-      font-size: 12px;
-      padding: 8px;
-      border-radius: 8px;
-      display: none;
-    }
-    .copy-all-btn.visible { display: block; }
 
     .info-box {
       background: #EFF6FF;
@@ -194,46 +157,20 @@
   </div>
 
   <div class="info-box">
-    ℹ️ Keys are tied to a specific device. The user's <strong>Device ID</strong> is shown in the app under
+    ℹ️ One key per device. The user's <strong>Device ID</strong> is shown in the app under
     <strong>Settings → Activate Pro → Your Device ID</strong>. Ask for it before generating a key.
   </div>
 
   <!-- Single Key -->
   <div class="card">
-    <span class="card-title">Generate — Single Key</span>
+    <span class="card-title">Generate Key</span>
     <div>
       <label for="deviceId">Device ID <span class="label-hint">(from the user's phone)</span></label>
       <input type="text" id="deviceId" class="mono" placeholder="e.g. a1b2c3d4e5f60001" autocomplete="off" />
     </div>
-    <div>
-      <label for="serial">Serial <span class="label-hint">(1 – 9999)</span></label>
-      <input type="number" id="serial" min="1" max="9999" value="1" placeholder="1" />
-    </div>
     <button onclick="generateSingle()">Generate Key</button>
     <div class="key-display" id="singleKey" onclick="copyText(this.textContent, 'Key copied!')"></div>
     <p class="copy-hint" id="singleHint">Click the key to copy</p>
-  </div>
-
-  <!-- Batch Keys -->
-  <div class="card">
-    <span class="card-title">Generate — Batch <span class="count-badge" id="batchCount"></span></span>
-    <div>
-      <label for="batchDeviceId">Device ID <span class="label-hint">(same device for all keys)</span></label>
-      <input type="text" id="batchDeviceId" class="mono" placeholder="e.g. a1b2c3d4e5f60001" autocomplete="off" />
-    </div>
-    <div class="row">
-      <div>
-        <label for="batchFrom">From</label>
-        <input type="number" id="batchFrom" min="1" max="9999" value="1" placeholder="1" />
-      </div>
-      <div>
-        <label for="batchTo">To</label>
-        <input type="number" id="batchTo" min="1" max="9999" value="5" placeholder="5" />
-      </div>
-    </div>
-    <button onclick="generateBatch()">Generate Batch</button>
-    <button class="copy-all-btn secondary" id="copyAllBtn" onclick="copyAll()">Copy all keys</button>
-    <div class="batch-output" id="batchOutput"></div>
   </div>
 
   <!-- Validate -->
@@ -306,40 +243,11 @@
   function generateSingle() {
     const deviceId = document.getElementById('deviceId').value.trim();
     if (!deviceId) { showToast('Enter the Device ID first'); return; }
-    const serial = parseInt(document.getElementById('serial').value);
-    if (!serial || serial < 1 || serial > 9999) { showToast('Enter a serial between 1 and 9999'); return; }
-    const key = genKey(serial, deviceId);
+    const key = genKey(1, deviceId);
     const el = document.getElementById('singleKey');
     el.textContent = key;
     el.classList.add('visible');
     document.getElementById('singleHint').classList.add('visible');
-  }
-
-  let batchLines = [];
-
-  function generateBatch() {
-    const deviceId = document.getElementById('batchDeviceId').value.trim();
-    if (!deviceId) { showToast('Enter the Device ID first'); return; }
-    const from = parseInt(document.getElementById('batchFrom').value);
-    const to   = parseInt(document.getElementById('batchTo').value);
-    if (!from || !to || from < 1 || to > 9999 || from > to) {
-      showToast('Check your From / To range (1–9999)');
-      return;
-    }
-    if (to - from > 499) { showToast('Max 500 keys per batch'); return; }
-    batchLines = [];
-    for (let i = from; i <= to; i++) {
-      batchLines.push(`${String(i).padStart(4, '0')}  ${genKey(i, deviceId)}`);
-    }
-    const out = document.getElementById('batchOutput');
-    out.textContent = batchLines.join('\n');
-    out.classList.add('visible');
-    document.getElementById('batchCount').textContent = `${batchLines.length} keys`;
-    document.getElementById('copyAllBtn').classList.add('visible');
-  }
-
-  function copyAll() {
-    copyText(batchLines.map(l => l.split('  ')[1]).join('\n'), `${batchLines.length} keys copied!`);
   }
 
   function validateKey() {
