@@ -120,6 +120,8 @@ export interface TransferInput {
   toAccountId: number;
   /** Integer amount in minor units (cents) */
   amount: number;
+  /** Optional fee deducted from the source account (minor units). */
+  fee?: number;
   occurredAt: string;
   note?: string | null;
   receiptImageUri?: string | null;
@@ -145,7 +147,7 @@ export async function createTransfer(db: Database, input: TransferInput): Promis
 
   const [fromTransaction] = await db
     .insert(transactions)
-    .values({ ...shared, type: 'expense', accountId: input.fromAccountId })
+    .values({ ...shared, type: 'expense', accountId: input.fromAccountId, fee: input.fee ?? 0 })
     .returning();
   const [toTransaction] = await db
     .insert(transactions)
@@ -179,7 +181,7 @@ export async function updateTransfer(db: Database, transferId: number, input: Tr
 
   await db
     .update(transactions)
-    .set({ ...shared, accountId: input.fromAccountId })
+    .set({ ...shared, accountId: input.fromAccountId, fee: input.fee ?? 0 })
     .where(eq(transactions.id, legs.fromTransaction.id));
   await db
     .update(transactions)

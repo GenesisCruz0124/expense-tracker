@@ -43,6 +43,7 @@
     }
 
     label { font-size: 13px; font-weight: 600; color: #0F172A; display: block; margin-bottom: 6px; }
+    .label-hint { font-size: 11px; color: #94A3B8; font-weight: 400; margin-left: 4px; }
 
     input[type="number"], input[type="text"] {
       width: 100%;
@@ -56,6 +57,7 @@
       transition: border-color 0.15s;
     }
     input[type="number"]:focus, input[type="text"]:focus { border-color: #3B82F6; background: #fff; }
+    input.mono { font-family: 'Courier New', monospace; font-size: 13px; }
 
     .row { display: flex; gap: 10px; }
     .row > * { flex: 1; }
@@ -73,7 +75,6 @@
       transition: opacity 0.15s;
     }
     button:hover { opacity: 0.88; }
-    button.danger { background: #EF4444; }
     button.secondary { background: #64748B; }
 
     .key-display {
@@ -87,7 +88,6 @@
       color: #3B82F6;
       text-align: center;
       letter-spacing: 3px;
-      word-break: break-all;
       cursor: pointer;
       user-select: all;
       transition: background 0.15s;
@@ -126,8 +126,14 @@
     .validate-result.valid   { background: #F0FDF4; color: #16A34A; border: 1.5px solid #86EFAC; display: block; }
     .validate-result.invalid { background: #FEF2F2; color: #DC2626; border: 1.5px solid #FCA5A5; display: block; }
 
-    .validate-input-wrap { position: relative; }
-    .validate-input-wrap input { text-transform: uppercase; letter-spacing: 2px; font-family: 'Courier New', monospace; font-size: 15px; font-weight: 700; text-align: center; }
+    .validate-input-wrap input {
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      font-family: 'Courier New', monospace;
+      font-size: 15px;
+      font-weight: 700;
+      text-align: center;
+    }
 
     .count-badge {
       font-size: 11px;
@@ -149,6 +155,16 @@
       display: none;
     }
     .copy-all-btn.visible { display: block; }
+
+    .info-box {
+      background: #EFF6FF;
+      border: 1px solid #BFDBFE;
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 12px;
+      color: #1E40AF;
+      line-height: 1.7;
+    }
 
     .toast {
       position: fixed;
@@ -174,14 +190,23 @@
 
   <div class="header">
     <h1>⭐ Expense Tracker Pro</h1>
-    <p>License Key Generator &amp; Validator</p>
+    <p>License Key Generator &amp; Validator — keys are device-bound</p>
+  </div>
+
+  <div class="info-box">
+    ℹ️ Keys are tied to a specific device. The user's <strong>Device ID</strong> is shown in the app under
+    <strong>Settings → Activate Pro → Your Device ID</strong>. Ask for it before generating a key.
   </div>
 
   <!-- Single Key -->
   <div class="card">
     <span class="card-title">Generate — Single Key</span>
     <div>
-      <label for="serial">Serial number <span style="color:#94A3B8;font-weight:400">(1 – 9999)</span></label>
+      <label for="deviceId">Device ID <span class="label-hint">(from the user's phone)</span></label>
+      <input type="text" id="deviceId" class="mono" placeholder="e.g. a1b2c3d4e5f60001" autocomplete="off" />
+    </div>
+    <div>
+      <label for="serial">Serial <span class="label-hint">(1 – 9999)</span></label>
       <input type="number" id="serial" min="1" max="9999" value="1" placeholder="1" />
     </div>
     <button onclick="generateSingle()">Generate Key</button>
@@ -192,6 +217,10 @@
   <!-- Batch Keys -->
   <div class="card">
     <span class="card-title">Generate — Batch <span class="count-badge" id="batchCount"></span></span>
+    <div>
+      <label for="batchDeviceId">Device ID <span class="label-hint">(same device for all keys)</span></label>
+      <input type="text" id="batchDeviceId" class="mono" placeholder="e.g. a1b2c3d4e5f60001" autocomplete="off" />
+    </div>
     <div class="row">
       <div>
         <label for="batchFrom">From</label>
@@ -199,7 +228,7 @@
       </div>
       <div>
         <label for="batchTo">To</label>
-        <input type="number" id="batchTo" min="1" max="9999" value="10" placeholder="10" />
+        <input type="number" id="batchTo" min="1" max="9999" value="5" placeholder="5" />
       </div>
     </div>
     <button onclick="generateBatch()">Generate Batch</button>
@@ -210,6 +239,10 @@
   <!-- Validate -->
   <div class="card">
     <span class="card-title">Validate Key</span>
+    <div>
+      <label for="validateDeviceId">Device ID <span class="label-hint">(must match the one used to generate)</span></label>
+      <input type="text" id="validateDeviceId" class="mono" placeholder="e.g. a1b2c3d4e5f60001" autocomplete="off" />
+    </div>
     <div class="validate-input-wrap">
       <label for="validateInput">License key</label>
       <input
@@ -238,31 +271,44 @@
     return (n & 0xffff).toString(16).toUpperCase().padStart(4, '0');
   }
 
-  function genKey(serial) {
+  function deviceHash(deviceId) {
+    let h = 0x4857;
+    const id = deviceId.trim().toLowerCase();
+    for (let i = 0; i < id.length; i++) {
+      h = ((h << 5) - h + id.charCodeAt(i)) & 0xffff;
+    }
+    return h;
+  }
+
+  function genKey(serial, deviceId) {
     const s = serial & 0xffff;
-    const a = (s ^ S1) & 0xffff;
-    const b = ((s * S2) ^ (a >>> 3)) & 0xffff;
-    const c = (a ^ b ^ (s << 5)) & 0xffff;
+    const dh = deviceHash(deviceId);
+    const a = (s ^ S1 ^ dh) & 0xffff;
+    const b = ((s * S2) ^ (a >>> 3) ^ dh) & 0xffff;
+    const c = (a ^ b ^ (s << 5) ^ dh) & 0xffff;
     const d = ((a * 3 + b * 7 + c * 13 + S1 * S2) ^ (a ^ b ^ c)) & 0xffff;
     return [a, b, c, d].map(h4).join('-');
   }
 
-  function isValid(key) {
+  function isValid(key, deviceId) {
     const parts = key.trim().toUpperCase().replace(/\s/g, '').split('-');
     if (parts.length !== 4 || parts.some(p => !/^[0-9A-F]{4}$/.test(p))) return false;
     const [a, b, c, d] = parts.map(p => parseInt(p, 16));
-    const s = a ^ S1;
+    const dh = deviceHash(deviceId);
+    const s = (a ^ S1 ^ dh) & 0xffff;
     if (s < 1 || s > 9999) return false;
-    const eb = ((s * S2) ^ (a >>> 3)) & 0xffff;
-    const ec = (a ^ b ^ (s << 5)) & 0xffff;
+    const eb = ((s * S2) ^ (a >>> 3) ^ dh) & 0xffff;
+    const ec = (a ^ b ^ (s << 5) ^ dh) & 0xffff;
     const ed = ((a * 3 + b * 7 + c * 13 + S1 * S2) ^ (a ^ b ^ c)) & 0xffff;
     return b === eb && c === ec && d === ed;
   }
 
   function generateSingle() {
+    const deviceId = document.getElementById('deviceId').value.trim();
+    if (!deviceId) { showToast('Enter the Device ID first'); return; }
     const serial = parseInt(document.getElementById('serial').value);
     if (!serial || serial < 1 || serial > 9999) { showToast('Enter a serial between 1 and 9999'); return; }
-    const key = genKey(serial);
+    const key = genKey(serial, deviceId);
     const el = document.getElementById('singleKey');
     el.textContent = key;
     el.classList.add('visible');
@@ -272,6 +318,8 @@
   let batchLines = [];
 
   function generateBatch() {
+    const deviceId = document.getElementById('batchDeviceId').value.trim();
+    if (!deviceId) { showToast('Enter the Device ID first'); return; }
     const from = parseInt(document.getElementById('batchFrom').value);
     const to   = parseInt(document.getElementById('batchTo').value);
     if (!from || !to || from < 1 || to > 9999 || from > to) {
@@ -281,7 +329,7 @@
     if (to - from > 499) { showToast('Max 500 keys per batch'); return; }
     batchLines = [];
     for (let i = from; i <= to; i++) {
-      batchLines.push(`${String(i).padStart(4, '0')}  ${genKey(i)}`);
+      batchLines.push(`${String(i).padStart(4, '0')}  ${genKey(i, deviceId)}`);
     }
     const out = document.getElementById('batchOutput');
     out.textContent = batchLines.join('\n');
@@ -295,35 +343,31 @@
   }
 
   function validateKey() {
+    const deviceId = document.getElementById('validateDeviceId').value.trim();
     const raw = document.getElementById('validateInput').value.trim();
     const result = document.getElementById('validateResult');
-    if (!raw) { result.className = 'validate-result'; return; }
-    if (isValid(raw)) {
+    if (!raw || !deviceId) { result.className = 'validate-result'; return; }
+    if (isValid(raw, deviceId)) {
       result.className = 'validate-result valid';
-      result.textContent = '✓  Valid license key';
+      result.textContent = '✓  Valid — key is bound to this Device ID';
     } else {
       result.className = 'validate-result invalid';
-      result.textContent = '✕  Invalid license key';
+      result.textContent = '✕  Invalid — wrong key or wrong Device ID';
     }
   }
 
   function onValidateInput(el) {
-    // Auto-format as XXXX-XXXX-XXXX-XXXX
-    const pos = el.selectionStart;
     const raw = el.value.toUpperCase().replace(/[^0-9A-F]/g, '').slice(0, 16);
     const groups = [raw.slice(0,4), raw.slice(4,8), raw.slice(8,12), raw.slice(12,16)].filter(Boolean);
     el.value = groups.join('-');
-    // clear result while typing
     document.getElementById('validateResult').className = 'validate-result';
-    // auto-validate when full key entered
     if (raw.length === 16) validateKey();
   }
 
   function copyText(text, msg) {
     navigator.clipboard.writeText(text).then(() => showToast(msg || 'Copied!')).catch(() => {
-      // fallback
       const ta = document.createElement('textarea');
-      ta.value = text; ta.style.position='fixed'; ta.style.opacity=0;
+      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = 0;
       document.body.appendChild(ta); ta.select();
       document.execCommand('copy');
       document.body.removeChild(ta);

@@ -11,21 +11,30 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 
 import { PALETTE } from '../constants/colors';
 import { useLicense } from '../context/LicenseProvider';
 import { TRIAL_DAYS } from '../utils/license';
 
 export default function ActivationScreen() {
-  const { status, daysLeft, activateKey } = useLicense();
+  const { status, daysLeft, deviceId, activateKey } = useLicense();
   const [keyInput, setKeyInput] = useState('');
   const [keyError, setKeyError] = useState('');
   const [activating, setActivating] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   function formatKeyInput(raw: string): string {
     const clean = raw.toUpperCase().replace(/[^0-9A-F]/g, '');
     const groups = [clean.slice(0, 4), clean.slice(4, 8), clean.slice(8, 12), clean.slice(12, 16)].filter(Boolean);
     return groups.join('-');
+  }
+
+  async function handleCopyDeviceId() {
+    if (!deviceId) return;
+    await Clipboard.setStringAsync(deviceId);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
 
   async function handleActivate() {
@@ -38,7 +47,7 @@ export default function ActivationScreen() {
     const result = await activateKey(keyInput);
     setActivating(false);
     if (result === 'invalid') {
-      setKeyError('Invalid license key. Please check and try again.');
+      setKeyError('Invalid license key. Keys are bound to this specific device.');
     } else {
       Alert.alert('Activated!', 'Expense Tracker Pro is now unlocked. Thank you!');
     }
@@ -61,13 +70,27 @@ export default function ActivationScreen() {
           </Text>
         </View>
 
+        {deviceId ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Your Device ID</Text>
+            <Text style={styles.helperText}>
+              Share this with the developer to receive a license key bound to this device.
+            </Text>
+            <View style={styles.deviceIdRow}>
+              <Text style={styles.deviceIdValue} selectable>{deviceId}</Text>
+              <Pressable style={styles.copyButton} onPress={handleCopyDeviceId}>
+                <Text style={styles.copyButtonText}>{copied ? '✓ Copied' : 'Copy'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
+
         {!isPro ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Activate License</Text>
             <Text style={styles.helperText}>
               Enter your license key below to unlock Pro permanently on this device.
             </Text>
-
             <View style={styles.inputGroup}>
               <TextInput
                 style={[styles.keyInput, keyError ? styles.keyInputError : null]}
@@ -84,7 +107,6 @@ export default function ActivationScreen() {
               />
               {keyError ? <Text style={styles.errorText}>{keyError}</Text> : null}
             </View>
-
             <Pressable
               style={[styles.activateButton, activating && styles.activateButtonDisabled]}
               onPress={handleActivate}
@@ -118,7 +140,7 @@ export default function ActivationScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Get a License Key</Text>
           <Text style={styles.helperText}>
-            Contact the developer to purchase a license key for this device.
+            Contact the developer with your Device ID above to purchase a key for this device.
           </Text>
           <View style={styles.row}>
             <Text style={styles.rowLabel}>Email</Text>
@@ -159,6 +181,31 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   helperText: { fontSize: 13, color: PALETTE.textSecondary, lineHeight: 19 },
+  deviceIdRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: PALETTE.background,
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.border,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 10,
+  },
+  deviceIdValue: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '700',
+    color: PALETTE.textPrimary,
+    fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
+  },
+  copyButton: {
+    backgroundColor: `${PALETTE.net}1A`,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  copyButtonText: { fontSize: 12, fontWeight: '700', color: PALETTE.net },
   inputGroup: { gap: 6 },
   keyInput: {
     borderWidth: 1.5,

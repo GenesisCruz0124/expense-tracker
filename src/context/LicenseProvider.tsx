@@ -14,6 +14,7 @@ import {
 import { PALETTE } from '../constants/colors';
 import { getSetting, setSetting } from '../db/queries/settings';
 import { TRIAL_DAYS, trialDaysLeft, validateKey } from '../utils/license';
+import { getDeviceId } from '../utils/deviceId';
 import { useDatabase } from './DatabaseProvider';
 
 export type LicenseStatus = 'loading' | 'trial' | 'pro' | 'expired';
@@ -21,6 +22,7 @@ export type LicenseStatus = 'loading' | 'trial' | 'pro' | 'expired';
 interface LicenseContextValue {
   status: LicenseStatus;
   daysLeft: number;
+  deviceId: string;
   activateKey: (key: string) => Promise<'ok' | 'invalid'>;
 }
 
@@ -36,29 +38,11 @@ export function LicenseProvider({ children }: { children: React.ReactNode }) {
   const { db } = useDatabase();
   const [status, setStatus] = useState<LicenseStatus>('loading');
   const [daysLeft, setDaysLeft] = useState(TRIAL_DAYS);
+  const [deviceId, setDeviceId] = useState('');
   const [keyInput, setKeyInput] = useState('');
   const [keyError, setKeyError] = useState('');
   const [activating, setActivating] = useState(false);
   const initialized = useRef(false);
-
-  const computeStatus = useCallback(
-    (firstLaunchAt: string | null, licenseKey: string | null) => {
-      if (licenseKey && validateKey(licenseKey)) {
-        setStatus('pro');
-        setDaysLeft(0);
-        return;
-      }
-      if (!firstLaunchAt) {
-        setStatus('trial');
-        setDaysLeft(TRIAL_DAYS);
-        return;
-      }
-      const left = trialDaysLeft(firstLaunchAt);
-      setDaysLeft(left);
-      setStatus(left > 0 ? 'trial' : 'expired');
-    },
-    [],
-  );
 
   useEffect(() => {
     if (initialized.current) return;
@@ -66,29 +50,41 @@ export function LicenseProvider({ children }: { children: React.ReactNode }) {
 
     (async () => {
       try {
+        const id = await getDeviceId();
+        setDeviceId(id);
+
         let firstLaunchAt = await getSetting(db, 'firstLaunchAt');
         if (!firstLaunchAt) {
           firstLaunchAt = new Date().toISOString().slice(0, 10);
           await setSetting(db, 'firstLaunchAt', firstLaunchAt);
         }
-        const licenseKey = await getSetting(db, 'licenseKey');
-        computeStatus(firstLaunchAt, licenseKey);
+
+        const storedKey = await getSetting(db, 'licenseKey');
+        if (storedKey && validateKey(storedKey, id)) {
+          setStatus('pro');
+          setDaysLeft(0);
+          return;
+        }
+
+        const left = trialDaysLeft(firstLaunchAt);
+        setDaysLeft(left);
+        setStatus(left > 0 ? 'trial' : 'expired');
       } catch {
         setStatus('trial');
         setDaysLeft(TRIAL_DAYS);
       }
     })();
-  }, [db, computeStatus]);
+  }, [db]);
 
   const activateKey = useCallback(
     async (key: string): Promise<'ok' | 'invalid'> => {
-      if (!validateKey(key)) return 'invalid';
+      if (!validateKey(key, deviceId)) return 'invalid';
       await setSetting(db, 'licenseKey', key.trim().toUpperCase());
       setStatus('pro');
       setDaysLeft(0);
       return 'ok';
     },
-    [db],
+    [db, deviceId],
   );
 
   async function handleActivate() {
@@ -101,7 +97,7 @@ export function LicenseProvider({ children }: { children: React.ReactNode }) {
     const result = await activateKey(keyInput);
     setActivating(false);
     if (result === 'invalid') {
-      setKeyError('Invalid license key. Please check and try again.');
+      setKeyError('Invalid license key. Keys are bound to this device.');
     }
   }
 
@@ -112,7 +108,7 @@ export function LicenseProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <LicenseContext.Provider value={{ status, daysLeft, activateKey }}>
+    <LicenseContext.Provider value={{ status, daysLeft, deviceId, activateKey }}>
       {children}
 
       <Modal visible={status === 'expired'} animationType="slide" statusBarTranslucent>
@@ -123,6 +119,14 @@ export function LicenseProvider({ children }: { children: React.ReactNode }) {
             <Text style={styles.modalSubtitle}>
               Your {TRIAL_DAYS}-day free trial has ended. Enter your license key to unlock Expense Tracker Pro.
             </Text>
+
+            {deviceId ? (
+              <View style={styles.deviceIdBox}>
+                <Text style={styles.deviceIdLabel}>YOUR DEVICE ID</Text>
+                <Text style={styles.deviceIdValue} selectable>{deviceId}</Text>
+                <Text style={styles.deviceIdHint}>Share this with the developer to get your key</Text>
+              </View>
+            ) : null}
 
             <View style={styles.inputGroup}>
               <TextInput
@@ -154,8 +158,7 @@ export function LicenseProvider({ children }: { children: React.ReactNode }) {
             </Pressable>
 
             <Text style={styles.contactHint}>
-              Need a license key? Contact{'\n'}
-              <Text style={styles.contactEmail}>genesiscruz.dev@gmail.com</Text>
+              Contact <Text style={styles.contactEmail}>genesiscruz.dev@gmail.com</Text>
             </Text>
           </View>
         </KeyboardAvoidingView>
@@ -174,12 +177,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   lockIcon: { fontSize: 48 },
-  modalTitle: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: PALETTE.textPrimary,
-    textAlign: 'center',
-  },
+  modalTitle: { fontSize: 26, fontWeight: '800', color: PALETTE.textPrimary, textAlign: 'center' },
   modalSubtitle: {
     fontSize: 14,
     color: PALETTE.textSecondary,
@@ -187,6 +185,30 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     maxWidth: 300,
   },
+  deviceIdBox: {
+    width: '100%',
+    backgroundColor: PALETTE.surface,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.border,
+    padding: 14,
+    gap: 4,
+    alignItems: 'center',
+  },
+  deviceIdLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: PALETTE.textSecondary,
+    letterSpacing: 0.8,
+  },
+  deviceIdValue: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: PALETTE.textPrimary,
+    fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
+    textAlign: 'center',
+  },
+  deviceIdHint: { fontSize: 11, color: PALETTE.textSecondary },
   inputGroup: { width: '100%', gap: 6 },
   keyInput: {
     width: '100%',
@@ -213,12 +235,6 @@ const styles = StyleSheet.create({
   },
   activateButtonDisabled: { opacity: 0.6 },
   activateButtonText: { color: '#fff', fontSize: 16, fontWeight: '800' },
-  contactHint: {
-    fontSize: 12,
-    color: PALETTE.textSecondary,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginTop: 8,
-  },
+  contactHint: { fontSize: 12, color: PALETTE.textSecondary, textAlign: 'center' },
   contactEmail: { color: PALETTE.net, fontWeight: '600' },
 });

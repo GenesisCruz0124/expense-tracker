@@ -11,6 +11,7 @@
     "date-fns": "^4.4.0",
     "drizzle-orm": "^0.45.2",
     "expo": "~54.0.34",
+    "expo-application": "~7.0.8",
     "expo-clipboard": "~8.0.8",
     "expo-constants": "~18.0.13",
     "expo-document-picker": "~14.0.8",

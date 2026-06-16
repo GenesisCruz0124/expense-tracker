@@ -56,6 +56,7 @@ export default function AddEditTransactionScreen() {
         setType('transfer');
         setTransferId(legs.transferId);
         setAmountText(String(fromMinorUnits(legs.fromTransaction.amount)));
+        setFeeText(legs.fromTransaction.fee ? String(fromMinorUnits(legs.fromTransaction.fee)) : '');
         setAccountId(legs.fromTransaction.accountId);
         setToAccountId(legs.toTransaction.accountId);
         setOccurredAt(legs.fromTransaction.occurredAt);
@@ -130,6 +131,7 @@ export default function AddEditTransactionScreen() {
           fromAccountId: accountId,
           toAccountId,
           amount,
+          fee: fee ?? 0,
           occurredAt,
           note: note.trim() || null,
           receiptImageUri,
@@ -227,12 +229,10 @@ export default function AddEditTransactionScreen() {
         <AmountInput value={amountText} onChangeText={setAmountText} />
       </View>
 
-      {type !== 'transfer' ? (
-        <View style={styles.field}>
-          <Text style={styles.label}>Fee (optional)</Text>
-          <AmountInput value={feeText} onChangeText={setFeeText} />
-        </View>
-      ) : null}
+      <View style={styles.field}>
+        <Text style={styles.label}>{type === 'transfer' ? 'Transfer fee (optional)' : 'Fee (optional)'}</Text>
+        <AmountInput value={feeText} onChangeText={setFeeText} />
+      </View>
 
       {type !== 'transfer' ? (
         <View style={styles.field}>
