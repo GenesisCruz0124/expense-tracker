@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Expense Tracker — License Key Generator</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #F8FAFC;
+      color: #0F172A;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 40px 16px 60px;
+    }
+
+    .container { width: 100%; max-width: 560px; display: flex; flex-direction: column; gap: 24px; }
+
+    .header { text-align: center; }
+    .header h1 { font-size: 22px; font-weight: 800; color: #0F172A; margin-bottom: 4px; }
+    .header p  { font-size: 13px; color: #64748B; }
+
+    .card {
+      background: #fff;
+      border-radius: 14px;
+      border: 1px solid #E2E8F0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .card-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: #64748B;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    label { font-size: 13px; font-weight: 600; color: #0F172A; display: block; margin-bottom: 6px; }
+
+    input[type="number"], input[type="text"] {
+      width: 100%;
+      border: 1.5px solid #E2E8F0;
+      border-radius: 10px;
+      padding: 11px 14px;
+      font-size: 14px;
+      color: #0F172A;
+      background: #F8FAFC;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input[type="number"]:focus, input[type="text"]:focus { border-color: #3B82F6; background: #fff; }
+
+    .row { display: flex; gap: 10px; }
+    .row > * { flex: 1; }
+
+    button {
+      width: 100%;
+      background: #3B82F6;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 12px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    button:hover { opacity: 0.88; }
+    button.danger { background: #EF4444; }
+    button.secondary { background: #64748B; }
+
+    .key-display {
+      background: #F8FAFC;
+      border: 1.5px solid #E2E8F0;
+      border-radius: 10px;
+      padding: 14px;
+      font-family: 'Courier New', monospace;
+      font-size: 20px;
+      font-weight: 700;
+      color: #3B82F6;
+      text-align: center;
+      letter-spacing: 3px;
+      word-break: break-all;
+      cursor: pointer;
+      user-select: all;
+      transition: background 0.15s;
+      display: none;
+    }
+    .key-display:hover { background: #EFF6FF; }
+    .key-display.visible { display: block; }
+
+    .copy-hint { font-size: 11px; color: #94A3B8; text-align: center; display: none; }
+    .copy-hint.visible { display: block; }
+
+    .batch-output {
+      background: #F8FAFC;
+      border: 1.5px solid #E2E8F0;
+      border-radius: 10px;
+      padding: 14px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      color: #0F172A;
+      max-height: 240px;
+      overflow-y: auto;
+      white-space: pre;
+      display: none;
+      line-height: 1.7;
+    }
+    .batch-output.visible { display: block; }
+
+    .validate-result {
+      border-radius: 10px;
+      padding: 14px 16px;
+      font-size: 14px;
+      font-weight: 700;
+      text-align: center;
+      display: none;
+    }
+    .validate-result.valid   { background: #F0FDF4; color: #16A34A; border: 1.5px solid #86EFAC; display: block; }
+    .validate-result.invalid { background: #FEF2F2; color: #DC2626; border: 1.5px solid #FCA5A5; display: block; }
+
+    .validate-input-wrap { position: relative; }
+    .validate-input-wrap input { text-transform: uppercase; letter-spacing: 2px; font-family: 'Courier New', monospace; font-size: 15px; font-weight: 700; text-align: center; }
+
+    .count-badge {
+      font-size: 11px;
+      font-weight: 600;
+      color: #64748B;
+      background: #F1F5F9;
+      border-radius: 99px;
+      padding: 2px 8px;
+      float: right;
+      margin-top: -2px;
+    }
+
+    .copy-all-btn {
+      background: #F1F5F9;
+      color: #64748B;
+      font-size: 12px;
+      padding: 8px;
+      border-radius: 8px;
+      display: none;
+    }
+    .copy-all-btn.visible { display: block; }
+
+    .toast {
+      position: fixed;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: #0F172A;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 10px 20px;
+      border-radius: 99px;
+      opacity: 0;
+      transition: opacity 0.2s, transform 0.2s;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <h1>⭐ Expense Tracker Pro</h1>
+    <p>License Key Generator &amp; Validator</p>
+  </div>
+
+  <!-- Single Key -->
+  <div class="card">
+    <span class="card-title">Generate — Single Key</span>
+    <div>
+      <label for="serial">Serial number <span style="color:#94A3B8;font-weight:400">(1 – 9999)</span></label>
+      <input type="number" id="serial" min="1" max="9999" value="1" placeholder="1" />
+    </div>
+    <button onclick="generateSingle()">Generate Key</button>
+    <div class="key-display" id="singleKey" onclick="copyText(this.textContent, 'Key copied!')"></div>
+    <p class="copy-hint" id="singleHint">Click the key to copy</p>
+  </div>
+
+  <!-- Batch Keys -->
+  <div class="card">
+    <span class="card-title">Generate — Batch <span class="count-badge" id="batchCount"></span></span>
+    <div class="row">
+      <div>
+        <label for="batchFrom">From</label>
+        <input type="number" id="batchFrom" min="1" max="9999" value="1" placeholder="1" />
+      </div>
+      <div>
+        <label for="batchTo">To</label>
+        <input type="number" id="batchTo" min="1" max="9999" value="10" placeholder="10" />
+      </div>
+    </div>
+    <button onclick="generateBatch()">Generate Batch</button>
+    <button class="copy-all-btn secondary" id="copyAllBtn" onclick="copyAll()">Copy all keys</button>
+    <div class="batch-output" id="batchOutput"></div>
+  </div>
+
+  <!-- Validate -->
+  <div class="card">
+    <span class="card-title">Validate Key</span>
+    <div class="validate-input-wrap">
+      <label for="validateInput">License key</label>
+      <input
+        type="text"
+        id="validateInput"
+        placeholder="XXXX-XXXX-XXXX-XXXX"
+        maxlength="19"
+        autocomplete="off"
+        oninput="onValidateInput(this)"
+        onkeydown="if(event.key==='Enter') validateKey()"
+      />
+    </div>
+    <button onclick="validateKey()">Validate</button>
+    <div class="validate-result" id="validateResult"></div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const S1 = 0x5a3f;
+  const S2 = 0x1d7b;
+
+  function h4(n) {
+    return (n & 0xffff).toString(16).toUpperCase().padStart(4, '0');
+  }
+
+  function genKey(serial) {
+    const s = serial & 0xffff;
+    const a = (s ^ S1) & 0xffff;
+    const b = ((s * S2) ^ (a >>> 3)) & 0xffff;
+    const c = (a ^ b ^ (s << 5)) & 0xffff;
+    const d = ((a * 3 + b * 7 + c * 13 + S1 * S2) ^ (a ^ b ^ c)) & 0xffff;
+    return [a, b, c, d].map(h4).join('-');
+  }
+
+  function isValid(key) {
+    const parts = key.trim().toUpperCase().replace(/\s/g, '').split('-');
+    if (parts.length !== 4 || parts.some(p => !/^[0-9A-F]{4}$/.test(p))) return false;
+    const [a, b, c, d] = parts.map(p => parseInt(p, 16));
+    const s = a ^ S1;
+    if (s < 1 || s > 9999) return false;
+    const eb = ((s * S2) ^ (a >>> 3)) & 0xffff;
+    const ec = (a ^ b ^ (s << 5)) & 0xffff;
+    const ed = ((a * 3 + b * 7 + c * 13 + S1 * S2) ^ (a ^ b ^ c)) & 0xffff;
+    return b === eb && c === ec && d === ed;
+  }
+
+  function generateSingle() {
+    const serial = parseInt(document.getElementById('serial').value);
+    if (!serial || serial < 1 || serial > 9999) { showToast('Enter a serial between 1 and 9999'); return; }
+    const key = genKey(serial);
+    const el = document.getElementById('singleKey');
+    el.textContent = key;
+    el.classList.add('visible');
+    document.getElementById('singleHint').classList.add('visible');
+  }
+
+  let batchLines = [];
+
+  function generateBatch() {
+    const from = parseInt(document.getElementById('batchFrom').value);
+    const to   = parseInt(document.getElementById('batchTo').value);
+    if (!from || !to || from < 1 || to > 9999 || from > to) {
+      showToast('Check your From / To range (1–9999)');
+      return;
+    }
+    if (to - from > 499) { showToast('Max 500 keys per batch'); return; }
+    batchLines = [];
+    for (let i = from; i <= to; i++) {
+      batchLines.push(`${String(i).padStart(4, '0')}  ${genKey(i)}`);
+    }
+    const out = document.getElementById('batchOutput');
+    out.textContent = batchLines.join('\n');
+    out.classList.add('visible');
+    document.getElementById('batchCount').textContent = `${batchLines.length} keys`;
+    document.getElementById('copyAllBtn').classList.add('visible');
+  }
+
+  function copyAll() {
+    copyText(batchLines.map(l => l.split('  ')[1]).join('\n'), `${batchLines.length} keys copied!`);
+  }
+
+  function validateKey() {
+    const raw = document.getElementById('validateInput').value.trim();
+    const result = document.getElementById('validateResult');
+    if (!raw) { result.className = 'validate-result'; return; }
+    if (isValid(raw)) {
+      result.className = 'validate-result valid';
+      result.textContent = '✓  Valid license key';
+    } else {
+      result.className = 'validate-result invalid';
+      result.textContent = '✕  Invalid license key';
+    }
+  }
+
+  function onValidateInput(el) {
+    // Auto-format as XXXX-XXXX-XXXX-XXXX
+    const pos = el.selectionStart;
+    const raw = el.value.toUpperCase().replace(/[^0-9A-F]/g, '').slice(0, 16);
+    const groups = [raw.slice(0,4), raw.slice(4,8), raw.slice(8,12), raw.slice(12,16)].filter(Boolean);
+    el.value = groups.join('-');
+    // clear result while typing
+    document.getElementById('validateResult').className = 'validate-result';
+    // auto-validate when full key entered
+    if (raw.length === 16) validateKey();
+  }
+
+  function copyText(text, msg) {
+    navigator.clipboard.writeText(text).then(() => showToast(msg || 'Copied!')).catch(() => {
+      // fallback
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.style.position='fixed'; ta.style.opacity=0;
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      showToast(msg || 'Copied!');
+    });
+  }
+
+  let toastTimer;
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2000);
+  }
+</script>
+</body>
+</html>
