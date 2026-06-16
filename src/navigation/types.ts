@@ -14,6 +14,7 @@ export type MoreStackParamList = {
   Categories: undefined;
   AccountCategories: undefined;
   Billers: undefined;
+  Activation: undefined;
 };
 
 export type TabParamList = {

@@ -7,9 +7,11 @@ import migrations from '../db/migrations/migrations';
 import { repairAccountsSchema } from '../db/repair';
 import { seedAdditionalCategories, seedDefaultCategories } from '../db/seed';
 import { generateDueRecurringTransactions } from '../db/queries/recurring';
+import { initSettingsTable } from '../db/queries/settings';
 import { checkBudgetAlerts } from '../db/budgetAlerts';
 import { checkBillReminders } from '../db/billReminders';
 import { configureNotificationChannel, requestNotificationPermissions } from '../utils/notifications';
+import { LicenseProvider } from './LicenseProvider';
 import { PALETTE } from '../constants/colors';
 
 interface DatabaseContextValue {
@@ -49,6 +51,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     (async () => {
       try {
         await repairAccountsSchema(db);
+        await initSettingsTable(db);
         await configureNotificationChannel();
         await requestNotificationPermissions();
         await seedDefaultCategories(db);
@@ -86,7 +89,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <DatabaseContext.Provider value={{ db, refreshSignal, notifyDataChanged }}>
-      {children}
+      <LicenseProvider>{children}</LicenseProvider>
     </DatabaseContext.Provider>
   );
 }

@@ -7,6 +7,8 @@ import * as Notifications from 'expo-notifications';
 
 import { PALETTE } from '../constants/colors';
 import { useDatabase } from '../context/DatabaseProvider';
+import { useLicense } from '../context/LicenseProvider';
+import { TRIAL_DAYS } from '../utils/license';
 import { deleteAllTransactions } from '../db/queries/transactions';
 import type { MoreStackParamList } from '../navigation/types';
 import { createBackupFile, pickBackupFile, restoreBackupFromFile, shareBackupFile } from '../utils/backup';
@@ -23,6 +25,7 @@ const STATUS_LABEL: Record<Notifications.PermissionStatus, string> = {
 export default function SettingsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<MoreStackParamList>>();
   const { db, notifyDataChanged } = useDatabase();
+  const { status: licenseStatus, daysLeft } = useLicense();
   const [status, setStatus] = useState<Notifications.PermissionStatus | null>(null);
   const [clearing, setClearing] = useState(false);
   const [backingUp, setBackingUp] = useState(false);
@@ -188,6 +191,30 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.section}>
+        <Text style={styles.sectionTitle}>License</Text>
+        <View style={styles.row}>
+          <Text style={styles.rowLabel}>Status</Text>
+          <Text style={[styles.rowValue, licenseStatus === 'pro' && styles.rowValuePro]}>
+            {licenseStatus === 'pro'
+              ? 'Pro — Activated'
+              : licenseStatus === 'trial'
+                ? `Trial — ${daysLeft} day${daysLeft !== 1 ? 's' : ''} left`
+                : 'Trial expired'}
+          </Text>
+        </View>
+        {licenseStatus !== 'pro' ? (
+          <Pressable style={styles.button} onPress={() => navigation.navigate('Activation')}>
+            <Text style={styles.buttonText}>Activate License Key</Text>
+          </Pressable>
+        ) : null}
+        {licenseStatus === 'trial' ? (
+          <Text style={styles.helperText}>
+            You have {daysLeft} of {TRIAL_DAYS} trial days remaining. Activate a license key to unlock Pro permanently.
+          </Text>
+        ) : null}
+      </View>
+
+      <View style={styles.section}>
         <Text style={styles.sectionTitle}>About</Text>
         <View style={styles.row}>
           <Text style={styles.rowLabel}>App</Text>
@@ -223,6 +250,7 @@ const styles = StyleSheet.create({
   rowValue: { fontSize: 14, color: PALETTE.textSecondary },
   rowChevron: { fontSize: 18, color: PALETTE.textSecondary },
   rowValueLink: { color: PALETTE.net, fontWeight: '600' },
+  rowValuePro: { color: PALETTE.income, fontWeight: '700' },
   button: { alignSelf: 'flex-start', paddingVertical: 8, paddingHorizontal: 14, borderRadius: 10, backgroundColor: `${PALETTE.net}1A` },
   buttonText: { fontSize: 13, fontWeight: '700', color: PALETTE.net },
   dangerButton: { backgroundColor: `${PALETTE.danger}1A` },

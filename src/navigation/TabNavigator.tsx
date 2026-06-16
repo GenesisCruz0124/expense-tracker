@@ -7,6 +7,7 @@ import { PALETTE } from '../constants/colors';
 import AccountCategoriesScreen from '../screens/AccountCategoriesScreen';
 import AccountsScreen from '../screens/AccountsScreen';
 import AccountTransactionsScreen from '../screens/AccountTransactionsScreen';
+import ActivationScreen from '../screens/ActivationScreen';
 import BillersScreen from '../screens/BillersScreen';
 import BillsScreen from '../screens/BillsScreen';
 import BudgetsScreen from '../screens/BudgetsScreen';
@@ -65,6 +66,7 @@ function MoreNavigator() {
         options={{ title: 'Account Types' }}
       />
       <MoreStack.Screen name="Billers" component={BillersScreen} options={{ title: 'Billers' }} />
+      <MoreStack.Screen name="Activation" component={ActivationScreen} options={{ title: 'Activate Pro' }} />
     </MoreStack.Navigator>
   );
 }
