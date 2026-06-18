@@ -200,25 +200,36 @@ export async function restoreBackupFromFile(db: Database, fileUri: string): Prom
     }
 
     const accountIdMap = new Map<number, number>();
-    for (const { id, categoryId, qrImageUri, ...rest } of backup.tables.accounts) {
+    const linkedCreditCardPairs: { newId: number; oldLinkedCreditCardId: number }[] = [];
+    for (const { id, categoryId, qrImageUri, linkedCreditCardId, ...rest } of backup.tables.accounts) {
       const [inserted] = await tx
         .insert(accounts)
         .values({
           ...rest,
           categoryId: accountCategoryIdMap.get(categoryId) ?? categoryId,
           qrImageUri: qrImageUri ? uriMap.get(qrImageUri) ?? qrImageUri : null,
+          linkedCreditCardId: null,
         })
         .returning();
       accountIdMap.set(id, inserted.id);
+      if (linkedCreditCardId != null) linkedCreditCardPairs.push({ newId: inserted.id, oldLinkedCreditCardId: linkedCreditCardId });
+    }
+
+    for (const { newId, oldLinkedCreditCardId } of linkedCreditCardPairs) {
+      const newLinkedCreditCardId = accountIdMap.get(oldLinkedCreditCardId);
+      if (newLinkedCreditCardId != null) {
+        await tx.update(accounts).set({ linkedCreditCardId: newLinkedCreditCardId }).where(eq(accounts.id, newId));
+      }
     }
 
     const recurringIdMap = new Map<number, number>();
-    for (const { id, categoryId, ...rest } of backup.tables.recurringTransactions) {
+    for (const { id, categoryId, billerId, ...rest } of backup.tables.recurringTransactions) {
       const [inserted] = await tx
         .insert(recurringTransactions)
         .values({
           ...rest,
           categoryId: categoryId != null ? categoryIdMap.get(categoryId) ?? null : null,
+          billerId: billerId != null ? categoryIdMap.get(billerId) ?? null : null,
         })
         .returning();
       recurringIdMap.set(id, inserted.id);
