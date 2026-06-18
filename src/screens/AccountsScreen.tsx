@@ -28,6 +28,29 @@ type AccountsScreenNavigationProp = CompositeNavigationProp<
 
 const AMOUNT_MASK = '••••••';
 
+type SortOption = 'name_asc' | 'name_desc' | 'balance_desc' | 'balance_asc';
+
+const SORT_LABELS: Record<SortOption, string> = {
+  name_asc: 'Name (A–Z)',
+  name_desc: 'Name (Z–A)',
+  balance_desc: 'Balance (high to low)',
+  balance_asc: 'Balance (low to high)',
+};
+
+function sortAccounts(accounts: AccountWithBalance[], sort: SortOption): AccountWithBalance[] {
+  const sorted = [...accounts];
+  switch (sort) {
+    case 'name_asc':
+      return sorted.sort((a, b) => a.name.localeCompare(b.name));
+    case 'name_desc':
+      return sorted.sort((a, b) => b.name.localeCompare(a.name));
+    case 'balance_desc':
+      return sorted.sort((a, b) => b.balance - a.balance);
+    case 'balance_asc':
+      return sorted.sort((a, b) => a.balance - b.balance);
+  }
+}
+
 /** Returns the last 4 digits of an account number for a masked subtitle, or null if too short to mask. */
 function lastFourDigits(accountNumber: string | null): string | null {
   const digits = (accountNumber ?? '').replace(/\D/g, '');
@@ -40,6 +63,8 @@ export default function AccountsScreen() {
   const [hideAmounts, setHideAmounts] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [menuAccount, setMenuAccount] = useState<AccountWithBalance | null>(null);
+  const [sortOption, setSortOption] = useState<SortOption>('name_asc');
+  const [showSortPicker, setShowSortPicker] = useState(false);
   const { accounts, error, setArchived } = useAccounts({ includeArchived: true });
   const { accountCategories } = useAccountCategories({ includeArchived: true });
 
@@ -74,7 +99,7 @@ export default function AccountsScreen() {
   const sections = useMemo<AccountSection[]>(() => {
     return accountCategories
       .map((category) => {
-        const data = filtered.filter((account) => account.categoryId === category.id);
+        const data = sortAccounts(filtered.filter((account) => account.categoryId === category.id), sortOption);
         return {
           title: category.name,
           icon: category.icon ?? DEFAULT_ACCOUNT_ICON,
@@ -84,7 +109,7 @@ export default function AccountsScreen() {
         };
       })
       .filter((section) => section.data.length > 0);
-  }, [accountCategories, filtered]);
+  }, [accountCategories, filtered, sortOption]);
 
   return (
     <View style={styles.screen}>
@@ -150,6 +175,12 @@ export default function AccountsScreen() {
                 })}
               </ScrollView>
             ) : null}
+
+            <View style={styles.controlsRow}>
+              <Pressable style={styles.sortButton} onPress={() => setShowSortPicker(true)}>
+                <Text style={styles.sortButtonText}>⇅ Sort: {SORT_LABELS[sortOption]}</Text>
+              </Pressable>
+            </View>
 
             <View style={styles.toggleRow}>
               <Text style={styles.toggleLabel}>Show archived</Text>
@@ -242,6 +273,16 @@ export default function AccountsScreen() {
             : []
         }
       />
+
+      <ActionSheet
+        visible={showSortPicker}
+        onClose={() => setShowSortPicker(false)}
+        title="Sort accounts by"
+        options={(Object.keys(SORT_LABELS) as SortOption[]).map((option) => ({
+          label: SORT_LABELS[option],
+          onPress: () => { setSortOption(option); setShowSortPicker(false); },
+        }))}
+      />
     </View>
   );
 }
@@ -301,6 +342,16 @@ const styles = StyleSheet.create({
   filterChipAllSelected: { borderColor: PALETTE.net, backgroundColor: PALETTE.net },
   filterChipText: { fontSize: 13, fontWeight: '600', color: PALETTE.textSecondary },
   filterChipTextSelected: { color: '#fff' },
+  controlsRow: { flexDirection: 'row', justifyContent: 'flex-end', paddingBottom: 10 },
+  sortButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: PALETTE.surface,
+    borderWidth: 1.5,
+    borderColor: PALETTE.border,
+  },
+  sortButtonText: { fontSize: 12, fontWeight: '600', color: PALETTE.textSecondary },
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
