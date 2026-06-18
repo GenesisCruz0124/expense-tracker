@@ -7,5 +7,5 @@ import type { NativeStackNavigationOptions } from '@react-navigation/native-stac
 export const themedHeaderOptions: NativeStackNavigationOptions = {
   headerTitleStyle: { fontWeight: '700', fontSize: 18 },
   headerShadowVisible: false,
-  animation: 'fade',
+  animation: 'none',
 };
