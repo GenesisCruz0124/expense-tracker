@@ -29,7 +29,7 @@ export type TabParamList = {
 
 export type RootStackParamList = {
   Tabs: NavigatorScreenParams<TabParamList>;
-  AddEditTransaction: { transactionId?: number } | undefined;
+  AddEditTransaction: { transactionId?: number; accountId?: number } | undefined;
   AddEditCategory: { categoryId?: number; lockType?: 'expense' | 'income' | 'both' } | undefined;
   AddEditAccountCategory: { accountCategoryId?: number } | undefined;
   AddEditBudget: { budgetId?: number; monthKey: string };

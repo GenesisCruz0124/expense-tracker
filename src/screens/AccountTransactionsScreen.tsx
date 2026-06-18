@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 
 import { EmptyState } from '../components/EmptyState';
@@ -65,6 +65,10 @@ export default function AccountTransactionsScreen() {
           ) : null
         }
       />
+
+      <Pressable style={styles.fab} onPress={() => navigation.navigate('AddEditTransaction', { accountId })}>
+        <Text style={styles.fabIcon}>+</Text>
+      </Pressable>
     </View>
   );
 }
@@ -85,4 +89,21 @@ const styles = StyleSheet.create({
   summaryAmount: { fontSize: 16, fontWeight: '700', color: PALETTE.textPrimary },
   dueGroup: { alignItems: 'flex-end' },
   emptyContainer: { flexGrow: 1, justifyContent: 'center' },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: PALETTE.net,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+  fabIcon: { color: '#fff', fontSize: 28, fontWeight: '600', lineHeight: 30 },
 });

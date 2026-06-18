@@ -21,6 +21,7 @@ export default function AddEditTransactionScreen() {
   const navigation = useNavigation();
   const route = useRoute<RouteProp<RootStackParamList, 'AddEditTransaction'>>();
   const transactionId = route.params?.transactionId;
+  const initialAccountId = route.params?.accountId ?? null;
   const isEditing = transactionId != null;
 
   const { db } = useDatabase();
@@ -31,7 +32,7 @@ export default function AddEditTransactionScreen() {
   const [amountText, setAmountText] = useState('');
   const [feeText, setFeeText] = useState('');
   const [categoryId, setCategoryId] = useState<number | null>(null);
-  const [accountId, setAccountId] = useState<number | null>(null);
+  const [accountId, setAccountId] = useState<number | null>(initialAccountId);
   const [toAccountId, setToAccountId] = useState<number | null>(null);
   const [transferId, setTransferId] = useState<number | null>(null);
   const [occurredAt, setOccurredAt] = useState(() => formatIsoDate(new Date()));
