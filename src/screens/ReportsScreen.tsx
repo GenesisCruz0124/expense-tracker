@@ -1,16 +1,29 @@
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { isSameMonth } from 'date-fns';
+import { isSameDay, isSameMonth, isSameWeek } from 'date-fns';
 
 import { CategoryBarChart } from '../components/charts/CategoryBarChart';
 import { CategoryPieChart } from '../components/charts/CategoryPieChart';
 import { MonthlyTotalsBarChart } from '../components/charts/MonthlyTotalsBarChart';
 import { TrendLineChart } from '../components/charts/TrendLineChart';
+import { DateField } from '../components/DateField';
 import { MonthSelector } from '../components/MonthSelector';
+import { PeriodTypeSelector } from '../components/PeriodTypeSelector';
 import { SummaryCard } from '../components/SummaryCard';
 import { PALETTE } from '../constants/colors';
 import { useReportsData, type ReportKind } from '../hooks/useReportsData';
-import { monthRangeFor, shiftMonth } from '../utils/dateRanges';
+import {
+  customRangeFor,
+  dayRangeFor,
+  formatIsoDate,
+  monthRangeFor,
+  parseIsoDate,
+  shiftDay,
+  shiftMonth,
+  shiftWeek,
+  weekRangeFor,
+  type PeriodType,
+} from '../utils/dateRanges';
 
 type BreakdownView = 'pie' | 'bar';
 type TrendView = 'line' | 'bar';
@@ -24,23 +37,69 @@ function SegmentButton({ label, active, onPress }: { label: string; active: bool
 }
 
 export default function ReportsScreen() {
+  const [period, setPeriod] = useState<PeriodType>('month');
   const [anchorDate, setAnchorDate] = useState(() => new Date());
+  const [customRange, setCustomRange] = useState(() => ({ start: new Date(), end: new Date() }));
   const [breakdownView, setBreakdownView] = useState<BreakdownView>('pie');
   const [trendView, setTrendView] = useState<TrendView>('line');
 
-  const range = monthRangeFor(anchorDate);
-  const isCurrentMonth = isSameMonth(anchorDate, new Date());
-  const { categoryData, trend, totals, breakdownKind, setBreakdownKind } = useReportsData(anchorDate, 6);
+  const range =
+    period === 'custom'
+      ? customRangeFor(customRange.start, customRange.end)
+      : period === 'day'
+        ? dayRangeFor(anchorDate)
+        : period === 'week'
+          ? weekRangeFor(anchorDate)
+          : monthRangeFor(anchorDate);
+
+  const today = new Date();
+  const nextDisabled =
+    period === 'day'
+      ? isSameDay(anchorDate, today)
+      : period === 'week'
+        ? isSameWeek(anchorDate, today, { weekStartsOn: 1 })
+        : isSameMonth(anchorDate, today);
+
+  function shiftAnchor(delta: number) {
+    setAnchorDate((current) => {
+      if (period === 'day') return shiftDay(current, delta);
+      if (period === 'week') return shiftWeek(current, delta);
+      return shiftMonth(current, delta);
+    });
+  }
+
+  const { categoryData, trend, totals, breakdownKind, setBreakdownKind } = useReportsData(range, 6);
   const net = totals.income - totals.expense;
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <MonthSelector
-        label={range.label}
-        onPrevious={() => setAnchorDate((current) => shiftMonth(current, -1))}
-        onNext={() => setAnchorDate((current) => shiftMonth(current, 1))}
-        nextDisabled={isCurrentMonth}
-      />
+      <PeriodTypeSelector value={period} onChange={setPeriod} />
+
+      {period === 'custom' ? (
+        <View style={styles.customRangeRow}>
+          <View style={styles.customRangeField}>
+            <DateField
+              label="From"
+              value={formatIsoDate(customRange.start)}
+              onChangeText={(text) => setCustomRange((current) => ({ ...current, start: parseIsoDate(text) }))}
+            />
+          </View>
+          <View style={styles.customRangeField}>
+            <DateField
+              label="Until"
+              value={formatIsoDate(customRange.end)}
+              onChangeText={(text) => setCustomRange((current) => ({ ...current, end: parseIsoDate(text) }))}
+            />
+          </View>
+        </View>
+      ) : (
+        <MonthSelector
+          label={range.label}
+          onPrevious={() => shiftAnchor(-1)}
+          onNext={() => shiftAnchor(1)}
+          nextDisabled={nextDisabled}
+        />
+      )}
 
       <View style={styles.summaryRow}>
         <SummaryCard label="Income" amount={totals.income} tone="income" />
@@ -90,6 +149,8 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: PALETTE.background },
   content: { padding: 20, gap: 20, paddingBottom: 40 },
   summaryRow: { flexDirection: 'row', gap: 12 },
+  customRangeRow: { flexDirection: 'row', gap: 12 },
+  customRangeField: { flex: 1 },
   section: { gap: 12 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   sectionTitle: { fontSize: 15, fontWeight: '700', color: PALETTE.textPrimary },

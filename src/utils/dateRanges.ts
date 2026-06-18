@@ -1,17 +1,35 @@
-import { addMonths, endOfMonth, format, parseISO, startOfMonth, subMonths } from 'date-fns';
+import {
+  addDays,
+  addMonths,
+  addWeeks,
+  endOfMonth,
+  endOfWeek,
+  format,
+  parseISO,
+  startOfMonth,
+  startOfWeek,
+  subDays,
+  subMonths,
+  subWeeks,
+} from 'date-fns';
 
 export const ISO_DATE_FORMAT = 'yyyy-MM-dd';
 export const MONTH_KEY_FORMAT = 'yyyy-MM';
 
-export interface MonthRange {
-  /** 'YYYY-MM' key identifying the month, also used as the budgets.month value */
-  monthKey: string;
+export type PeriodType = 'day' | 'week' | 'month' | 'custom';
+
+export interface DateRange {
   /** Inclusive ISO start date 'YYYY-MM-DD' */
   start: string;
   /** Inclusive ISO end date 'YYYY-MM-DD' */
   end: string;
   /** Human label, e.g. "June 2026" */
   label: string;
+}
+
+export interface MonthRange extends DateRange {
+  /** 'YYYY-MM' key identifying the month, also used as the budgets.month value */
+  monthKey: string;
 }
 
 export function monthRangeFor(date: Date): MonthRange {
@@ -31,6 +49,37 @@ export function monthKeyFor(date: Date): string {
 
 export function shiftMonth(date: Date, deltaMonths: number): Date {
   return deltaMonths >= 0 ? addMonths(date, deltaMonths) : subMonths(date, -deltaMonths);
+}
+
+export function dayRangeFor(date: Date): DateRange {
+  const iso = formatIsoDate(date);
+  return { start: iso, end: iso, label: format(date, 'MMM d, yyyy') };
+}
+
+export function weekRangeFor(date: Date): DateRange {
+  const start = startOfWeek(date, { weekStartsOn: 1 });
+  const end = endOfWeek(date, { weekStartsOn: 1 });
+  return {
+    start: formatIsoDate(start),
+    end: formatIsoDate(end),
+    label: `${format(start, 'MMM d')} – ${format(end, 'MMM d, yyyy')}`,
+  };
+}
+
+export function customRangeFor(start: Date, end: Date): DateRange {
+  return {
+    start: formatIsoDate(start),
+    end: formatIsoDate(end),
+    label: `${format(start, 'MMM d, yyyy')} – ${format(end, 'MMM d, yyyy')}`,
+  };
+}
+
+export function shiftDay(date: Date, delta: number): Date {
+  return delta >= 0 ? addDays(date, delta) : subDays(date, -delta);
+}
+
+export function shiftWeek(date: Date, delta: number): Date {
+  return delta >= 0 ? addWeeks(date, delta) : subWeeks(date, -delta);
 }
 
 /** Builds the last `count` month ranges ending with (and including) `anchor`, oldest first. */

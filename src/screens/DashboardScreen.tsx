@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { differenceInCalendarDays, isSameMonth } from 'date-fns';
+import { differenceInCalendarDays, isSameDay, isSameMonth, isSameWeek } from 'date-fns';
 
 import { CategoryBarChart } from '../components/charts/CategoryBarChart';
+import { DateField } from '../components/DateField';
 import { EmptyState } from '../components/EmptyState';
 import { MonthSelector } from '../components/MonthSelector';
+import { PeriodTypeSelector } from '../components/PeriodTypeSelector';
 import { SummaryCard } from '../components/SummaryCard';
 import { PALETTE } from '../constants/colors';
 import type { BillWithDetails } from '../db/queries/bills';
@@ -13,7 +15,19 @@ import { useBills } from '../hooks/useBills';
 import { useBudgets } from '../hooks/useBudgets';
 import { useReportsData } from '../hooks/useReportsData';
 import { formatCurrency } from '../utils/currency';
-import { formatDisplayDate, monthRangeFor, parseIsoDate, shiftMonth } from '../utils/dateRanges';
+import {
+  customRangeFor,
+  dayRangeFor,
+  formatDisplayDate,
+  formatIsoDate,
+  monthRangeFor,
+  parseIsoDate,
+  shiftDay,
+  shiftMonth,
+  shiftWeek,
+  weekRangeFor,
+  type PeriodType,
+} from '../utils/dateRanges';
 
 /** A bill is "due soon" once it lands within this many days — flagged amber instead of neutral. */
 const DUE_SOON_THRESHOLD_DAYS = 3;
@@ -47,15 +61,39 @@ function billStatusFor(bill: BillWithDetails, today: Date): BillStatus {
 
 export default function DashboardScreen() {
   const navigation = useNavigation();
+  const [period, setPeriod] = useState<PeriodType>('month');
   const [anchorDate, setAnchorDate] = useState(() => new Date());
-  const range = monthRangeFor(anchorDate);
-  const isCurrentMonth = isSameMonth(anchorDate, new Date());
+  const [customRange, setCustomRange] = useState(() => ({ start: new Date(), end: new Date() }));
 
-  const { totals, categoryData, loading, refresh } = useReportsData(anchorDate, 6);
-  const { budgets } = useBudgets(range);
-  const { bills } = useBills();
+  const range =
+    period === 'custom'
+      ? customRangeFor(customRange.start, customRange.end)
+      : period === 'day'
+        ? dayRangeFor(anchorDate)
+        : period === 'week'
+          ? weekRangeFor(anchorDate)
+          : monthRangeFor(anchorDate);
 
   const today = new Date();
+  const nextDisabled =
+    period === 'day'
+      ? isSameDay(anchorDate, today)
+      : period === 'week'
+        ? isSameWeek(anchorDate, today, { weekStartsOn: 1 })
+        : isSameMonth(anchorDate, today);
+
+  function shiftAnchor(delta: number) {
+    setAnchorDate((current) => {
+      if (period === 'day') return shiftDay(current, delta);
+      if (period === 'week') return shiftWeek(current, delta);
+      return shiftMonth(current, delta);
+    });
+  }
+
+  const { totals, categoryData, loading, refresh } = useReportsData(range, 6);
+  const { budgets } = useBudgets(monthRangeFor(new Date()));
+  const { bills } = useBills();
+
   const net = totals.income - totals.expense;
   const upcomingBills = bills.filter((bill) => !bill.isPaid).slice(0, 3);
   const attentionBudgets = budgets
@@ -69,12 +107,33 @@ export default function DashboardScreen() {
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={PALETTE.net} />}
     >
-      <MonthSelector
-        label={range.label}
-        onPrevious={() => setAnchorDate((current) => shiftMonth(current, -1))}
-        onNext={() => setAnchorDate((current) => shiftMonth(current, 1))}
-        nextDisabled={isCurrentMonth}
-      />
+      <PeriodTypeSelector value={period} onChange={setPeriod} />
+
+      {period === 'custom' ? (
+        <View style={styles.customRangeRow}>
+          <View style={styles.customRangeField}>
+            <DateField
+              label="From"
+              value={formatIsoDate(customRange.start)}
+              onChangeText={(text) => setCustomRange((current) => ({ ...current, start: parseIsoDate(text) }))}
+            />
+          </View>
+          <View style={styles.customRangeField}>
+            <DateField
+              label="Until"
+              value={formatIsoDate(customRange.end)}
+              onChangeText={(text) => setCustomRange((current) => ({ ...current, end: parseIsoDate(text) }))}
+            />
+          </View>
+        </View>
+      ) : (
+        <MonthSelector
+          label={range.label}
+          onPrevious={() => shiftAnchor(-1)}
+          onNext={() => shiftAnchor(1)}
+          nextDisabled={nextDisabled}
+        />
+      )}
 
       <View style={styles.summaryRow}>
         <SummaryCard label="Income" amount={totals.income} tone="income" />
@@ -164,6 +223,8 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: PALETTE.background },
   content: { padding: 20, gap: 20, paddingBottom: 40 },
   summaryRow: { flexDirection: 'row', gap: 12 },
+  customRangeRow: { flexDirection: 'row', gap: 12 },
+  customRangeField: { flex: 1 },
   section: { gap: 12 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   sectionHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: 16 },

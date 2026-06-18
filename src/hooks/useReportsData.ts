@@ -10,11 +10,11 @@ import {
   type MonthlyTotals,
   type MonthlyTrendEntry,
 } from '../db/queries/reports';
-import { formatIsoDate, lastMonthRanges, monthRangeFor } from '../utils/dateRanges';
+import { lastMonthRanges, type DateRange } from '../utils/dateRanges';
 
 export type ReportKind = 'expense' | 'income';
 
-export function useReportsData(anchorDate: Date, monthsBack: number = 6) {
+export function useReportsData(range: DateRange, monthsBack: number = 6) {
   const { db, refreshSignal } = useDatabase();
   const [breakdownKind, setBreakdownKind] = useState<ReportKind>('expense');
   const [categoryData, setCategoryData] = useState<CategoryBreakdownEntry[]>([]);
@@ -22,13 +22,10 @@ export function useReportsData(anchorDate: Date, monthsBack: number = 6) {
   const [totals, setTotals] = useState<MonthlyTotals>({ income: 0, expense: 0 });
   const [loading, setLoading] = useState(true);
 
-  const anchorKey = formatIsoDate(anchorDate);
-
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const range = monthRangeFor(anchorDate);
-      const ranges = lastMonthRanges(anchorDate, monthsBack);
+      const ranges = lastMonthRanges(new Date(), monthsBack);
       const [breakdown, trendData, totalsData] = await Promise.all([
         categoryBreakdown(db, breakdownKind, range),
         incomeVsExpenseTrend(db, ranges),
@@ -41,7 +38,7 @@ export function useReportsData(anchorDate: Date, monthsBack: number = 6) {
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [db, anchorKey, monthsBack, breakdownKind]);
+  }, [db, range.start, range.end, monthsBack, breakdownKind]);
 
   useFocusEffect(
     useCallback(() => {

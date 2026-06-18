@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, SectionList, StyleSheet, Switch, Text, View } from 'react-native';
 import { useNavigation, type CompositeNavigationProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -7,11 +7,16 @@ import { ActionSheet } from '../components/ActionSheet';
 import { EmptyState } from '../components/EmptyState';
 import { DEFAULT_ACCOUNT_ICON } from '../constants/accountIcons';
 import { PALETTE } from '../constants/colors';
+import { useDatabase } from '../context/DatabaseProvider';
 import type { AccountWithBalance } from '../db/queries/accounts';
+import { getSetting, setSetting } from '../db/queries/settings';
 import { useAccountCategories } from '../hooks/useAccountCategories';
 import { useAccounts } from '../hooks/useAccounts';
 import { formatCurrency } from '../utils/currency';
 import type { AccountsStackParamList, RootStackParamList } from '../navigation/types';
+
+const COLLAPSED_GROUPS_KEY = 'accountsCollapsedGroups';
+
 
 interface AccountSection {
   key: string;
@@ -68,6 +73,8 @@ export default function AccountsScreen() {
   const [showSortPicker, setShowSortPicker] = useState(false);
   const [grouped, setGrouped] = useState(true);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [groupsLoaded, setGroupsLoaded] = useState(false);
+  const { db } = useDatabase();
 
   function toggleGroup(key: string) {
     setCollapsedGroups((prev) => {
@@ -76,6 +83,26 @@ export default function AccountsScreen() {
       return next;
     });
   }
+
+  useEffect(() => {
+    (async () => {
+      const stored = await getSetting(db, COLLAPSED_GROUPS_KEY);
+      if (stored) {
+        try {
+          setCollapsedGroups(new Set(JSON.parse(stored)));
+        } catch {
+          // ignore malformed stored value
+        }
+      }
+      setGroupsLoaded(true);
+    })();
+  }, [db]);
+
+  useEffect(() => {
+    if (!groupsLoaded) return;
+    setSetting(db, COLLAPSED_GROUPS_KEY, JSON.stringify(Array.from(collapsedGroups)));
+  }, [collapsedGroups, groupsLoaded, db]);
+
   const { accounts, error, setArchived } = useAccounts({ includeArchived: true });
   const { accountCategories } = useAccountCategories({ includeArchived: true });
 
