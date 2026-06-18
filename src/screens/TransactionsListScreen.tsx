@@ -18,16 +18,18 @@ export default function TransactionsListScreen() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [typeFilter, setTypeFilter] = useState<'expense' | 'income' | undefined>(route.params?.type);
+  const [runningBalanceMode, setRunningBalanceMode] = useState(route.params?.runningBalance ?? false);
   const [filterVisible, setFilterVisible] = useState(false);
 
   useEffect(() => {
     setTypeFilter(route.params?.type);
+    setRunningBalanceMode(route.params?.runningBalance ?? false);
     setStartDate(route.params?.start ?? '');
     setEndDate(route.params?.end ?? '');
     setSelectedCategoryIds([]);
     setSearchText('');
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [route.params?.type, route.params?.start, route.params?.end]);
+  }, [route.params?.type, route.params?.start, route.params?.end, route.params?.runningBalance]);
 
   const filter = useMemo<ListTransactionsFilter>(() => {
     const next: ListTransactionsFilter = {};
@@ -37,15 +39,25 @@ export default function TransactionsListScreen() {
       next.start = startDate;
       next.end = endDate;
     }
-    if (typeFilter) {
-      next.type = typeFilter;
-      next.excludeFromExpense = false;
-    }
+    if (typeFilter) next.type = typeFilter;
+    if (typeFilter || runningBalanceMode) next.excludeFromExpense = false;
     return next;
-  }, [searchText, selectedCategoryIds, startDate, endDate, typeFilter]);
+  }, [searchText, selectedCategoryIds, startDate, endDate, typeFilter, runningBalanceMode]);
 
   const { transactions, loading } = useTransactions(filter);
-  const activeFilterCount = selectedCategoryIds.length + (startDate && endDate ? 1 : 0) + (typeFilter ? 1 : 0);
+  const transactionsWithBalance = useMemo(() => {
+    if (!runningBalanceMode) {
+      return transactions.map((transaction) => ({ transaction, runningBalance: undefined as number | undefined }));
+    }
+    let cursor = transactions.reduce((sum, t) => sum + (t.type === 'income' ? t.amount : -t.amount), 0);
+    return transactions.map((transaction) => {
+      const runningBalance = cursor;
+      cursor -= transaction.type === 'income' ? transaction.amount : -transaction.amount;
+      return { transaction, runningBalance };
+    });
+  }, [transactions, runningBalanceMode]);
+  const activeFilterCount =
+    selectedCategoryIds.length + (startDate && endDate ? 1 : 0) + (typeFilter ? 1 : 0) + (runningBalanceMode ? 1 : 0);
 
   function toggleCategory(id: number) {
     setSelectedCategoryIds((prev) => (prev.includes(id) ? prev.filter((existing) => existing !== id) : [...prev, id]));
@@ -56,6 +68,7 @@ export default function TransactionsListScreen() {
     setStartDate('');
     setEndDate('');
     setTypeFilter(undefined);
+    setRunningBalanceMode(false);
   }
 
   return (
@@ -78,11 +91,13 @@ export default function TransactionsListScreen() {
         </Pressable>
       </View>
 
-      {typeFilter ? (
+      {typeFilter || runningBalanceMode ? (
         <View style={styles.typeFilterRow}>
           <View style={styles.typeFilterChip}>
-            <Text style={styles.typeFilterChipText}>Showing: {typeFilter === 'income' ? 'Income' : 'Expense'}</Text>
-            <Pressable onPress={() => setTypeFilter(undefined)}>
+            <Text style={styles.typeFilterChipText}>
+              Showing: {runningBalanceMode ? 'Net (running balance)' : typeFilter === 'income' ? 'Income' : 'Expense'}
+            </Text>
+            <Pressable onPress={() => (runningBalanceMode ? setRunningBalanceMode(false) : setTypeFilter(undefined))}>
               <Text style={styles.typeFilterChipClose}>✕</Text>
             </Pressable>
           </View>
@@ -90,12 +105,13 @@ export default function TransactionsListScreen() {
       ) : null}
 
       <FlatList
-        data={transactions}
-        keyExtractor={(item) => String(item.id)}
+        data={transactionsWithBalance}
+        keyExtractor={(item) => String(item.transaction.id)}
         renderItem={({ item }) => (
           <TransactionListItem
-            transaction={item}
-            onPress={() => navigation.navigate('AddEditTransaction', { transactionId: item.id })}
+            transaction={item.transaction}
+            runningBalance={item.runningBalance}
+            onPress={() => navigation.navigate('AddEditTransaction', { transactionId: item.transaction.id })}
           />
         )}
         contentContainerStyle={transactions.length === 0 ? styles.emptyContainer : undefined}

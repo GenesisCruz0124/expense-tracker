@@ -1,7 +1,7 @@
 import type { NavigatorScreenParams } from '@react-navigation/native';
 
 export type TransactionsStackParamList = {
-  TransactionsList: { type?: 'expense' | 'income'; start?: string; end?: string } | undefined;
+  TransactionsList: { type?: 'expense' | 'income'; start?: string; end?: string; runningBalance?: boolean } | undefined;
 };
 
 export type AccountsStackParamList = {

@@ -10,9 +10,10 @@ import { CategoryBadge, TransferBadge, UncategorizedBadge } from './CategoryBadg
 interface Props {
   transaction: TransactionWithCategory;
   onPress: () => void;
+  runningBalance?: number;
 }
 
-export function TransactionListItem({ transaction, onPress }: Props) {
+export function TransactionListItem({ transaction, onPress, runningBalance }: Props) {
   const isTransfer = transaction.transferId != null;
   const isIncome = transaction.type === 'income';
   const amountColor = isTransfer ? PALETTE.net : isIncome ? PALETTE.income : PALETTE.expense;
@@ -50,6 +51,7 @@ export function TransactionListItem({ transaction, onPress }: Props) {
           {formatCurrency(transaction.amount)}
         </Text>
         {transaction.fee ? <Text style={styles.fee}>+{formatCurrency(transaction.fee)} fee</Text> : null}
+        {runningBalance !== undefined ? <Text style={styles.runningBalance}>Bal {formatCurrency(runningBalance)}</Text> : null}
       </View>
     </Pressable>
   );
@@ -78,4 +80,5 @@ const styles = StyleSheet.create({
   amountGroup: { alignItems: 'flex-end', gap: 2 },
   amount: { fontSize: 15, fontWeight: '700' },
   fee: { fontSize: 11, color: PALETTE.textSecondary },
+  runningBalance: { fontSize: 11, color: PALETTE.net, fontWeight: '600' },
 });

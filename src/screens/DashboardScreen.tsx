@@ -158,7 +158,17 @@ export default function DashboardScreen() {
             })
           }
         />
-        <SummaryCard label="Net" amount={net} tone="net" />
+        <SummaryCard
+          label="Net"
+          amount={net}
+          tone="net"
+          onPress={() =>
+            navigation.navigate('Tabs', {
+              screen: 'TransactionsTab',
+              params: { screen: 'TransactionsList', params: { start: range.start, end: range.end, runningBalance: true } },
+            })
+          }
+        />
       </View>
 
       <View style={styles.section}>
