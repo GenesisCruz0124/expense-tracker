@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { isSameDay, isSameMonth, isSameWeek } from 'date-fns';
 
 import { CategoryBarChart } from '../components/charts/CategoryBarChart';
@@ -37,6 +38,7 @@ function SegmentButton({ label, active, onPress }: { label: string; active: bool
 }
 
 export default function ReportsScreen() {
+  const navigation = useNavigation();
   const [period, setPeriod] = useState<PeriodType>('month');
   const [anchorDate, setAnchorDate] = useState(() => new Date());
   const [customRange, setCustomRange] = useState(() => ({ start: new Date(), end: new Date() }));
@@ -102,8 +104,28 @@ export default function ReportsScreen() {
       )}
 
       <View style={styles.summaryRow}>
-        <SummaryCard label="Income" amount={totals.income} tone="income" />
-        <SummaryCard label="Expense" amount={totals.expense} tone="expense" />
+        <SummaryCard
+          label="Income"
+          amount={totals.income}
+          tone="income"
+          onPress={() =>
+            navigation.navigate('Tabs', {
+              screen: 'TransactionsTab',
+              params: { screen: 'TransactionsList', params: { type: 'income', start: range.start, end: range.end } },
+            })
+          }
+        />
+        <SummaryCard
+          label="Expense"
+          amount={totals.expense}
+          tone="expense"
+          onPress={() =>
+            navigation.navigate('Tabs', {
+              screen: 'TransactionsTab',
+              params: { screen: 'TransactionsList', params: { type: 'expense', start: range.start, end: range.end } },
+            })
+          }
+        />
         <SummaryCard label="Net" amount={net} tone="net" />
       </View>
 

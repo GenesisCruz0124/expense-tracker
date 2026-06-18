@@ -20,6 +20,7 @@ export interface ListTransactionsFilter {
   start?: string;
   end?: string;
   searchText?: string;
+  excludeFromExpense?: boolean;
 }
 
 function buildFilterConditions(filter: ListTransactionsFilter): SQL[] {
@@ -30,6 +31,9 @@ function buildFilterConditions(filter: ListTransactionsFilter): SQL[] {
   }
   if (filter.accountIds && filter.accountIds.length > 0) {
     conditions.push(inArray(transactions.accountId, filter.accountIds));
+  }
+  if (filter.excludeFromExpense !== undefined) {
+    conditions.push(eq(transactions.excludeFromExpense, filter.excludeFromExpense));
   }
   if (filter.start && filter.end) {
     conditions.push(between(transactions.occurredAt, filter.start, filter.end));

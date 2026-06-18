@@ -92,6 +92,11 @@ export function TabNavigator() {
           title: 'Transactions',
           tabBarIcon: ({ focused }) => <TabGlyph glyph="📋" focused={focused} />,
         }}
+        listeners={({ navigation }) => ({
+          tabPress: () => {
+            navigation.navigate('TransactionsTab', { screen: 'TransactionsList', params: undefined });
+          },
+        })}
       />
       <Tab.Screen
         name="AccountsTab"

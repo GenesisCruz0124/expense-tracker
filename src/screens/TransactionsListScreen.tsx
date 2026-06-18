@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 
 import { EmptyState } from '../components/EmptyState';
 import { FilterSheet } from '../components/FilterSheet';
@@ -8,14 +8,26 @@ import { TransactionListItem } from '../components/TransactionListItem';
 import { PALETTE } from '../constants/colors';
 import { useTransactions } from '../hooks/useTransactions';
 import type { ListTransactionsFilter } from '../db/queries/transactions';
+import type { TransactionsStackParamList } from '../navigation/types';
 
 export default function TransactionsListScreen() {
   const navigation = useNavigation();
+  const route = useRoute<RouteProp<TransactionsStackParamList, 'TransactionsList'>>();
   const [searchText, setSearchText] = useState('');
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [typeFilter, setTypeFilter] = useState<'expense' | 'income' | undefined>(route.params?.type);
   const [filterVisible, setFilterVisible] = useState(false);
+
+  useEffect(() => {
+    setTypeFilter(route.params?.type);
+    setStartDate(route.params?.start ?? '');
+    setEndDate(route.params?.end ?? '');
+    setSelectedCategoryIds([]);
+    setSearchText('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route.params?.type, route.params?.start, route.params?.end]);
 
   const filter = useMemo<ListTransactionsFilter>(() => {
     const next: ListTransactionsFilter = {};
@@ -25,11 +37,15 @@ export default function TransactionsListScreen() {
       next.start = startDate;
       next.end = endDate;
     }
+    if (typeFilter) {
+      next.type = typeFilter;
+      next.excludeFromExpense = false;
+    }
     return next;
-  }, [searchText, selectedCategoryIds, startDate, endDate]);
+  }, [searchText, selectedCategoryIds, startDate, endDate, typeFilter]);
 
   const { transactions, loading } = useTransactions(filter);
-  const activeFilterCount = selectedCategoryIds.length + (startDate && endDate ? 1 : 0);
+  const activeFilterCount = selectedCategoryIds.length + (startDate && endDate ? 1 : 0) + (typeFilter ? 1 : 0);
 
   function toggleCategory(id: number) {
     setSelectedCategoryIds((prev) => (prev.includes(id) ? prev.filter((existing) => existing !== id) : [...prev, id]));
@@ -39,6 +55,7 @@ export default function TransactionsListScreen() {
     setSelectedCategoryIds([]);
     setStartDate('');
     setEndDate('');
+    setTypeFilter(undefined);
   }
 
   return (
@@ -60,6 +77,17 @@ export default function TransactionsListScreen() {
           </Text>
         </Pressable>
       </View>
+
+      {typeFilter ? (
+        <View style={styles.typeFilterRow}>
+          <View style={styles.typeFilterChip}>
+            <Text style={styles.typeFilterChipText}>Showing: {typeFilter === 'income' ? 'Income' : 'Expense'}</Text>
+            <Pressable onPress={() => setTypeFilter(undefined)}>
+              <Text style={styles.typeFilterChipClose}>✕</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
 
       <FlatList
         data={transactions}
@@ -131,6 +159,21 @@ const styles = StyleSheet.create({
   filterButtonActive: { borderColor: PALETTE.net, backgroundColor: `${PALETTE.net}1A` },
   filterButtonText: { fontSize: 13, fontWeight: '600', color: PALETTE.textSecondary },
   filterButtonTextActive: { color: PALETTE.net },
+  typeFilterRow: { paddingHorizontal: 16, paddingBottom: 12 },
+  typeFilterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 8,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: PALETTE.net,
+    backgroundColor: `${PALETTE.net}1A`,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  typeFilterChipText: { fontSize: 12, fontWeight: '600', color: PALETTE.net },
+  typeFilterChipClose: { fontSize: 12, fontWeight: '700', color: PALETTE.net },
   emptyContainer: { flexGrow: 1, justifyContent: 'center' },
   fab: {
     position: 'absolute',

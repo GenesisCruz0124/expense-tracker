@@ -136,8 +136,28 @@ export default function DashboardScreen() {
       )}
 
       <View style={styles.summaryRow}>
-        <SummaryCard label="Income" amount={totals.income} tone="income" />
-        <SummaryCard label="Expense" amount={totals.expense} tone="expense" />
+        <SummaryCard
+          label="Income"
+          amount={totals.income}
+          tone="income"
+          onPress={() =>
+            navigation.navigate('Tabs', {
+              screen: 'TransactionsTab',
+              params: { screen: 'TransactionsList', params: { type: 'income', start: range.start, end: range.end } },
+            })
+          }
+        />
+        <SummaryCard
+          label="Expense"
+          amount={totals.expense}
+          tone="expense"
+          onPress={() =>
+            navigation.navigate('Tabs', {
+              screen: 'TransactionsTab',
+              params: { screen: 'TransactionsList', params: { type: 'expense', start: range.start, end: range.end } },
+            })
+          }
+        />
         <SummaryCard label="Net" amount={net} tone="net" />
       </View>
 
