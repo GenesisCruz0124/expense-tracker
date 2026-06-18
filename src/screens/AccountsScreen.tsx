@@ -65,6 +65,7 @@ export default function AccountsScreen() {
   const [menuAccount, setMenuAccount] = useState<AccountWithBalance | null>(null);
   const [sortOption, setSortOption] = useState<SortOption>('name_asc');
   const [showSortPicker, setShowSortPicker] = useState(false);
+  const [grouped, setGrouped] = useState(true);
   const { accounts, error, setArchived } = useAccounts({ includeArchived: true });
   const { accountCategories } = useAccountCategories({ includeArchived: true });
 
@@ -97,6 +98,19 @@ export default function AccountsScreen() {
   }, [visible]);
 
   const sections = useMemo<AccountSection[]>(() => {
+    if (!grouped) {
+      const data = sortAccounts(filtered, sortOption);
+      if (data.length === 0) return [];
+      return [
+        {
+          title: 'All accounts',
+          icon: '🏦',
+          color: PALETTE.net,
+          total: data.reduce((sum, account) => sum + account.balance, 0),
+          data,
+        },
+      ];
+    }
     return accountCategories
       .map((category) => {
         const data = sortAccounts(filtered.filter((account) => account.categoryId === category.id), sortOption);
@@ -109,7 +123,7 @@ export default function AccountsScreen() {
         };
       })
       .filter((section) => section.data.length > 0);
-  }, [accountCategories, filtered, sortOption]);
+  }, [accountCategories, filtered, sortOption, grouped]);
 
   return (
     <View style={styles.screen}>
@@ -177,6 +191,9 @@ export default function AccountsScreen() {
             ) : null}
 
             <View style={styles.controlsRow}>
+              <Pressable style={styles.sortButton} onPress={() => setGrouped((value) => !value)}>
+                <Text style={styles.sortButtonText}>{grouped ? '▦ Grouped' : '☰ Ungrouped'}</Text>
+              </Pressable>
               <Pressable style={styles.sortButton} onPress={() => setShowSortPicker(true)}>
                 <Text style={styles.sortButtonText}>⇅ Sort: {SORT_LABELS[sortOption]}</Text>
               </Pressable>
@@ -342,7 +359,7 @@ const styles = StyleSheet.create({
   filterChipAllSelected: { borderColor: PALETTE.net, backgroundColor: PALETTE.net },
   filterChipText: { fontSize: 13, fontWeight: '600', color: PALETTE.textSecondary },
   filterChipTextSelected: { color: '#fff' },
-  controlsRow: { flexDirection: 'row', justifyContent: 'flex-end', paddingBottom: 10 },
+  controlsRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, paddingBottom: 10 },
   sortButton: {
     paddingHorizontal: 12,
     paddingVertical: 7,
