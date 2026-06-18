@@ -69,7 +69,7 @@ export default function AccountsScreen() {
   const [hideAmounts, setHideAmounts] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [menuAccount, setMenuAccount] = useState<AccountWithBalance | null>(null);
-  const [sortOption, setSortOption] = useState<SortOption>('name_asc');
+  const [sortOption, setSortOption] = useState<SortOption>('balance_desc');
   const [showSortPicker, setShowSortPicker] = useState(false);
   const [grouped, setGrouped] = useState(true);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());

@@ -26,6 +26,25 @@ export default function AccountTransactionsScreen() {
   const filter = useMemo(() => ({ accountIds: [accountId] }), [accountId]);
   const { transactions, loading } = useTransactions(filter);
 
+  /** Per-transaction effect on this account's balance, mirroring the SQL `balanceExpr` in db/queries/accounts.ts. */
+  function balanceEffect(transaction: (typeof transactions)[number]): number {
+    if (category?.kind === 'credit_card') {
+      return (transaction.type === 'expense' ? transaction.amount : -transaction.amount) + transaction.fee;
+    }
+    return (transaction.type === 'income' ? transaction.amount : -transaction.amount) - transaction.fee;
+  }
+
+  const transactionsWithBalance = useMemo(() => {
+    if (!account) return transactions.map((transaction) => ({ transaction, runningBalance: undefined as number | undefined }));
+    let cursor = account.balance;
+    return transactions.map((transaction) => {
+      const runningBalance = cursor;
+      cursor -= balanceEffect(transaction);
+      return { transaction, runningBalance };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transactions, account?.balance, category?.kind]);
+
   useEffect(() => {
     navigation.setOptions({ title: account?.name ?? 'Account' });
   }, [navigation, account?.name]);
@@ -50,12 +69,13 @@ export default function AccountTransactionsScreen() {
       ) : null}
 
       <FlatList
-        data={transactions}
-        keyExtractor={(item) => String(item.id)}
+        data={transactionsWithBalance}
+        keyExtractor={(item) => String(item.transaction.id)}
         renderItem={({ item }) => (
           <TransactionListItem
-            transaction={item}
-            onPress={() => navigation.navigate('AddEditTransaction', { transactionId: item.id })}
+            transaction={item.transaction}
+            runningBalance={item.runningBalance}
+            onPress={() => navigation.navigate('AddEditTransaction', { transactionId: item.transaction.id })}
           />
         )}
         contentContainerStyle={transactions.length === 0 ? styles.emptyContainer : undefined}
