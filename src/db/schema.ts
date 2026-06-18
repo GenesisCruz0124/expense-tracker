@@ -167,6 +167,8 @@ export const bills = sqliteTable(
     reminderDaysBefore: integer('reminder_days_before').notNull().default(1),
     remindedAt: text('reminded_at'),
     isPaid: integer('is_paid', { mode: 'boolean' }).notNull().default(false),
+    /** ISO date this bill was most recently marked paid — survives recurring bills rolling `dueDate` forward. */
+    lastPaidAt: text('last_paid_at'),
     paidTransactionId: integer('paid_transaction_id').references(() => transactions.id, { onDelete: 'set null' }),
     excludeFromExpense: integer('exclude_from_expense', { mode: 'boolean' }).notNull().default(false),
     createdAt: text('created_at')

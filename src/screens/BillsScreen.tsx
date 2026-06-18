@@ -2,13 +2,15 @@ import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { PALETTE } from '../constants/colors';
+import PaidBillsScreen from './PaidBillsScreen';
 import RecurringTransactionsScreen from './RecurringTransactionsScreen';
 import UnpaidBillsScreen from './UnpaidBillsScreen';
 
-type Segment = 'upcoming' | 'recurring';
+type Segment = 'upcoming' | 'paid' | 'recurring';
 
 const SEGMENTS: { key: Segment; label: string }[] = [
-  { key: 'upcoming', label: 'Upcoming bills' },
+  { key: 'upcoming', label: 'Upcoming' },
+  { key: 'paid', label: 'Paid this month' },
   { key: 'recurring', label: 'Recurring' },
 ];
 
@@ -32,7 +34,13 @@ export default function BillsScreen() {
           );
         })}
       </View>
-      {segment === 'upcoming' ? <UnpaidBillsScreen /> : <RecurringTransactionsScreen />}
+      {segment === 'upcoming' ? (
+        <UnpaidBillsScreen />
+      ) : segment === 'paid' ? (
+        <PaidBillsScreen />
+      ) : (
+        <RecurringTransactionsScreen />
+      )}
     </View>
   );
 }

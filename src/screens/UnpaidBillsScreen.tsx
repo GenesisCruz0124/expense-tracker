@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
@@ -6,30 +6,16 @@ import { differenceInCalendarDays, parseISO } from 'date-fns';
 import { CategoryBadge, UncategorizedBadge } from '../components/CategoryBadge';
 import { EmptyState } from '../components/EmptyState';
 import { PALETTE } from '../constants/colors';
-import type { BillFrequency, BillWithDetails } from '../db/queries/bills';
+import type { BillWithDetails } from '../db/queries/bills';
 import { useBills } from '../hooks/useBills';
 import { formatCurrency } from '../utils/currency';
 import { formatDisplayDate, formatIsoDate } from '../utils/dateRanges';
-
-const FREQUENCY_LABELS: Record<BillFrequency, string | null> = {
-  once: null,
-  weekly: 'Repeats weekly',
-  semi_monthly: 'Repeats semi-monthly',
-  monthly: 'Repeats monthly',
-  yearly: 'Repeats yearly',
-  every_n_days: null,
-};
-
-function frequencyLabelFor(bill: BillWithDetails): string | null {
-  if (bill.frequency === 'every_n_days') {
-    return bill.intervalDays != null ? `Repeats every ${bill.intervalDays} days` : 'Repeats every N days';
-  }
-  return FREQUENCY_LABELS[bill.frequency];
-}
+import { frequencyLabelFor } from '../utils/bills';
 
 export default function UnpaidBillsScreen() {
   const navigation = useNavigation();
-  const { bills, payBill, unpayBill } = useBills();
+  const { bills, payBill } = useBills();
+  const unpaidBills = useMemo(() => bills.filter((bill) => !bill.isPaid), [bills]);
 
   function handleMarkPaid(bill: BillWithDetails) {
     Alert.alert(
@@ -42,23 +28,12 @@ export default function UnpaidBillsScreen() {
     );
   }
 
-  function handleMarkUnpaid(bill: BillWithDetails) {
-    Alert.alert(
-      'Mark as unpaid?',
-      'This removes the transaction that was logged when this bill was marked paid.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Mark unpaid', style: 'destructive', onPress: () => unpayBill(bill.id) },
-      ],
-    );
-  }
-
   return (
     <View style={styles.screen}>
       <FlatList
-        data={bills}
+        data={unpaidBills}
         keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={bills.length === 0 ? styles.emptyContainer : styles.listContent}
+        contentContainerStyle={unpaidBills.length === 0 ? styles.emptyContainer : styles.listContent}
         ListEmptyComponent={
           <EmptyState
             icon="🧾"
@@ -68,18 +43,11 @@ export default function UnpaidBillsScreen() {
         }
         renderItem={({ item }) => {
           const daysUntilDue = differenceInCalendarDays(parseISO(item.dueDate), new Date());
-          const isOverdue = !item.isPaid && daysUntilDue < 0;
-          const dueLabel = item.isPaid
-            ? `Paid · was due ${formatDisplayDate(item.dueDate)}`
-            : isOverdue
-              ? `Overdue · due ${formatDisplayDate(item.dueDate)}`
-              : `Due ${formatDisplayDate(item.dueDate)}`;
+          const isOverdue = daysUntilDue < 0;
+          const dueLabel = isOverdue ? `Overdue · due ${formatDisplayDate(item.dueDate)}` : `Due ${formatDisplayDate(item.dueDate)}`;
           const frequencyLabel = frequencyLabelFor(item);
           return (
-            <Pressable
-              style={[styles.card, item.isPaid && styles.cardPaid]}
-              onPress={() => navigation.navigate('AddEditBill', { billId: item.id })}
-            >
+            <Pressable style={styles.card} onPress={() => navigation.navigate('AddEditBill', { billId: item.id })}>
               <View style={styles.cardMain}>
                 <Text style={styles.cardTitle}>{item.name}</Text>
                 {item.categoryName ? (
@@ -92,13 +60,8 @@ export default function UnpaidBillsScreen() {
               </View>
               <View style={styles.cardTrailing}>
                 <Text style={styles.cardAmount}>{formatCurrency(item.amount)}</Text>
-                <Pressable
-                  style={[styles.payButton, item.isPaid && styles.payButtonPaid]}
-                  onPress={() => (item.isPaid ? handleMarkUnpaid(item) : handleMarkPaid(item))}
-                >
-                  <Text style={[styles.payButtonText, item.isPaid && styles.payButtonTextPaid]}>
-                    {item.isPaid ? 'Undo' : 'Mark paid'}
-                  </Text>
+                <Pressable style={styles.payButton} onPress={() => handleMarkPaid(item)}>
+                  <Text style={styles.payButtonText}>Mark paid</Text>
                 </Pressable>
               </View>
             </Pressable>
@@ -128,7 +91,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     gap: 12,
   },
-  cardPaid: { opacity: 0.55 },
   cardMain: { flex: 1, gap: 6 },
   cardTitle: { fontSize: 14, fontWeight: '700', color: PALETTE.textPrimary },
   cardSubtitle: { fontSize: 12, color: PALETTE.textSecondary },
@@ -142,9 +104,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: `${PALETTE.net}1A`,
   },
-  payButtonPaid: { backgroundColor: `${PALETTE.textSecondary}1A` },
   payButtonText: { fontSize: 12, fontWeight: '700', color: PALETTE.net },
-  payButtonTextPaid: { color: PALETTE.textSecondary },
   fab: {
     position: 'absolute',
     right: 20,

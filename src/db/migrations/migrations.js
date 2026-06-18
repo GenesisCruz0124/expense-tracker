@@ -30,6 +30,7 @@ import m0025 from './0025_account_total_months.sql';
 import m0026 from './0026_account_credit_limit.sql';
 import m0027 from './0027_account_linked_credit_card.sql';
 import m0028 from './0028_bill_interval_days.sql';
+import m0029 from './0029_bill_last_paid_at.sql';
 
   export default {
     journal,
@@ -62,7 +63,8 @@ m0024,
 m0025,
 m0026,
 m0027,
-m0028
+m0028,
+m0029
     }
   }
   

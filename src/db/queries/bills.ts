@@ -37,6 +37,7 @@ export async function listBills(db: Database): Promise<BillWithDetails[]> {
       reminderDaysBefore: bills.reminderDaysBefore,
       remindedAt: bills.remindedAt,
       isPaid: bills.isPaid,
+      lastPaidAt: bills.lastPaidAt,
       paidTransactionId: bills.paidTransactionId,
       excludeFromExpense: bills.excludeFromExpense,
       createdAt: bills.createdAt,
@@ -157,7 +158,10 @@ export async function markBillPaid(db: Database, id: number, occurredAt: string)
       .returning();
 
     if (bill.frequency === 'once') {
-      await tx.update(bills).set({ isPaid: true, paidTransactionId: transaction.id }).where(eq(bills.id, id));
+      await tx
+        .update(bills)
+        .set({ isPaid: true, paidTransactionId: transaction.id, lastPaidAt: occurredAt })
+        .where(eq(bills.id, id));
     } else {
       await tx
         .update(bills)
@@ -165,6 +169,7 @@ export async function markBillPaid(db: Database, id: number, occurredAt: string)
           isPaid: false,
           paidTransactionId: null,
           remindedAt: null,
+          lastPaidAt: occurredAt,
           dueDate: getNextDueDate(bill.dueDate, bill.frequency, bill.intervalDays),
         })
         .where(eq(bills.id, id));
@@ -181,7 +186,7 @@ export async function markBillUnpaid(db: Database, id: number): Promise<void> {
     if (bill.paidTransactionId != null) {
       await tx.delete(transactions).where(eq(transactions.id, bill.paidTransactionId));
     }
-    await tx.update(bills).set({ isPaid: false, paidTransactionId: null }).where(eq(bills.id, id));
+    await tx.update(bills).set({ isPaid: false, paidTransactionId: null, lastPaidAt: null }).where(eq(bills.id, id));
   });
 }
 
