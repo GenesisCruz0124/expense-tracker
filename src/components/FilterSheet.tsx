@@ -14,6 +14,14 @@ const EXCLUDED_FILTER_OPTIONS: { value: ExcludedFilter; label: string }[] = [
   { value: 'only', label: 'Only excluded' },
 ];
 
+type TypeFilter = 'expense' | 'income' | undefined;
+
+const TYPE_FILTER_OPTIONS: { value: TypeFilter; label: string; color: string }[] = [
+  { value: undefined, label: 'All', color: PALETTE.textSecondary },
+  { value: 'income', label: 'Income', color: PALETTE.income },
+  { value: 'expense', label: 'Expense', color: PALETTE.expense },
+];
+
 interface Props {
   visible: boolean;
   onClose: () => void;
@@ -23,12 +31,14 @@ interface Props {
   endDate: string;
   onChangeStartDate: (value: string) => void;
   onChangeEndDate: (value: string) => void;
+  typeFilter: TypeFilter;
+  onChangeTypeFilter: (value: TypeFilter) => void;
   excludedFilter: ExcludedFilter;
   onChangeExcludedFilter: (value: ExcludedFilter) => void;
   onClear: () => void;
 }
 
-/** Category multi-select + date-range + excluded-transactions filter for the Transactions list. */
+/** Type + category multi-select + date-range + excluded-transactions filter for the Transactions list. */
 export function FilterSheet({
   visible,
   onClose,
@@ -38,6 +48,8 @@ export function FilterSheet({
   endDate,
   onChangeStartDate,
   onChangeEndDate,
+  typeFilter,
+  onChangeTypeFilter,
   excludedFilter,
   onChangeExcludedFilter,
   onClear,
@@ -54,6 +66,22 @@ export function FilterSheet({
           </Pressable>
         </View>
         <ScrollView contentContainerStyle={styles.content}>
+          <Text style={styles.sectionLabel}>Type</Text>
+          <View style={styles.chips}>
+            {TYPE_FILTER_OPTIONS.map((option) => {
+              const selected = typeFilter === option.value;
+              return (
+                <Pressable
+                  key={option.label}
+                  onPress={() => onChangeTypeFilter(option.value)}
+                  style={[styles.chip, { borderColor: option.color }, selected && { backgroundColor: option.color }]}
+                >
+                  <Text style={[styles.chipText, { color: selected ? '#fff' : option.color }]}>{option.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
           <Text style={styles.sectionLabel}>Categories</Text>
           <View style={styles.chips}>
             {categories.map((category) => {

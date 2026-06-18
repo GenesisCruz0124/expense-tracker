@@ -152,6 +152,8 @@ export default function TransactionsListScreen() {
         endDate={endDate}
         onChangeStartDate={setStartDate}
         onChangeEndDate={setEndDate}
+        typeFilter={typeFilter}
+        onChangeTypeFilter={setTypeFilter}
         excludedFilter={excludedFilter}
         onChangeExcludedFilter={setExcludedFilter}
         onClear={clearFilters}
