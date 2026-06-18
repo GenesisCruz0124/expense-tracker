@@ -3,7 +3,7 @@ import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-na
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 
 import { EmptyState } from '../components/EmptyState';
-import { FilterSheet } from '../components/FilterSheet';
+import { FilterSheet, type ExcludedFilter } from '../components/FilterSheet';
 import { TransactionListItem } from '../components/TransactionListItem';
 import { PALETTE } from '../constants/colors';
 import { useTransactions } from '../hooks/useTransactions';
@@ -19,6 +19,7 @@ export default function TransactionsListScreen() {
   const [endDate, setEndDate] = useState('');
   const [typeFilter, setTypeFilter] = useState<'expense' | 'income' | undefined>(route.params?.type);
   const [runningBalanceMode, setRunningBalanceMode] = useState(route.params?.runningBalance ?? false);
+  const [excludedFilter, setExcludedFilter] = useState<ExcludedFilter>('all');
   const [filterVisible, setFilterVisible] = useState(false);
 
   useEffect(() => {
@@ -28,6 +29,7 @@ export default function TransactionsListScreen() {
     setEndDate(route.params?.end ?? '');
     setSelectedCategoryIds([]);
     setSearchText('');
+    setExcludedFilter('all');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route.params?.type, route.params?.start, route.params?.end, route.params?.runningBalance]);
 
@@ -40,9 +42,11 @@ export default function TransactionsListScreen() {
       next.end = endDate;
     }
     if (typeFilter) next.type = typeFilter;
-    if (typeFilter || runningBalanceMode) next.excludeFromExpense = false;
+    if (excludedFilter === 'hide') next.excludeFromExpense = false;
+    else if (excludedFilter === 'only') next.excludeFromExpense = true;
+    else if (typeFilter || runningBalanceMode) next.excludeFromExpense = false;
     return next;
-  }, [searchText, selectedCategoryIds, startDate, endDate, typeFilter, runningBalanceMode]);
+  }, [searchText, selectedCategoryIds, startDate, endDate, typeFilter, runningBalanceMode, excludedFilter]);
 
   const { transactions, loading } = useTransactions(filter);
   const transactionsWithBalance = useMemo(() => {
@@ -57,7 +61,11 @@ export default function TransactionsListScreen() {
     });
   }, [transactions, runningBalanceMode]);
   const activeFilterCount =
-    selectedCategoryIds.length + (startDate && endDate ? 1 : 0) + (typeFilter ? 1 : 0) + (runningBalanceMode ? 1 : 0);
+    selectedCategoryIds.length +
+    (startDate && endDate ? 1 : 0) +
+    (typeFilter ? 1 : 0) +
+    (runningBalanceMode ? 1 : 0) +
+    (excludedFilter !== 'all' ? 1 : 0);
 
   function toggleCategory(id: number) {
     setSelectedCategoryIds((prev) => (prev.includes(id) ? prev.filter((existing) => existing !== id) : [...prev, id]));
@@ -69,6 +77,7 @@ export default function TransactionsListScreen() {
     setEndDate('');
     setTypeFilter(undefined);
     setRunningBalanceMode(false);
+    setExcludedFilter('all');
   }
 
   return (
@@ -143,6 +152,8 @@ export default function TransactionsListScreen() {
         endDate={endDate}
         onChangeStartDate={setStartDate}
         onChangeEndDate={setEndDate}
+        excludedFilter={excludedFilter}
+        onChangeExcludedFilter={setExcludedFilter}
         onClear={clearFilters}
       />
     </View>

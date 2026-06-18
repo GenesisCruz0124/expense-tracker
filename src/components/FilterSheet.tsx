@@ -6,6 +6,14 @@ import { PALETTE } from '../constants/colors';
 import { useCategories } from '../hooks/useCategories';
 import { DateField } from './DateField';
 
+export type ExcludedFilter = 'all' | 'hide' | 'only';
+
+const EXCLUDED_FILTER_OPTIONS: { value: ExcludedFilter; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'hide', label: 'Hide excluded' },
+  { value: 'only', label: 'Only excluded' },
+];
+
 interface Props {
   visible: boolean;
   onClose: () => void;
@@ -15,10 +23,12 @@ interface Props {
   endDate: string;
   onChangeStartDate: (value: string) => void;
   onChangeEndDate: (value: string) => void;
+  excludedFilter: ExcludedFilter;
+  onChangeExcludedFilter: (value: ExcludedFilter) => void;
   onClear: () => void;
 }
 
-/** Category multi-select + date-range filter for the Transactions list. */
+/** Category multi-select + date-range + excluded-transactions filter for the Transactions list. */
 export function FilterSheet({
   visible,
   onClose,
@@ -28,6 +38,8 @@ export function FilterSheet({
   endDate,
   onChangeStartDate,
   onChangeEndDate,
+  excludedFilter,
+  onChangeExcludedFilter,
   onClear,
 }: Props) {
   const { categories } = useCategories({ includeArchived: true });
@@ -69,6 +81,22 @@ export function FilterSheet({
             <View style={styles.dateField}>
               <DateField label="To" value={endDate} onChangeText={onChangeEndDate} />
             </View>
+          </View>
+
+          <Text style={styles.sectionLabel}>Excluded transactions</Text>
+          <View style={styles.chips}>
+            {EXCLUDED_FILTER_OPTIONS.map((option) => {
+              const selected = excludedFilter === option.value;
+              return (
+                <Pressable
+                  key={option.value}
+                  onPress={() => onChangeExcludedFilter(option.value)}
+                  style={[styles.chip, { borderColor: PALETTE.net }, selected && { backgroundColor: PALETTE.net }]}
+                >
+                  <Text style={[styles.chipText, { color: selected ? '#fff' : PALETTE.net }]}>{option.label}</Text>
+                </Pressable>
+              );
+            })}
           </View>
 
           <Pressable onPress={onClear} style={styles.clearButton}>
