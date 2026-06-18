@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 
 import { EmptyState } from '../components/EmptyState';
@@ -7,8 +7,21 @@ import { FilterSheet, type ExcludedFilter } from '../components/FilterSheet';
 import { TransactionListItem } from '../components/TransactionListItem';
 import { PALETTE } from '../constants/colors';
 import { useTransactions } from '../hooks/useTransactions';
-import type { ListTransactionsFilter } from '../db/queries/transactions';
+import type { ListTransactionsFilter, TransactionWithCategory } from '../db/queries/transactions';
 import type { TransactionsStackParamList } from '../navigation/types';
+import { formatCurrency } from '../utils/currency';
+import { formatDisplayDate } from '../utils/dateRanges';
+
+interface TransactionRow {
+  transaction: TransactionWithCategory;
+  runningBalance: number | undefined;
+}
+
+interface DaySection {
+  title: string;
+  subtotal: number;
+  data: TransactionRow[];
+}
 
 export default function TransactionsListScreen() {
   const navigation = useNavigation();
@@ -20,6 +33,7 @@ export default function TransactionsListScreen() {
   const [typeFilter, setTypeFilter] = useState<'expense' | 'income' | undefined>(route.params?.type);
   const [runningBalanceMode, setRunningBalanceMode] = useState(route.params?.runningBalance ?? false);
   const [excludedFilter, setExcludedFilter] = useState<ExcludedFilter>('all');
+  const [groupByDay, setGroupByDay] = useState(false);
   const [filterVisible, setFilterVisible] = useState(false);
 
   useEffect(() => {
@@ -60,6 +74,23 @@ export default function TransactionsListScreen() {
       return { transaction, runningBalance };
     });
   }, [transactions, runningBalanceMode]);
+  const daySections = useMemo<DaySection[]>(() => {
+    const sections: DaySection[] = [];
+    const sectionByDay = new Map<string, DaySection>();
+    for (const item of transactionsWithBalance) {
+      const dayKey = item.transaction.occurredAt.slice(0, 10);
+      let section = sectionByDay.get(dayKey);
+      if (!section) {
+        section = { title: dayKey, subtotal: 0, data: [] };
+        sectionByDay.set(dayKey, section);
+        sections.push(section);
+      }
+      section.subtotal += item.transaction.type === 'income' ? item.transaction.amount : -item.transaction.amount;
+      section.data.push(item);
+    }
+    return sections;
+  }, [transactionsWithBalance]);
+
   const activeFilterCount =
     selectedCategoryIds.length +
     (startDate && endDate ? 1 : 0) +
@@ -93,6 +124,12 @@ export default function TransactionsListScreen() {
             placeholderTextColor={PALETTE.textSecondary}
           />
         </View>
+        <Pressable
+          style={[styles.filterButton, groupByDay && styles.filterButtonActive]}
+          onPress={() => setGroupByDay((current) => !current)}
+        >
+          <Text style={[styles.filterButtonText, groupByDay && styles.filterButtonTextActive]}>Group by day</Text>
+        </Pressable>
         <Pressable style={[styles.filterButton, activeFilterCount > 0 && styles.filterButtonActive]} onPress={() => setFilterVisible(true)}>
           <Text style={[styles.filterButtonText, activeFilterCount > 0 && styles.filterButtonTextActive]}>
             Filter{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
@@ -113,31 +150,69 @@ export default function TransactionsListScreen() {
         </View>
       ) : null}
 
-      <FlatList
-        data={transactionsWithBalance}
-        keyExtractor={(item) => String(item.transaction.id)}
-        renderItem={({ item }) => (
-          <TransactionListItem
-            transaction={item.transaction}
-            runningBalance={item.runningBalance}
-            onPress={() => navigation.navigate('AddEditTransaction', { transactionId: item.transaction.id })}
-          />
-        )}
-        contentContainerStyle={transactions.length === 0 ? styles.emptyContainer : undefined}
-        ListEmptyComponent={
-          !loading ? (
-            <EmptyState
-              icon="📋"
-              title="No transactions"
-              message={
-                activeFilterCount > 0 || searchText
-                  ? 'Nothing matches your filters yet.'
-                  : 'Add your first income or expense to get started.'
-              }
+      {groupByDay ? (
+        <SectionList
+          sections={daySections}
+          keyExtractor={(item) => String(item.transaction.id)}
+          renderItem={({ item }) => (
+            <TransactionListItem
+              transaction={item.transaction}
+              runningBalance={item.runningBalance}
+              onPress={() => navigation.navigate('AddEditTransaction', { transactionId: item.transaction.id })}
             />
-          ) : null
-        }
-      />
+          )}
+          renderSectionHeader={({ section }) => (
+            <View style={styles.dayHeader}>
+              <Text style={styles.dayHeaderDate}>{formatDisplayDate(section.title)}</Text>
+              <Text style={[styles.dayHeaderSubtotal, { color: section.subtotal >= 0 ? PALETTE.income : PALETTE.expense }]}>
+                {section.subtotal >= 0 ? '+' : '−'}
+                {formatCurrency(Math.abs(section.subtotal))}
+              </Text>
+            </View>
+          )}
+          contentContainerStyle={transactions.length === 0 ? styles.emptyContainer : undefined}
+          stickySectionHeadersEnabled
+          ListEmptyComponent={
+            !loading ? (
+              <EmptyState
+                icon="📋"
+                title="No transactions"
+                message={
+                  activeFilterCount > 0 || searchText
+                    ? 'Nothing matches your filters yet.'
+                    : 'Add your first income or expense to get started.'
+                }
+              />
+            ) : null
+          }
+        />
+      ) : (
+        <FlatList
+          data={transactionsWithBalance}
+          keyExtractor={(item) => String(item.transaction.id)}
+          renderItem={({ item }) => (
+            <TransactionListItem
+              transaction={item.transaction}
+              runningBalance={item.runningBalance}
+              onPress={() => navigation.navigate('AddEditTransaction', { transactionId: item.transaction.id })}
+            />
+          )}
+          contentContainerStyle={transactions.length === 0 ? styles.emptyContainer : undefined}
+          ListEmptyComponent={
+            !loading ? (
+              <EmptyState
+                icon="📋"
+                title="No transactions"
+                message={
+                  activeFilterCount > 0 || searchText
+                    ? 'Nothing matches your filters yet.'
+                    : 'Add your first income or expense to get started.'
+                }
+              />
+            ) : null
+          }
+        />
+      )}
 
       <Pressable style={styles.fab} onPress={() => navigation.navigate('AddEditTransaction')}>
         <Text style={styles.fabIcon}>+</Text>
@@ -204,6 +279,18 @@ const styles = StyleSheet.create({
   typeFilterChipText: { fontSize: 12, fontWeight: '600', color: PALETTE.net },
   typeFilterChipClose: { fontSize: 12, fontWeight: '700', color: PALETTE.net },
   emptyContainer: { flexGrow: 1, justifyContent: 'center' },
+  dayHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: PALETTE.background,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: PALETTE.border,
+  },
+  dayHeaderDate: { fontSize: 12, fontWeight: '700', color: PALETTE.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4 },
+  dayHeaderSubtotal: { fontSize: 13, fontWeight: '700' },
   fab: {
     position: 'absolute',
     right: 20,
