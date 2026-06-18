@@ -14,6 +14,7 @@ import { formatCurrency } from '../utils/currency';
 import type { AccountsStackParamList, RootStackParamList } from '../navigation/types';
 
 interface AccountSection {
+  key: string;
   title: string;
   icon: string;
   color: string;
@@ -66,6 +67,15 @@ export default function AccountsScreen() {
   const [sortOption, setSortOption] = useState<SortOption>('name_asc');
   const [showSortPicker, setShowSortPicker] = useState(false);
   const [grouped, setGrouped] = useState(true);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+
+  function toggleGroup(key: string) {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  }
   const { accounts, error, setArchived } = useAccounts({ includeArchived: true });
   const { accountCategories } = useAccountCategories({ includeArchived: true });
 
@@ -103,6 +113,7 @@ export default function AccountsScreen() {
       if (data.length === 0) return [];
       return [
         {
+          key: 'all',
           title: 'All accounts',
           icon: '🏦',
           color: PALETTE.net,
@@ -115,6 +126,7 @@ export default function AccountsScreen() {
       .map((category) => {
         const data = sortAccounts(filtered.filter((account) => account.categoryId === category.id), sortOption);
         return {
+          key: String(category.id),
           title: category.name,
           icon: category.icon ?? DEFAULT_ACCOUNT_ICON,
           color: category.color,
@@ -125,6 +137,11 @@ export default function AccountsScreen() {
       .filter((section) => section.data.length > 0);
   }, [accountCategories, filtered, sortOption, grouped]);
 
+  const sectionListData = useMemo(
+    () => sections.map((s) => (collapsedGroups.has(s.key) ? { ...s, data: [] } : s)),
+    [sections, collapsedGroups],
+  );
+
   return (
     <View style={styles.screen}>
       {error ? (
@@ -134,7 +151,7 @@ export default function AccountsScreen() {
       ) : null}
 
       <SectionList
-        sections={sections}
+        sections={sectionListData}
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={sections.length === 0 ? styles.emptyContainer : styles.listContent}
         stickySectionHeadersEnabled={false}
@@ -212,19 +229,23 @@ export default function AccountsScreen() {
             message={showArchived ? undefined : 'Add an account to start tracking balances and assigning transactions.'}
           />
         }
-        renderSectionHeader={({ section }) => (
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionHeaderLeft}>
-              <View style={[styles.sectionIcon, { backgroundColor: `${section.color}1A` }]}>
-                <Text style={styles.sectionIconText}>{section.icon}</Text>
+        renderSectionHeader={({ section }) => {
+          const collapsed = collapsedGroups.has(section.key);
+          return (
+            <Pressable style={styles.sectionHeader} onPress={() => toggleGroup(section.key)}>
+              <View style={styles.sectionHeaderLeft}>
+                <Text style={styles.sectionChevron}>{collapsed ? '▸' : '▾'}</Text>
+                <View style={[styles.sectionIcon, { backgroundColor: `${section.color}1A` }]}>
+                  <Text style={styles.sectionIconText}>{section.icon}</Text>
+                </View>
+                <Text style={styles.sectionTitle}>{section.title}</Text>
               </View>
-              <Text style={styles.sectionTitle}>{section.title}</Text>
-            </View>
-            <Text style={[styles.sectionTotal, section.total < 0 && styles.negative]}>
-              {hideAmounts ? AMOUNT_MASK : formatCurrency(section.total)}
-            </Text>
-          </View>
-        )}
+              <Text style={[styles.sectionTotal, section.total < 0 && styles.negative]}>
+                {hideAmounts ? AMOUNT_MASK : formatCurrency(section.total)}
+              </Text>
+            </Pressable>
+          );
+        }}
         renderItem={({ item }) => {
           const subtitle = lastFourDigits(item.accountNumber);
           const categoryKind = accountCategories.find((c) => c.id === item.categoryId)?.kind;
@@ -385,6 +406,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   sectionHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  sectionChevron: { fontSize: 12, color: PALETTE.textSecondary, width: 14 },
   sectionIcon: {
     width: 26,
     height: 26,
