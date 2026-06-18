@@ -5,9 +5,19 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 
-import { PALETTE } from '../constants/colors';
+import {
+  ACCENT_PRESETS,
+  getStoredAccentKey,
+  getStoredThemeMode,
+  PALETTE,
+  THEME_ACCENT_KEY,
+  THEME_MODE_KEY,
+  type AccentKey,
+  type ThemeMode,
+} from '../constants/colors';
 import { useDatabase } from '../context/DatabaseProvider';
 import { useLicense } from '../context/LicenseProvider';
+import { setPreference } from '../db/themePreferences';
 import { TRIAL_DAYS } from '../utils/license';
 import { deleteAllTransactions } from '../db/queries/transactions';
 import type { MoreStackParamList } from '../navigation/types';
@@ -30,12 +40,32 @@ export default function SettingsScreen() {
   const [clearing, setClearing] = useState(false);
   const [backingUp, setBackingUp] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  const [themeMode, setThemeMode] = useState<ThemeMode>(getStoredThemeMode);
+  const [accentKey, setAccentKey] = useState<AccentKey>(getStoredAccentKey);
 
   const refreshStatus = useCallback(() => {
     getNotificationPermissionStatus().then(setStatus);
   }, []);
 
   useFocusEffect(refreshStatus);
+
+  function promptRestart() {
+    Alert.alert('Theme updated', 'Close and reopen the app to see the new theme.');
+  }
+
+  function handleSelectThemeMode(mode: ThemeMode) {
+    if (mode === themeMode) return;
+    setPreference(THEME_MODE_KEY, mode);
+    setThemeMode(mode);
+    promptRestart();
+  }
+
+  function handleSelectAccent(key: AccentKey) {
+    if (key === accentKey) return;
+    setPreference(THEME_ACCENT_KEY, key);
+    setAccentKey(key);
+    promptRestart();
+  }
 
   async function handleRequestPermission() {
     setStatus(await requestNotificationPermissions());
@@ -114,6 +144,45 @@ export default function SettingsScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Appearance</Text>
+        <Text style={styles.rowLabel}>Mode</Text>
+        <View style={styles.modeRow}>
+          {(['light', 'dark'] as ThemeMode[]).map((mode) => {
+            const selected = mode === themeMode;
+            return (
+              <Pressable
+                key={mode}
+                style={[styles.modeOption, selected && styles.modeOptionSelected]}
+                onPress={() => handleSelectThemeMode(mode)}
+              >
+                <Text style={[styles.modeOptionText, selected && styles.modeOptionTextSelected]}>
+                  {mode === 'light' ? 'Light' : 'Dark'}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <Text style={styles.rowLabel}>Accent color</Text>
+        <View style={styles.accentRow}>
+          {(Object.keys(ACCENT_PRESETS) as AccentKey[]).map((key) => {
+            const preset = ACCENT_PRESETS[key];
+            const selected = key === accentKey;
+            return (
+              <Pressable
+                key={key}
+                style={[styles.accentSwatch, { backgroundColor: preset.color }, selected && styles.accentSwatchSelected]}
+                onPress={() => handleSelectAccent(key)}
+                accessibilityLabel={preset.label}
+              >
+                {selected ? <Text style={styles.accentSwatchCheck}>✓</Text> : null}
+              </Pressable>
+            );
+          })}
+        </View>
+        <Text style={styles.helperText}>Theme changes take effect the next time you open the app.</Text>
+      </View>
+
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Manage</Text>
         <Pressable style={styles.row} onPress={() => navigation.navigate('Categories')}>
@@ -256,4 +325,26 @@ const styles = StyleSheet.create({
   dangerButton: { backgroundColor: `${PALETTE.danger}1A` },
   dangerButtonText: { color: PALETTE.danger },
   helperText: { fontSize: 12, color: PALETTE.textSecondary, lineHeight: 18 },
+  modeRow: { flexDirection: 'row', gap: 8 },
+  modeOption: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.border,
+  },
+  modeOptionSelected: { backgroundColor: PALETTE.primary, borderColor: PALETTE.primary },
+  modeOptionText: { fontSize: 13, fontWeight: '700', color: PALETTE.textSecondary },
+  modeOptionTextSelected: { color: PALETTE.onPrimary },
+  accentRow: { flexDirection: 'row', gap: 12 },
+  accentSwatch: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  accentSwatchSelected: { borderWidth: 2, borderColor: PALETTE.textPrimary },
+  accentSwatchCheck: { color: PALETTE.onPrimary, fontWeight: '700', fontSize: 14 },
 });
