@@ -33,6 +33,7 @@ export async function listBills(db: Database): Promise<BillWithDetails[]> {
       accountId: bills.accountId,
       dueDate: bills.dueDate,
       frequency: bills.frequency,
+      intervalDays: bills.intervalDays,
       reminderDaysBefore: bills.reminderDaysBefore,
       remindedAt: bills.remindedAt,
       isPaid: bills.isPaid,
@@ -70,6 +71,8 @@ export interface BillInput {
   accountId?: number | null;
   dueDate: string;
   frequency: BillFrequency;
+  /** Day interval used when `frequency` is 'every_n_days', e.g. 11 for "every 11 days". */
+  intervalDays?: number | null;
   reminderDaysBefore: number;
   /** When true, the expense logged by "mark as paid" is excluded from expense reports. */
   excludeFromExpense?: boolean;
@@ -84,13 +87,14 @@ function toNewBillValues(input: BillInput): NewBill {
     accountId: input.accountId ?? null,
     dueDate: input.dueDate,
     frequency: input.frequency,
+    intervalDays: input.frequency === 'every_n_days' ? input.intervalDays ?? null : null,
     reminderDaysBefore: input.reminderDaysBefore,
     excludeFromExpense: input.excludeFromExpense ?? false,
   };
 }
 
 /** Advances a bill's due date to its next occurrence based on its repeat frequency. */
-function getNextDueDate(dueDate: string, frequency: BillFrequency): string {
+function getNextDueDate(dueDate: string, frequency: BillFrequency, intervalDays: number | null): string {
   const current = parseISO(dueDate);
   switch (frequency) {
     case 'weekly':
@@ -101,6 +105,8 @@ function getNextDueDate(dueDate: string, frequency: BillFrequency): string {
       return formatIsoDate(addMonths(current, 1));
     case 'yearly':
       return formatIsoDate(addYears(current, 1));
+    case 'every_n_days':
+      return formatIsoDate(addDays(current, intervalDays ?? 1));
     case 'once':
     default:
       return dueDate;
@@ -159,7 +165,7 @@ export async function markBillPaid(db: Database, id: number, occurredAt: string)
           isPaid: false,
           paidTransactionId: null,
           remindedAt: null,
-          dueDate: getNextDueDate(bill.dueDate, bill.frequency),
+          dueDate: getNextDueDate(bill.dueDate, bill.frequency, bill.intervalDays),
         })
         .where(eq(bills.id, id));
     }

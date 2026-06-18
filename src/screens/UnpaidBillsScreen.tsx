@@ -17,7 +17,15 @@ const FREQUENCY_LABELS: Record<BillFrequency, string | null> = {
   semi_monthly: 'Repeats semi-monthly',
   monthly: 'Repeats monthly',
   yearly: 'Repeats yearly',
+  every_n_days: null,
 };
+
+function frequencyLabelFor(bill: BillWithDetails): string | null {
+  if (bill.frequency === 'every_n_days') {
+    return bill.intervalDays != null ? `Repeats every ${bill.intervalDays} days` : 'Repeats every N days';
+  }
+  return FREQUENCY_LABELS[bill.frequency];
+}
 
 export default function UnpaidBillsScreen() {
   const navigation = useNavigation();
@@ -66,7 +74,7 @@ export default function UnpaidBillsScreen() {
             : isOverdue
               ? `Overdue · due ${formatDisplayDate(item.dueDate)}`
               : `Due ${formatDisplayDate(item.dueDate)}`;
-          const frequencyLabel = FREQUENCY_LABELS[item.frequency];
+          const frequencyLabel = frequencyLabelFor(item);
           return (
             <Pressable
               style={[styles.card, item.isPaid && styles.cardPaid]}

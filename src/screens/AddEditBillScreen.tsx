@@ -38,6 +38,7 @@ const FREQUENCY_OPTIONS: FrequencyOption[] = [
   { value: 'semi_monthly', label: 'Semi-monthly' },
   { value: 'monthly', label: 'Monthly' },
   { value: 'yearly', label: 'Yearly' },
+  { value: 'every_n_days', label: 'Every N days' },
 ];
 
 export default function AddEditBillScreen() {
@@ -56,6 +57,7 @@ export default function AddEditBillScreen() {
   const [accountId, setAccountId] = useState<number | null>(null);
   const [dueDate, setDueDate] = useState(() => formatIsoDate(new Date()));
   const [frequency, setFrequency] = useState<BillFrequency>('once');
+  const [intervalDaysText, setIntervalDaysText] = useState('');
   const [reminderDays, setReminderDays] = useState(1);
   const [excludeFromExpense, setExcludeFromExpense] = useState(false);
   const [isPaid, setIsPaid] = useState(false);
@@ -76,6 +78,7 @@ export default function AddEditBillScreen() {
       setAccountId(existing.accountId);
       setDueDate(existing.dueDate);
       setFrequency(existing.frequency);
+      setIntervalDaysText(existing.intervalDays != null ? String(existing.intervalDays) : '');
       setReminderDays(existing.reminderDaysBefore);
       setExcludeFromExpense(existing.excludeFromExpense);
       setIsPaid(existing.isPaid);
@@ -105,6 +108,11 @@ export default function AddEditBillScreen() {
       setError('Enter a valid due date in YYYY-MM-DD format.');
       return;
     }
+    const intervalDays = parseInt(intervalDaysText, 10);
+    if (frequency === 'every_n_days' && (!Number.isFinite(intervalDays) || intervalDays <= 0)) {
+      setError('Enter a valid number of days greater than zero.');
+      return;
+    }
 
     setSaving(true);
     try {
@@ -116,6 +124,7 @@ export default function AddEditBillScreen() {
         accountId,
         dueDate,
         frequency,
+        intervalDays: frequency === 'every_n_days' ? intervalDays : null,
         reminderDaysBefore: reminderDays,
         excludeFromExpense,
       };
@@ -237,6 +246,20 @@ export default function AddEditBillScreen() {
             );
           })}
         </View>
+        {frequency === 'every_n_days' ? (
+          <View style={styles.intervalRow}>
+            <Text style={styles.intervalLabel}>Every</Text>
+            <TextInput
+              style={styles.intervalInput}
+              value={intervalDaysText}
+              onChangeText={setIntervalDaysText}
+              placeholder="11"
+              placeholderTextColor={PALETTE.textSecondary}
+              keyboardType="number-pad"
+            />
+            <Text style={styles.intervalLabel}>days</Text>
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.field}>
@@ -321,6 +344,20 @@ const styles = StyleSheet.create({
   optionChipSelected: { borderColor: PALETTE.net, backgroundColor: `${PALETTE.net}1A` },
   optionChipText: { fontSize: 13, fontWeight: '600', color: PALETTE.textSecondary },
   optionChipTextSelected: { color: PALETTE.net },
+  intervalRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4 },
+  intervalLabel: { fontSize: 13, fontWeight: '600', color: PALETTE.textSecondary },
+  intervalInput: {
+    width: 64,
+    backgroundColor: PALETTE.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 15,
+    color: PALETTE.textPrimary,
+    textAlign: 'center',
+  },
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',

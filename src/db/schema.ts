@@ -159,9 +159,11 @@ export const bills = sqliteTable(
     billerId: integer('biller_id').references(() => categories.id, { onDelete: 'set null' }),
     accountId: integer('account_id').references(() => accounts.id, { onDelete: 'set null' }),
     dueDate: text('due_date').notNull(),
-    frequency: text('frequency', { enum: ['once', 'weekly', 'semi_monthly', 'monthly', 'yearly'] })
+    frequency: text('frequency', { enum: ['once', 'weekly', 'semi_monthly', 'monthly', 'yearly', 'every_n_days'] })
       .notNull()
       .default('once'),
+    /** Day interval used when `frequency` is 'every_n_days', e.g. 11 for "every 11 days". */
+    intervalDays: integer('interval_days'),
     reminderDaysBefore: integer('reminder_days_before').notNull().default(1),
     remindedAt: text('reminded_at'),
     isPaid: integer('is_paid', { mode: 'boolean' }).notNull().default(false),
