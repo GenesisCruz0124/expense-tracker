@@ -12,5 +12,9 @@ export const themedHeaderOptions: NativeStackNavigationOptions = {
   headerTintColor: PALETTE.onPrimary,
   headerTitleStyle: { fontWeight: '700', fontSize: 18 },
   headerShadowVisible: false,
-  animation: 'slide_from_right',
+  // 'slide_from_right' drags the whole native header — pink background included — across the
+  // screen as one unit, which reads as the color itself animating. Every screen shares the same
+  // headerStyle background already, so there's nothing to transition there; 'fade' only crossfades
+  // the header title/content, leaving the (already-identical) background looking static.
+  animation: 'fade',
 };
