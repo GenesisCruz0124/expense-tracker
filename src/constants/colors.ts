@@ -25,4 +25,7 @@ export const PALETTE = {
   net: '#3B82F6',
   warning: '#F59E0B',
   danger: '#EF4444',
+  /** Piggy-bank pink lifted from the app icon — used for the themed navigation header. */
+  primary: '#F76C8A',
+  onPrimary: '#FFFFFF',
 } as const;

@@ -16,20 +16,37 @@ import DashboardScreen from '../screens/DashboardScreen';
 import ReportsScreen from '../screens/ReportsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import TransactionsListScreen from '../screens/TransactionsListScreen';
+import { themedHeaderOptions } from './headerOptions';
 import type { AccountsStackParamList, MoreStackParamList, TabParamList, TransactionsStackParamList } from './types';
 
 const Tab = createBottomTabNavigator<TabParamList>();
 const TransactionsStack = createNativeStackNavigator<TransactionsStackParamList>();
 const AccountsStack = createNativeStackNavigator<AccountsStackParamList>();
 const MoreStack = createNativeStackNavigator<MoreStackParamList>();
+// Single-screen stacks for the tabs that don't otherwise need one — wrapping every tab in a
+// native-stack navigator means all of them render the same native header (height, weight,
+// animation), instead of Dashboard/Bills/Reports/Budgets falling back to bottom-tabs' own JS
+// header while the other tabs use native-stack's.
+const DashboardStack = createNativeStackNavigator();
+const BillsStack = createNativeStackNavigator();
+const ReportsStack = createNativeStackNavigator();
+const BudgetsStack = createNativeStackNavigator();
 
 function TabGlyph({ glyph, focused }: { glyph: string; focused: boolean }) {
   return <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.45 }}>{glyph}</Text>;
 }
 
+function DashboardNavigator() {
+  return (
+    <DashboardStack.Navigator screenOptions={themedHeaderOptions}>
+      <DashboardStack.Screen name="Dashboard" component={DashboardScreen} options={{ title: 'Dashboard' }} />
+    </DashboardStack.Navigator>
+  );
+}
+
 function TransactionsNavigator() {
   return (
-    <TransactionsStack.Navigator>
+    <TransactionsStack.Navigator screenOptions={themedHeaderOptions}>
       <TransactionsStack.Screen
         name="TransactionsList"
         component={TransactionsListScreen}
@@ -41,10 +58,34 @@ function TransactionsNavigator() {
 
 function AccountsNavigator() {
   return (
-    <AccountsStack.Navigator>
+    <AccountsStack.Navigator screenOptions={themedHeaderOptions}>
       <AccountsStack.Screen name="AccountsList" component={AccountsScreen} options={{ title: 'Accounts' }} />
       <AccountsStack.Screen name="AccountTransactions" component={AccountTransactionsScreen} />
     </AccountsStack.Navigator>
+  );
+}
+
+function BillsNavigator() {
+  return (
+    <BillsStack.Navigator screenOptions={themedHeaderOptions}>
+      <BillsStack.Screen name="Bills" component={BillsScreen} options={{ title: 'Bills' }} />
+    </BillsStack.Navigator>
+  );
+}
+
+function ReportsNavigator() {
+  return (
+    <ReportsStack.Navigator screenOptions={themedHeaderOptions}>
+      <ReportsStack.Screen name="Reports" component={ReportsScreen} options={{ title: 'Reports' }} />
+    </ReportsStack.Navigator>
+  );
+}
+
+function BudgetsNavigator() {
+  return (
+    <BudgetsStack.Navigator screenOptions={themedHeaderOptions}>
+      <BudgetsStack.Screen name="Budgets" component={BudgetsScreen} options={{ title: 'Budgets' }} />
+    </BudgetsStack.Navigator>
   );
 }
 
@@ -53,7 +94,7 @@ function AccountsNavigator() {
 // live in their own tabs.
 function MoreNavigator() {
   return (
-    <MoreStack.Navigator>
+    <MoreStack.Navigator screenOptions={themedHeaderOptions}>
       <MoreStack.Screen name="Settings" component={SettingsScreen} />
       <MoreStack.Screen
         name="Categories"
@@ -81,8 +122,8 @@ export function TabNavigator() {
     >
       <Tab.Screen
         name="Dashboard"
-        component={DashboardScreen}
-        options={{ tabBarIcon: ({ focused }) => <TabGlyph glyph="🏠" focused={focused} /> }}
+        component={DashboardNavigator}
+        options={{ headerShown: false, tabBarIcon: ({ focused }) => <TabGlyph glyph="🏠" focused={focused} /> }}
       />
       <Tab.Screen
         name="TransactionsTab"
@@ -109,21 +150,22 @@ export function TabNavigator() {
       />
       <Tab.Screen
         name="Bills"
-        component={BillsScreen}
+        component={BillsNavigator}
         options={{
+          headerShown: false,
           title: 'Bills',
           tabBarIcon: ({ focused }) => <TabGlyph glyph="🧾" focused={focused} />,
         }}
       />
       <Tab.Screen
         name="Reports"
-        component={ReportsScreen}
-        options={{ tabBarIcon: ({ focused }) => <TabGlyph glyph="📊" focused={focused} /> }}
+        component={ReportsNavigator}
+        options={{ headerShown: false, tabBarIcon: ({ focused }) => <TabGlyph glyph="📊" focused={focused} /> }}
       />
       <Tab.Screen
         name="Budgets"
-        component={BudgetsScreen}
-        options={{ tabBarIcon: ({ focused }) => <TabGlyph glyph="🎯" focused={focused} /> }}
+        component={BudgetsNavigator}
+        options={{ headerShown: false, tabBarIcon: ({ focused }) => <TabGlyph glyph="🎯" focused={focused} /> }}
       />
       <Tab.Screen
         name="MoreTab"

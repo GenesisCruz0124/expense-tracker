@@ -8,6 +8,7 @@ import AddEditBudgetScreen from '../screens/AddEditBudgetScreen';
 import AddEditCategoryScreen from '../screens/AddEditCategoryScreen';
 import AddEditRecurringScreen from '../screens/AddEditRecurringScreen';
 import AddEditTransactionScreen from '../screens/AddEditTransactionScreen';
+import { themedHeaderOptions } from './headerOptions';
 import { TabNavigator } from './TabNavigator';
 import type { RootStackParamList } from './types';
 
@@ -17,7 +18,7 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 // they're transient, task-focused flows rather than peer destinations like the four tabs.
 export function RootNavigator() {
   return (
-    <Stack.Navigator>
+    <Stack.Navigator screenOptions={themedHeaderOptions}>
       <Stack.Screen name="Tabs" component={TabNavigator} options={{ headerShown: false }} />
       <Stack.Group screenOptions={{ presentation: 'modal' }}>
         <Stack.Screen name="AddEditTransaction" component={AddEditTransactionScreen} options={{ title: 'Transaction' }} />
