@@ -18,6 +18,14 @@ export const DEFAULT_ACCOUNT_ICON = '💵';
  */
 export const ACCOUNT_LOGOS: Record<string, ImageSourcePropType> = {
   'logo:pnb': require('../../assets/bank-icons/pnb.png'),
+  'logo:bpi': require('../../assets/bank-icons/bpi.jpg'),
+  'logo:china': require('../../assets/bank-icons/china.jpg'),
+  'logo:cimb': require('../../assets/bank-icons/cimb.jpg'),
+  'logo:gotyme': require('../../assets/bank-icons/gotyme.jpg'),
+  'logo:maya': require('../../assets/bank-icons/maya.jpg'),
+  'logo:maribank': require('../../assets/bank-icons/maribank.jpg'),
+  'logo:spaylater': require('../../assets/bank-icons/spaylater.jpg'),
+  'logo:aub': require('../../assets/bank-icons/aub.png'),
 };
 
 export const ACCOUNT_LOGO_OPTIONS = Object.keys(ACCOUNT_LOGOS);
