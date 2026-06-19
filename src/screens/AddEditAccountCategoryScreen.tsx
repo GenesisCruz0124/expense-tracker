@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 
-import { ACCOUNT_ICON_OPTIONS, DEFAULT_ACCOUNT_ICON } from '../constants/accountIcons';
+import { ACCOUNT_ICON_OPTIONS, ACCOUNT_LOGO_OPTIONS, DEFAULT_ACCOUNT_ICON } from '../constants/accountIcons';
+import { AccountIcon } from '../components/AccountIcon';
 import { CATEGORY_COLOR_PALETTE, PALETTE } from '../constants/colors';
 import { useDatabase } from '../context/DatabaseProvider';
 import { getAccountCategory, type AccountCategoryInput } from '../db/queries/accountCategories';
@@ -131,13 +132,13 @@ export default function AddEditAccountCategoryScreen() {
       <View style={styles.field}>
         <Text style={styles.label}>Icon</Text>
         <View style={styles.iconRow}>
-          {ACCOUNT_ICON_OPTIONS.map((option) => (
+          {[...ACCOUNT_ICON_OPTIONS, ...ACCOUNT_LOGO_OPTIONS].map((option) => (
             <Pressable
               key={option}
               onPress={() => setIcon(option)}
               style={[styles.iconOption, option === icon && styles.iconOptionSelected]}
             >
-              <Text style={styles.iconOptionText}>{option}</Text>
+              <AccountIcon icon={option} size={20} textStyle={styles.iconOptionText} />
             </Pressable>
           ))}
         </View>

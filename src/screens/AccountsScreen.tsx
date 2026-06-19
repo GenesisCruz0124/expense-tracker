@@ -3,6 +3,7 @@ import { Pressable, ScrollView, SectionList, StyleSheet, Switch, Text, View } fr
 import { useNavigation, type CompositeNavigationProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
+import { AccountIcon } from '../components/AccountIcon';
 import { ActionSheet } from '../components/ActionSheet';
 import { EmptyState } from '../components/EmptyState';
 import { DEFAULT_ACCOUNT_ICON } from '../constants/accountIcons';
@@ -225,9 +226,12 @@ export default function AccountsScreen() {
                         selected && { backgroundColor: category.color },
                       ]}
                     >
-                      <Text style={[styles.filterChipText, { color: selected ? '#fff' : category.color }]}>
-                        {category.icon ?? DEFAULT_ACCOUNT_ICON} {category.name}
-                      </Text>
+                      <View style={styles.filterChipContent}>
+                        <AccountIcon icon={category.icon} size={13} />
+                        <Text style={[styles.filterChipText, { color: selected ? '#fff' : category.color }]}>
+                          {category.name}
+                        </Text>
+                      </View>
                     </Pressable>
                   );
                 })}
@@ -263,7 +267,7 @@ export default function AccountsScreen() {
               <View style={styles.sectionHeaderLeft}>
                 <Text style={styles.sectionChevron}>{collapsed ? '▸' : '▾'}</Text>
                 <View style={[styles.sectionIcon, { backgroundColor: `${section.color}1A` }]}>
-                  <Text style={styles.sectionIconText}>{section.icon}</Text>
+                  <AccountIcon icon={section.icon} size={16} textStyle={styles.sectionIconText} />
                 </View>
                 <Text style={styles.sectionTitle}>{section.title}</Text>
               </View>
@@ -284,7 +288,7 @@ export default function AccountsScreen() {
               onPress={() => navigation.navigate('AccountTransactions', { accountId: item.id })}
             >
               <View style={[styles.avatar, { backgroundColor: `${item.color}1A` }]}>
-                <Text style={styles.avatarIcon}>{item.icon ?? DEFAULT_ACCOUNT_ICON}</Text>
+                <AccountIcon icon={item.icon} size={20} textStyle={styles.avatarIcon} />
               </View>
               <View style={styles.cardMain}>
                 <Text style={styles.cardName} numberOfLines={1}>
@@ -405,6 +409,7 @@ const styles = StyleSheet.create({
     backgroundColor: PALETTE.surface,
   },
   filterChipAllSelected: { borderColor: PALETTE.net, backgroundColor: PALETTE.net },
+  filterChipContent: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   filterChipText: { fontSize: 13, fontWeight: '600', color: PALETTE.textSecondary },
   filterChipTextSelected: { color: '#fff' },
   controlsRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, paddingBottom: 10 },

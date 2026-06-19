@@ -2,8 +2,8 @@ import React, { useMemo } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 
+import { AccountIcon } from '../components/AccountIcon';
 import { EmptyState } from '../components/EmptyState';
-import { DEFAULT_ACCOUNT_ICON } from '../constants/accountIcons';
 import { PALETTE } from '../constants/colors';
 import type { AccountWithBalance } from '../db/queries/accounts';
 import { useAccountCategories } from '../hooks/useAccountCategories';
@@ -113,7 +113,7 @@ export default function RecurringTransactionsScreen() {
                     onPress={() => navigation.navigate('AddEditAccount', { accountId: account.id })}
                   >
                     <View style={[styles.avatar, { backgroundColor: `${account.color}1A` }]}>
-                      <Text style={styles.avatarIcon}>{account.icon ?? DEFAULT_ACCOUNT_ICON}</Text>
+                      <AccountIcon icon={account.icon} size={18} textStyle={styles.avatarIcon} />
                     </View>
                     <View style={styles.cardMain}>
                       <Text style={styles.cardTitle}>{account.name}</Text>
@@ -154,7 +154,7 @@ export default function RecurringTransactionsScreen() {
                     onPress={() => navigation.navigate('AddEditAccount', { accountId: account.id })}
                   >
                     <View style={[styles.avatar, { backgroundColor: `${account.color}1A` }]}>
-                      <Text style={styles.avatarIcon}>{account.icon ?? DEFAULT_ACCOUNT_ICON}</Text>
+                      <AccountIcon icon={account.icon} size={18} textStyle={styles.avatarIcon} />
                     </View>
                     <View style={styles.cardMain}>
                       <Text style={styles.cardTitle}>{account.name}</Text>
