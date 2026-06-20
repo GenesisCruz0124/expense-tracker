@@ -68,7 +68,7 @@ export default function AccountsScreen() {
   const navigation = useNavigation<AccountsScreenNavigationProp>();
   const [showArchived, setShowArchived] = useState(false);
   const [hideAmounts, setHideAmounts] = useState(false);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
   const [menuAccount, setMenuAccount] = useState<AccountWithBalance | null>(null);
   const [sortOption, setSortOption] = useState<SortOption>('balance_desc');
   const [showSortPicker, setShowSortPicker] = useState(false);
@@ -115,7 +115,13 @@ export default function AccountsScreen() {
   );
 
   const filtered =
-    selectedCategoryId == null ? visible : visible.filter((account) => account.categoryId === selectedCategoryId);
+    selectedCategoryIds.length === 0
+      ? visible
+      : visible.filter((account) => account.categoryId != null && selectedCategoryIds.includes(account.categoryId));
+
+  function toggleCategoryFilter(id: number) {
+    setSelectedCategoryIds((prev) => (prev.includes(id) ? prev.filter((existing) => existing !== id) : [...prev, id]));
+  }
 
   const netWorth = useMemo(() => {
     return visible.reduce((sum, account) => {
@@ -207,19 +213,19 @@ export default function AccountsScreen() {
                 contentContainerStyle={styles.filterRow}
               >
                 <Pressable
-                  onPress={() => setSelectedCategoryId(null)}
-                  style={[styles.filterChip, selectedCategoryId == null && styles.filterChipAllSelected]}
+                  onPress={() => setSelectedCategoryIds([])}
+                  style={[styles.filterChip, selectedCategoryIds.length === 0 && styles.filterChipAllSelected]}
                 >
-                  <Text style={[styles.filterChipText, selectedCategoryId == null && styles.filterChipTextSelected]}>
+                  <Text style={[styles.filterChipText, selectedCategoryIds.length === 0 && styles.filterChipTextSelected]}>
                     All
                   </Text>
                 </Pressable>
                 {filterableCategories.map((category) => {
-                  const selected = category.id === selectedCategoryId;
+                  const selected = selectedCategoryIds.includes(category.id);
                   return (
                     <Pressable
                       key={category.id}
-                      onPress={() => setSelectedCategoryId(selected ? null : category.id)}
+                      onPress={() => toggleCategoryFilter(category.id)}
                       style={[
                         styles.filterChip,
                         { borderColor: category.color },
