@@ -1,5 +1,5 @@
-import React from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PALETTE } from '../constants/colors';
@@ -62,6 +62,15 @@ export function FilterSheet({
 }: Props) {
   const { categories } = useCategories({ includeArchived: true });
   const { accounts } = useAccounts({ includeArchived: true });
+  const [searchText, setSearchText] = useState('');
+
+  useEffect(() => {
+    if (!visible) setSearchText('');
+  }, [visible]);
+
+  const search = searchText.trim().toLowerCase();
+  const filteredCategories = search ? categories.filter((c) => c.name.toLowerCase().includes(search)) : categories;
+  const filteredAccounts = search ? accounts.filter((a) => a.name.toLowerCase().includes(search)) : accounts;
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -72,7 +81,15 @@ export function FilterSheet({
             <Text style={styles.doneLink}>Done</Text>
           </Pressable>
         </View>
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <TextInput
+            style={styles.searchInput}
+            value={searchText}
+            onChangeText={setSearchText}
+            placeholder="Search categories or accounts"
+            placeholderTextColor={PALETTE.textSecondary}
+          />
+
           <Text style={styles.sectionLabel}>Type</Text>
           <View style={styles.chips}>
             {TYPE_FILTER_OPTIONS.map((option) => {
@@ -89,41 +106,53 @@ export function FilterSheet({
             })}
           </View>
 
-          <Text style={styles.sectionLabel}>Categories</Text>
-          <View style={styles.chips}>
-            {categories.map((category) => {
-              const selected = selectedCategoryIds.includes(category.id);
-              return (
-                <Pressable
-                  key={category.id}
-                  onPress={() => onToggleCategory(category.id)}
-                  style={[styles.chip, { borderColor: category.color }, selected && { backgroundColor: category.color }]}
-                >
-                  <Text style={[styles.chipText, { color: selected ? '#fff' : category.color }]}>
-                    {category.icon ? `${category.icon} ` : ''}
-                    {category.name}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          {filteredCategories.length > 0 ? (
+            <>
+              <Text style={styles.sectionLabel}>Categories</Text>
+              <View style={styles.chips}>
+                {filteredCategories.map((category) => {
+                  const selected = selectedCategoryIds.includes(category.id);
+                  return (
+                    <Pressable
+                      key={category.id}
+                      onPress={() => onToggleCategory(category.id)}
+                      style={[styles.chip, { borderColor: category.color }, selected && { backgroundColor: category.color }]}
+                    >
+                      <Text style={[styles.chipText, { color: selected ? '#fff' : category.color }]}>
+                        {category.icon ? `${category.icon} ` : ''}
+                        {category.name}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </>
+          ) : null}
 
-          <Text style={styles.sectionLabel}>Accounts</Text>
-          <View style={styles.chips}>
-            {accounts.map((account) => {
-              const selected = selectedAccountIds.includes(account.id);
-              return (
-                <Pressable
-                  key={account.id}
-                  onPress={() => onToggleAccount(account.id)}
-                  style={[styles.chip, styles.accountChip, { borderColor: account.color }, selected && { backgroundColor: account.color }]}
-                >
-                  <AccountIcon icon={account.icon} size={13} />
-                  <Text style={[styles.chipText, { color: selected ? '#fff' : account.color }]}>{account.name}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          {filteredAccounts.length > 0 ? (
+            <>
+              <Text style={styles.sectionLabel}>Accounts</Text>
+              <View style={styles.chips}>
+                {filteredAccounts.map((account) => {
+                  const selected = selectedAccountIds.includes(account.id);
+                  return (
+                    <Pressable
+                      key={account.id}
+                      onPress={() => onToggleAccount(account.id)}
+                      style={[styles.chip, styles.accountChip, { borderColor: account.color }, selected && { backgroundColor: account.color }]}
+                    >
+                      <AccountIcon icon={account.icon} size={13} />
+                      <Text style={[styles.chipText, { color: selected ? '#fff' : account.color }]}>{account.name}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </>
+          ) : null}
+
+          {search && filteredCategories.length === 0 && filteredAccounts.length === 0 ? (
+            <Text style={styles.noMatches}>No categories or accounts match "{searchText.trim()}".</Text>
+          ) : null}
 
           <Text style={styles.sectionLabel}>Date range</Text>
           <View style={styles.dateRow}>
@@ -174,6 +203,17 @@ const styles = StyleSheet.create({
   title: { fontSize: 16, fontWeight: '700', color: PALETTE.textPrimary },
   doneLink: { fontSize: 15, fontWeight: '600', color: PALETTE.net },
   content: { padding: 20, gap: 12 },
+  searchInput: {
+    backgroundColor: PALETTE.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.border,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: PALETTE.textPrimary,
+  },
+  noMatches: { fontSize: 13, color: PALETTE.textSecondary, textAlign: 'center', marginTop: 8 },
   sectionLabel: { fontSize: 13, fontWeight: '700', color: PALETTE.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 8 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { borderWidth: 1.5, borderRadius: 999, paddingVertical: 6, paddingHorizontal: 12 },
