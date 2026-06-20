@@ -17,6 +17,7 @@ import { formatCurrency } from '../utils/currency';
 import type { AccountsStackParamList, RootStackParamList } from '../navigation/types';
 
 const COLLAPSED_GROUPS_KEY = 'accountsCollapsedGroups';
+const SELECTED_CATEGORY_IDS_KEY = 'accountsSelectedCategoryIds';
 
 
 interface AccountSection {
@@ -75,6 +76,7 @@ export default function AccountsScreen() {
   const [grouped, setGrouped] = useState(true);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [groupsLoaded, setGroupsLoaded] = useState(false);
+  const [categoryFilterLoaded, setCategoryFilterLoaded] = useState(false);
   const { db } = useDatabase();
 
   function toggleGroup(key: string) {
@@ -103,6 +105,25 @@ export default function AccountsScreen() {
     if (!groupsLoaded) return;
     setSetting(db, COLLAPSED_GROUPS_KEY, JSON.stringify(Array.from(collapsedGroups)));
   }, [collapsedGroups, groupsLoaded, db]);
+
+  useEffect(() => {
+    (async () => {
+      const stored = await getSetting(db, SELECTED_CATEGORY_IDS_KEY);
+      if (stored) {
+        try {
+          setSelectedCategoryIds(JSON.parse(stored));
+        } catch {
+          // ignore malformed stored value
+        }
+      }
+      setCategoryFilterLoaded(true);
+    })();
+  }, [db]);
+
+  useEffect(() => {
+    if (!categoryFilterLoaded) return;
+    setSetting(db, SELECTED_CATEGORY_IDS_KEY, JSON.stringify(selectedCategoryIds));
+  }, [selectedCategoryIds, categoryFilterLoaded, db]);
 
   const { accounts, error, setArchived } = useAccounts({ includeArchived: true });
   const { accountCategories } = useAccountCategories({ includeArchived: true });
