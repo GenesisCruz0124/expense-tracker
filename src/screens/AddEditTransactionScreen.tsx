@@ -9,7 +9,7 @@ import { DateField } from '../components/DateField';
 import { ReceiptImagePicker } from '../components/ReceiptImagePicker';
 import { PALETTE } from '../constants/colors';
 import { useDatabase } from '../context/DatabaseProvider';
-import { getTransaction, getTransferLegs } from '../db/queries/transactions';
+import { getTransaction, getTransferLegs, listEstablishments } from '../db/queries/transactions';
 import { useTransactions } from '../hooks/useTransactions';
 import { fromMinorUnits, toMinorUnits } from '../utils/currency';
 import { formatIsoDate } from '../utils/dateRanges';
@@ -37,6 +37,8 @@ export default function AddEditTransactionScreen() {
   const [transferId, setTransferId] = useState<number | null>(null);
   const [occurredAt, setOccurredAt] = useState(() => formatIsoDate(new Date()));
   const [establishment, setEstablishment] = useState('');
+  const [establishmentSuggestions, setEstablishmentSuggestions] = useState<string[]>([]);
+  const [establishmentFocused, setEstablishmentFocused] = useState(false);
   const [note, setNote] = useState('');
   const [receiptImageUri, setReceiptImageUri] = useState<string | null>(null);
   const [excludeFromExpense, setExcludeFromExpense] = useState(false);
@@ -87,6 +89,28 @@ export default function AddEditTransactionScreen() {
   useEffect(() => {
     navigation.setOptions({ title: isEditing ? 'Edit transaction' : 'Add transaction' });
   }, [navigation, isEditing]);
+
+  useEffect(() => {
+    listEstablishments(db).then(setEstablishmentSuggestions);
+  }, [db]);
+
+  const matchingEstablishments = establishment.trim()
+    ? establishmentSuggestions.filter(
+        (name) =>
+          name.toLowerCase().includes(establishment.trim().toLowerCase()) &&
+          name.toLowerCase() !== establishment.trim().toLowerCase(),
+      )
+    : establishmentSuggestions;
+
+  function handleSelectEstablishment(name: string) {
+    setEstablishment(name);
+    setEstablishmentFocused(false);
+  }
+
+  function handleEstablishmentBlur() {
+    // Delay hiding so a tap on a suggestion below still registers before the list unmounts.
+    setTimeout(() => setEstablishmentFocused(false), 150);
+  }
 
   function handleTypeChange(nextType: TransactionType) {
     if (nextType === type) return;
@@ -265,15 +289,32 @@ export default function AddEditTransactionScreen() {
       </View>
 
       {type !== 'transfer' ? (
-        <View style={styles.field}>
+        <View style={[styles.field, styles.establishmentField]}>
           <Text style={styles.label}>Establishment</Text>
           <TextInput
             style={styles.input}
             value={establishment}
             onChangeText={setEstablishment}
+            onFocus={() => setEstablishmentFocused(true)}
+            onBlur={handleEstablishmentBlur}
             placeholder="e.g. Jollibee, SM Mall"
             placeholderTextColor={PALETTE.textSecondary}
           />
+          {establishmentFocused && matchingEstablishments.length > 0 ? (
+            <View style={styles.suggestionList}>
+              {matchingEstablishments.slice(0, 6).map((name) => (
+                <Pressable
+                  key={name}
+                  style={styles.suggestionItem}
+                  onPress={() => handleSelectEstablishment(name)}
+                >
+                  <Text style={styles.suggestionText} numberOfLines={1}>
+                    {name}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
         </View>
       ) : null}
 
@@ -339,7 +380,32 @@ const styles = StyleSheet.create({
   typeOptionText: { fontSize: 14, fontWeight: '700', color: PALETTE.textSecondary },
   typeOptionTextSelected: { color: '#fff' },
   field: { gap: 8 },
+  establishmentField: { position: 'relative', zIndex: 10 },
   label: { fontSize: 13, fontWeight: '600', color: PALETTE.textSecondary },
+  suggestionList: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    marginTop: 4,
+    backgroundColor: PALETTE.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.border,
+    borderRadius: 10,
+    overflow: 'hidden',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  suggestionItem: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: PALETTE.border,
+  },
+  suggestionText: { fontSize: 14, color: PALETTE.textPrimary },
   input: {
     backgroundColor: PALETTE.surface,
     borderWidth: StyleSheet.hairlineWidth,

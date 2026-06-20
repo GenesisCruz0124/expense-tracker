@@ -218,6 +218,21 @@ export async function deleteAllTransactions(db: Database): Promise<void> {
   await db.delete(transactions);
 }
 
+/** Distinct establishment names used before, most-recently-used first — powers the autocomplete suggestions. */
+export async function listEstablishments(db: Database, limit = 50): Promise<string[]> {
+  const rows = await db
+    .select({
+      establishment: transactions.establishment,
+      lastUsed: sql<string>`max(${transactions.occurredAt})`,
+    })
+    .from(transactions)
+    .where(sql`${transactions.establishment} is not null and ${transactions.establishment} != ''`)
+    .groupBy(transactions.establishment)
+    .orderBy(desc(sql`max(${transactions.occurredAt})`))
+    .limit(limit);
+  return rows.map((row) => row.establishment!);
+}
+
 /** Sum of transaction amounts (minor units) matching a filter — used for budget-vs-actual checks. */
 export async function sumTransactions(db: Database, filter: ListTransactionsFilter): Promise<number> {
   const conditions = buildFilterConditions(filter);
