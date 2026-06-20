@@ -3,7 +3,9 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PALETTE } from '../constants/colors';
+import { useAccounts } from '../hooks/useAccounts';
 import { useCategories } from '../hooks/useCategories';
+import { AccountIcon } from './AccountIcon';
 import { DateField } from './DateField';
 
 export type ExcludedFilter = 'all' | 'hide' | 'only';
@@ -27,6 +29,8 @@ interface Props {
   onClose: () => void;
   selectedCategoryIds: number[];
   onToggleCategory: (id: number) => void;
+  selectedAccountIds: number[];
+  onToggleAccount: (id: number) => void;
   startDate: string;
   endDate: string;
   onChangeStartDate: (value: string) => void;
@@ -44,6 +48,8 @@ export function FilterSheet({
   onClose,
   selectedCategoryIds,
   onToggleCategory,
+  selectedAccountIds,
+  onToggleAccount,
   startDate,
   endDate,
   onChangeStartDate,
@@ -55,6 +61,7 @@ export function FilterSheet({
   onClear,
 }: Props) {
   const { categories } = useCategories({ includeArchived: true });
+  const { accounts } = useAccounts({ includeArchived: true });
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -96,6 +103,23 @@ export function FilterSheet({
                     {category.icon ? `${category.icon} ` : ''}
                     {category.name}
                   </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <Text style={styles.sectionLabel}>Accounts</Text>
+          <View style={styles.chips}>
+            {accounts.map((account) => {
+              const selected = selectedAccountIds.includes(account.id);
+              return (
+                <Pressable
+                  key={account.id}
+                  onPress={() => onToggleAccount(account.id)}
+                  style={[styles.chip, styles.accountChip, { borderColor: account.color }, selected && { backgroundColor: account.color }]}
+                >
+                  <AccountIcon icon={account.icon} size={13} />
+                  <Text style={[styles.chipText, { color: selected ? '#fff' : account.color }]}>{account.name}</Text>
                 </Pressable>
               );
             })}
@@ -153,6 +177,7 @@ const styles = StyleSheet.create({
   sectionLabel: { fontSize: 13, fontWeight: '700', color: PALETTE.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 8 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { borderWidth: 1.5, borderRadius: 999, paddingVertical: 6, paddingHorizontal: 12 },
+  accountChip: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   chipText: { fontSize: 13, fontWeight: '600' },
   dateRow: { flexDirection: 'row', gap: 12 },
   dateField: { flex: 1 },

@@ -28,6 +28,7 @@ export default function TransactionsListScreen() {
   const route = useRoute<RouteProp<TransactionsStackParamList, 'TransactionsList'>>();
   const [searchText, setSearchText] = useState('');
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
+  const [selectedAccountIds, setSelectedAccountIds] = useState<number[]>([]);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [typeFilter, setTypeFilter] = useState<'expense' | 'income' | undefined>(route.params?.type);
@@ -42,6 +43,7 @@ export default function TransactionsListScreen() {
     setStartDate(route.params?.start ?? '');
     setEndDate(route.params?.end ?? '');
     setSelectedCategoryIds([]);
+    setSelectedAccountIds([]);
     setSearchText('');
     setExcludedFilter('all');
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -51,6 +53,7 @@ export default function TransactionsListScreen() {
     const next: ListTransactionsFilter = {};
     if (searchText.trim()) next.searchText = searchText.trim();
     if (selectedCategoryIds.length > 0) next.categoryIds = selectedCategoryIds;
+    if (selectedAccountIds.length > 0) next.accountIds = selectedAccountIds;
     if (startDate && endDate) {
       next.start = startDate;
       next.end = endDate;
@@ -60,7 +63,7 @@ export default function TransactionsListScreen() {
     else if (excludedFilter === 'only') next.excludeFromExpense = true;
     else if (typeFilter || runningBalanceMode) next.excludeFromExpense = false;
     return next;
-  }, [searchText, selectedCategoryIds, startDate, endDate, typeFilter, runningBalanceMode, excludedFilter]);
+  }, [searchText, selectedCategoryIds, selectedAccountIds, startDate, endDate, typeFilter, runningBalanceMode, excludedFilter]);
 
   const { transactions, loading } = useTransactions(filter);
   const transactionsWithBalance = useMemo(() => {
@@ -93,6 +96,7 @@ export default function TransactionsListScreen() {
 
   const activeFilterCount =
     selectedCategoryIds.length +
+    selectedAccountIds.length +
     (startDate && endDate ? 1 : 0) +
     (typeFilter ? 1 : 0) +
     (runningBalanceMode ? 1 : 0) +
@@ -102,8 +106,13 @@ export default function TransactionsListScreen() {
     setSelectedCategoryIds((prev) => (prev.includes(id) ? prev.filter((existing) => existing !== id) : [...prev, id]));
   }
 
+  function toggleAccount(id: number) {
+    setSelectedAccountIds((prev) => (prev.includes(id) ? prev.filter((existing) => existing !== id) : [...prev, id]));
+  }
+
   function clearFilters() {
     setSelectedCategoryIds([]);
+    setSelectedAccountIds([]);
     setStartDate('');
     setEndDate('');
     setTypeFilter(undefined);
@@ -223,6 +232,8 @@ export default function TransactionsListScreen() {
         onClose={() => setFilterVisible(false)}
         selectedCategoryIds={selectedCategoryIds}
         onToggleCategory={toggleCategory}
+        selectedAccountIds={selectedAccountIds}
+        onToggleAccount={toggleAccount}
         startDate={startDate}
         endDate={endDate}
         onChangeStartDate={setStartDate}
