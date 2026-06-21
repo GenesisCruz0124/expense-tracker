@@ -88,7 +88,9 @@ export default function TransactionsListScreen() {
         sectionByDay.set(dayKey, section);
         sections.push(section);
       }
-      section.subtotal += item.transaction.type === 'income' ? item.transaction.amount : -item.transaction.amount;
+      if (!item.transaction.excludeFromExpense) {
+        section.subtotal += item.transaction.type === 'income' ? item.transaction.amount : -item.transaction.amount;
+      }
       section.data.push(item);
     }
     return sections;
