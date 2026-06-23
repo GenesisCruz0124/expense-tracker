@@ -129,6 +129,10 @@ export interface TransferInput {
   occurredAt: string;
   note?: string | null;
   receiptImageUri?: string | null;
+  /** When true, the outgoing (from-account) leg counts toward expense reports/totals instead of being excluded. */
+  includeAsExpense?: boolean;
+  /** Category for the outgoing leg, only applied when `includeAsExpense` is true. */
+  categoryId?: number | null;
 }
 
 export interface TransferLegs {
@@ -138,24 +142,38 @@ export interface TransferLegs {
 }
 
 /** A transfer is recorded as a linked pair of legs: an expense out of the source account
- * and an income into the destination account, both excluded from expense/income reports. */
+ * and an income into the destination account. Both legs are excluded from expense/income reports
+ * by default, unless `includeAsExpense` opts the outgoing leg into expense totals (e.g. for transfers
+ * that are really purchases, like paying via a bank app). */
 export async function createTransfer(db: Database, input: TransferInput): Promise<TransferLegs> {
   const shared = {
     amount: input.amount,
     occurredAt: input.occurredAt,
     note: input.note?.trim() || null,
     receiptImageUri: input.receiptImageUri ?? null,
-    excludeFromExpense: true,
-    categoryId: null,
   };
 
   const [fromTransaction] = await db
     .insert(transactions)
-    .values({ ...shared, type: 'expense', accountId: input.fromAccountId, fee: input.fee ?? 0 })
+    .values({
+      ...shared,
+      type: 'expense',
+      accountId: input.fromAccountId,
+      fee: input.fee ?? 0,
+      excludeFromExpense: !input.includeAsExpense,
+      categoryId: input.includeAsExpense ? input.categoryId ?? null : null,
+    })
     .returning();
   const [toTransaction] = await db
     .insert(transactions)
-    .values({ ...shared, type: 'income', accountId: input.toAccountId, transferId: fromTransaction.id })
+    .values({
+      ...shared,
+      type: 'income',
+      accountId: input.toAccountId,
+      transferId: fromTransaction.id,
+      excludeFromExpense: true,
+      categoryId: null,
+    })
     .returning();
   await db.update(transactions).set({ transferId: fromTransaction.id }).where(eq(transactions.id, fromTransaction.id));
 
@@ -185,7 +203,13 @@ export async function updateTransfer(db: Database, transferId: number, input: Tr
 
   await db
     .update(transactions)
-    .set({ ...shared, accountId: input.fromAccountId, fee: input.fee ?? 0 })
+    .set({
+      ...shared,
+      accountId: input.fromAccountId,
+      fee: input.fee ?? 0,
+      excludeFromExpense: !input.includeAsExpense,
+      categoryId: input.includeAsExpense ? input.categoryId ?? null : null,
+    })
     .where(eq(transactions.id, legs.fromTransaction.id));
   await db
     .update(transactions)

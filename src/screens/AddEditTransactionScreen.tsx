@@ -42,6 +42,7 @@ export default function AddEditTransactionScreen() {
   const [note, setNote] = useState('');
   const [receiptImageUri, setReceiptImageUri] = useState<string | null>(null);
   const [excludeFromExpense, setExcludeFromExpense] = useState(false);
+  const [includeTransferAsExpense, setIncludeTransferAsExpense] = useState(false);
   const [loading, setLoading] = useState(isEditing);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,6 +66,8 @@ export default function AddEditTransactionScreen() {
         setOccurredAt(legs.fromTransaction.occurredAt);
         setNote(legs.fromTransaction.note ?? '');
         setReceiptImageUri(legs.fromTransaction.receiptImageUri);
+        setIncludeTransferAsExpense(!legs.fromTransaction.excludeFromExpense);
+        setCategoryId(legs.fromTransaction.categoryId);
         setLoading(false);
         return;
       }
@@ -118,6 +121,7 @@ export default function AddEditTransactionScreen() {
     setCategoryId(null);
     if (nextType === 'transfer') {
       setExcludeFromExpense(false);
+      setIncludeTransferAsExpense(false);
       setToAccountId(null);
       setFeeText('');
     }
@@ -160,6 +164,8 @@ export default function AddEditTransactionScreen() {
           occurredAt,
           note: note.trim() || null,
           receiptImageUri,
+          includeAsExpense: includeTransferAsExpense,
+          categoryId: includeTransferAsExpense ? categoryId : null,
         };
         if (transferId != null) {
           await updateTransfer(transferId, input);
@@ -276,6 +282,29 @@ export default function AddEditTransactionScreen() {
             <Text style={styles.label}>To account</Text>
             <AccountPicker selectedAccountId={toAccountId} onSelect={setToAccountId} />
           </View>
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleTextGroup}>
+              <Text style={styles.label}>Count as expense in reports</Text>
+              <Text style={styles.helperText}>
+                Include this transfer's amount in expense totals and reports — useful when the "transfer" is really a
+                purchase, e.g. paying through a bank app.
+              </Text>
+            </View>
+            <Switch
+              value={includeTransferAsExpense}
+              onValueChange={(value) => {
+                setIncludeTransferAsExpense(value);
+                if (!value) setCategoryId(null);
+              }}
+              trackColor={{ true: PALETTE.net }}
+            />
+          </View>
+          {includeTransferAsExpense ? (
+            <View style={styles.field}>
+              <Text style={styles.label}>Category</Text>
+              <CategoryPicker forType="expense" selectedCategoryId={categoryId} onSelect={setCategoryId} />
+            </View>
+          ) : null}
         </>
       ) : (
         <View style={styles.field}>
