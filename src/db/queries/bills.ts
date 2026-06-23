@@ -31,6 +31,7 @@ export async function listBills(db: Database): Promise<BillWithDetails[]> {
       categoryId: bills.categoryId,
       billerId: bills.billerId,
       accountId: bills.accountId,
+      toAccountId: bills.toAccountId,
       dueDate: bills.dueDate,
       frequency: bills.frequency,
       intervalDays: bills.intervalDays,
@@ -70,6 +71,8 @@ export interface BillInput {
   categoryId?: number | null;
   billerId?: number | null;
   accountId?: number | null;
+  /** When set, "mark as paid" records a transfer into this account instead of a plain expense. */
+  toAccountId?: number | null;
   dueDate: string;
   frequency: BillFrequency;
   /** Day interval used when `frequency` is 'every_n_days', e.g. 11 for "every 11 days". */
@@ -86,6 +89,7 @@ function toNewBillValues(input: BillInput): NewBill {
     categoryId: input.categoryId ?? null,
     billerId: input.billerId ?? null,
     accountId: input.accountId ?? null,
+    toAccountId: input.toAccountId ?? null,
     dueDate: input.dueDate,
     frequency: input.frequency,
     intervalDays: input.frequency === 'every_n_days' ? input.intervalDays ?? null : null,
@@ -143,24 +147,54 @@ export async function markBillPaid(db: Database, id: number, occurredAt: string)
       billerName = biller?.name ?? null;
     }
 
-    const [transaction] = await tx
-      .insert(transactions)
-      .values({
-        type: 'expense',
+    let transactionId: number;
+    if (bill.toAccountId != null) {
+      const [fromTransaction] = await tx
+        .insert(transactions)
+        .values({
+          type: 'expense',
+          amount: bill.amount,
+          occurredAt,
+          note: bill.name,
+          establishment: billerName,
+          categoryId: bill.categoryId,
+          accountId: bill.accountId,
+          excludeFromExpense: bill.excludeFromExpense,
+        })
+        .returning();
+      await tx.insert(transactions).values({
+        type: 'income',
         amount: bill.amount,
         occurredAt,
         note: bill.name,
-        establishment: billerName,
-        categoryId: bill.categoryId,
-        accountId: bill.accountId,
-        excludeFromExpense: bill.excludeFromExpense,
-      })
-      .returning();
+        accountId: bill.toAccountId,
+        transferId: fromTransaction.id,
+        excludeFromExpense: true,
+        categoryId: null,
+      });
+      await tx.update(transactions).set({ transferId: fromTransaction.id }).where(eq(transactions.id, fromTransaction.id));
+      transactionId = fromTransaction.id;
+    } else {
+      const [transaction] = await tx
+        .insert(transactions)
+        .values({
+          type: 'expense',
+          amount: bill.amount,
+          occurredAt,
+          note: bill.name,
+          establishment: billerName,
+          categoryId: bill.categoryId,
+          accountId: bill.accountId,
+          excludeFromExpense: bill.excludeFromExpense,
+        })
+        .returning();
+      transactionId = transaction.id;
+    }
 
     if (bill.frequency === 'once') {
       await tx
         .update(bills)
-        .set({ isPaid: true, paidTransactionId: transaction.id, lastPaidAt: occurredAt })
+        .set({ isPaid: true, paidTransactionId: transactionId, lastPaidAt: occurredAt })
         .where(eq(bills.id, id));
     } else {
       await tx
@@ -184,7 +218,16 @@ export async function markBillUnpaid(db: Database, id: number): Promise<void> {
 
   await db.transaction(async (tx) => {
     if (bill.paidTransactionId != null) {
-      await tx.delete(transactions).where(eq(transactions.id, bill.paidTransactionId));
+      const [paidTransaction] = await tx
+        .select({ transferId: transactions.transferId })
+        .from(transactions)
+        .where(eq(transactions.id, bill.paidTransactionId))
+        .limit(1);
+      if (paidTransaction?.transferId != null) {
+        await tx.delete(transactions).where(eq(transactions.transferId, paidTransaction.transferId));
+      } else {
+        await tx.delete(transactions).where(eq(transactions.id, bill.paidTransactionId));
+      }
     }
     await tx.update(bills).set({ isPaid: false, paidTransactionId: null, lastPaidAt: null }).where(eq(bills.id, id));
   });

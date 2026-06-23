@@ -55,6 +55,8 @@ export default function AddEditBillScreen() {
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [billerId, setBillerId] = useState<number | null>(null);
   const [accountId, setAccountId] = useState<number | null>(null);
+  const [isTransfer, setIsTransfer] = useState(false);
+  const [toAccountId, setToAccountId] = useState<number | null>(null);
   const [dueDate, setDueDate] = useState(() => formatIsoDate(new Date()));
   const [frequency, setFrequency] = useState<BillFrequency>('once');
   const [intervalDaysText, setIntervalDaysText] = useState('');
@@ -76,6 +78,8 @@ export default function AddEditBillScreen() {
       setCategoryId(existing.categoryId);
       setBillerId(existing.billerId);
       setAccountId(existing.accountId);
+      setIsTransfer(existing.toAccountId != null);
+      setToAccountId(existing.toAccountId);
       setDueDate(existing.dueDate);
       setFrequency(existing.frequency);
       setIntervalDaysText(existing.intervalDays != null ? String(existing.intervalDays) : '');
@@ -113,6 +117,14 @@ export default function AddEditBillScreen() {
       setError('Enter a valid number of days greater than zero.');
       return;
     }
+    if (isTransfer && (!accountId || !toAccountId)) {
+      setError('Choose both a from and to account for a transfer bill.');
+      return;
+    }
+    if (isTransfer && accountId === toAccountId) {
+      setError('Choose two different accounts to transfer between.');
+      return;
+    }
 
     setSaving(true);
     try {
@@ -122,6 +134,7 @@ export default function AddEditBillScreen() {
         categoryId,
         billerId,
         accountId,
+        toAccountId: isTransfer ? toAccountId : null,
         dueDate,
         frequency,
         intervalDays: frequency === 'every_n_days' ? intervalDays : null,
@@ -225,6 +238,31 @@ export default function AddEditBillScreen() {
         <Text style={styles.label}>Pay from (optional)</Text>
         <AccountPicker selectedAccountId={accountId} onSelect={setAccountId} />
       </View>
+
+      <View style={styles.toggleRow}>
+        <View style={styles.toggleTextGroup}>
+          <Text style={styles.label}>This is a transfer</Text>
+          <Text style={styles.helperText}>
+            Pay this bill by moving money to another one of your accounts — e.g. a savings or investment contribution —
+            instead of paying an external biller.
+          </Text>
+        </View>
+        <Switch
+          value={isTransfer}
+          onValueChange={(value) => {
+            setIsTransfer(value);
+            if (!value) setToAccountId(null);
+          }}
+          trackColor={{ true: PALETTE.net }}
+        />
+      </View>
+
+      {isTransfer ? (
+        <View style={styles.field}>
+          <Text style={styles.label}>Transfer to</Text>
+          <AccountPicker selectedAccountId={toAccountId} onSelect={setToAccountId} />
+        </View>
+      ) : null}
 
       <View style={styles.field}>
         <DateField label="Due date" value={dueDate} onChangeText={setDueDate} />

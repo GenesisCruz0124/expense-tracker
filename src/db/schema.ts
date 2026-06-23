@@ -158,6 +158,8 @@ export const bills = sqliteTable(
     categoryId: integer('category_id').references(() => categories.id, { onDelete: 'set null' }),
     billerId: integer('biller_id').references(() => categories.id, { onDelete: 'set null' }),
     accountId: integer('account_id').references(() => accounts.id, { onDelete: 'set null' }),
+    /** When set, "mark as paid" records a transfer into this account instead of a plain expense — e.g. a bill that's really a contribution into a savings/investment account. */
+    toAccountId: integer('to_account_id'),
     dueDate: text('due_date').notNull(),
     frequency: text('frequency', { enum: ['once', 'weekly', 'semi_monthly', 'monthly', 'yearly', 'every_n_days'] })
       .notNull()
