@@ -64,6 +64,17 @@ export async function listAccounts(db: Database, options: ListAccountsOptions = 
   return query.where(eq(accounts.isArchived, false));
 }
 
+/** Names of non-archived investment-kind accounts — used to suggest bill names like a savings/investment contribution. */
+export async function listInvestmentAccountNames(db: Database): Promise<string[]> {
+  const rows = await db
+    .select({ name: accounts.name })
+    .from(accounts)
+    .innerJoin(accountCategories, eq(accountCategories.id, accounts.categoryId))
+    .where(sql`${accountCategories.kind} = 'investment' and ${accounts.isArchived} = 0`)
+    .orderBy(asc(accounts.name));
+  return rows.map((row) => row.name);
+}
+
 export async function getAccountWithBalance(db: Database, id: number): Promise<AccountWithBalance | undefined> {
   const [row] = await db
     .select({

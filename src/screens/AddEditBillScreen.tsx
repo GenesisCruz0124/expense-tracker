@@ -8,7 +8,8 @@ import { CategoryPicker } from '../components/CategoryPicker';
 import { DateField } from '../components/DateField';
 import { PALETTE } from '../constants/colors';
 import { useDatabase } from '../context/DatabaseProvider';
-import { getBill, type BillFrequency } from '../db/queries/bills';
+import { listInvestmentAccountNames } from '../db/queries/accounts';
+import { getBill, listBillNames, type BillFrequency } from '../db/queries/bills';
 import { useBills } from '../hooks/useBills';
 import { fromMinorUnits, toMinorUnits } from '../utils/currency';
 import { formatIsoDate } from '../utils/dateRanges';
@@ -51,6 +52,8 @@ export default function AddEditBillScreen() {
   const { addBill, editBill, removeBill, payBill, unpayBill } = useBills();
 
   const [name, setName] = useState('');
+  const [nameSuggestions, setNameSuggestions] = useState<string[]>([]);
+  const [nameFocused, setNameFocused] = useState(false);
   const [amountText, setAmountText] = useState('');
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [billerId, setBillerId] = useState<number | null>(null);
@@ -96,6 +99,31 @@ export default function AddEditBillScreen() {
   useEffect(() => {
     navigation.setOptions({ title: isEditing ? 'Edit bill' : 'Add bill' });
   }, [navigation, isEditing]);
+
+  useEffect(() => {
+    (async () => {
+      const [billNames, investmentNames] = await Promise.all([listBillNames(db), listInvestmentAccountNames(db)]);
+      setNameSuggestions([...new Set([...investmentNames, ...billNames])]);
+    })();
+  }, [db]);
+
+  const matchingNames = name.trim()
+    ? nameSuggestions.filter(
+        (suggestion) =>
+          suggestion.toLowerCase().includes(name.trim().toLowerCase()) &&
+          suggestion.toLowerCase() !== name.trim().toLowerCase(),
+      )
+    : nameSuggestions;
+
+  function handleSelectName(suggestion: string) {
+    setName(suggestion);
+    setNameFocused(false);
+  }
+
+  function handleNameBlur() {
+    // Delay hiding so a tap on a suggestion below still registers before the list unmounts.
+    setTimeout(() => setNameFocused(false), 150);
+  }
 
   async function handleSave() {
     setError(null);
@@ -208,15 +236,28 @@ export default function AddEditBillScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-      <View style={styles.field}>
+      <View style={[styles.field, styles.nameField]}>
         <Text style={styles.label}>Name</Text>
         <TextInput
           style={styles.nameInput}
           value={name}
           onChangeText={setName}
+          onFocus={() => setNameFocused(true)}
+          onBlur={handleNameBlur}
           placeholder="e.g. Electric bill"
           placeholderTextColor={PALETTE.textSecondary}
         />
+        {nameFocused && matchingNames.length > 0 ? (
+          <View style={styles.suggestionList}>
+            {matchingNames.slice(0, 6).map((suggestion) => (
+              <Pressable key={suggestion} style={styles.suggestionItem} onPress={() => handleSelectName(suggestion)}>
+                <Text style={styles.suggestionText} numberOfLines={1}>
+                  {suggestion}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.field}>
@@ -357,7 +398,32 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: PALETTE.background },
   loadingText: { color: PALETTE.textSecondary, fontSize: 14 },
   field: { gap: 8 },
+  nameField: { position: 'relative', zIndex: 10 },
   label: { fontSize: 13, fontWeight: '600', color: PALETTE.textSecondary },
+  suggestionList: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    marginTop: 4,
+    backgroundColor: PALETTE.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.border,
+    borderRadius: 10,
+    overflow: 'hidden',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  suggestionItem: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: PALETTE.border,
+  },
+  suggestionText: { fontSize: 14, color: PALETTE.textPrimary },
   nameInput: {
     backgroundColor: PALETTE.surface,
     borderWidth: StyleSheet.hairlineWidth,

@@ -1,5 +1,5 @@
 import { addDays, addMonths, addYears, parseISO } from 'date-fns';
-import { asc, eq } from 'drizzle-orm';
+import { asc, desc, eq, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 
 import type { Database } from '../client';
@@ -62,6 +62,20 @@ export async function listBills(db: Database): Promise<BillWithDetails[]> {
 export async function getBill(db: Database, id: number): Promise<Bill | undefined> {
   const [row] = await db.select().from(bills).where(eq(bills.id, id)).limit(1);
   return row;
+}
+
+/** Distinct bill names used before, most-recently-created first — powers name autocomplete suggestions. */
+export async function listBillNames(db: Database, limit = 50): Promise<string[]> {
+  const rows = await db
+    .select({
+      name: bills.name,
+      lastCreated: sql<string>`max(${bills.createdAt})`,
+    })
+    .from(bills)
+    .groupBy(bills.name)
+    .orderBy(desc(sql`max(${bills.createdAt})`))
+    .limit(limit);
+  return rows.map((row) => row.name);
 }
 
 export interface BillInput {
