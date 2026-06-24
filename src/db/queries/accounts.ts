@@ -1,4 +1,4 @@
-import { asc, eq, sql } from 'drizzle-orm';
+import { asc, desc, eq, sql } from 'drizzle-orm';
 
 import type { Database } from '../client';
 import { accountCategories, accounts, transactions, type Account, type NewAccount } from '../schema';
@@ -15,7 +15,11 @@ export interface AccountWithBalance extends Account {
 
 export interface ListAccountsOptions {
   includeArchived?: boolean;
+  /** 'name' (default) sorts alphabetically; 'recent' sorts by most recent transaction first. */
+  sortBy?: 'name' | 'recent';
 }
+
+const lastTransactionAtExpr = sql<string | null>`max(${transactions.occurredAt})`;
 
 const balanceExpr = sql<number>`${accounts.startingBalance} + coalesce(sum(case
   when ${accountCategories.kind} = 'credit_card' then
@@ -29,7 +33,7 @@ const balanceExpr = sql<number>`${accounts.startingBalance} + coalesce(sum(case
   end), 0)`;
 
 export async function listAccounts(db: Database, options: ListAccountsOptions = {}): Promise<AccountWithBalance[]> {
-  const { includeArchived = false } = options;
+  const { includeArchived = false, sortBy = 'name' } = options;
 
   const query = db
     .select({
@@ -53,12 +57,17 @@ export async function listAccounts(db: Database, options: ListAccountsOptions = 
       linkedCreditCardId: accounts.linkedCreditCardId,
       createdAt: accounts.createdAt,
       balance: balanceExpr,
+      lastTransactionAt: lastTransactionAtExpr,
     })
     .from(accounts)
     .leftJoin(transactions, eq(transactions.accountId, accounts.id))
     .leftJoin(accountCategories, eq(accountCategories.id, accounts.categoryId))
     .groupBy(accounts.id)
-    .orderBy(asc(accounts.name));
+    .orderBy(
+      sortBy === 'recent'
+        ? sql`${lastTransactionAtExpr} is null, ${lastTransactionAtExpr} desc`
+        : asc(accounts.name),
+    );
 
   if (includeArchived) return query;
   return query.where(eq(accounts.isArchived, false));

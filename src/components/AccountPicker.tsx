@@ -14,7 +14,7 @@ interface Props {
 }
 
 export function AccountPicker({ selectedAccountId, onSelect }: Props) {
-  const { accounts, loading } = useAccounts();
+  const { accounts, loading } = useAccounts({ sortBy: 'recent' });
   const [visible, setVisible] = useState(false);
   const [query, setQuery] = useState('');
 
