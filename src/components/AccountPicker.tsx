@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PALETTE } from '../constants/colors';
 import { useAccounts } from '../hooks/useAccounts';
+import { formatCurrency } from '../utils/currency';
 import { AccountBadge } from './AccountBadge';
 import { EmptyState } from './EmptyState';
 
@@ -39,7 +40,10 @@ export function AccountPicker({ selectedAccountId, onSelect }: Props) {
     <View>
       <Pressable style={styles.trigger} onPress={open}>
         {selected ? (
-          <AccountBadge name={selected.name} color={selected.color} icon={selected.icon} />
+          <View style={styles.triggerSelected}>
+            <AccountBadge name={selected.name} color={selected.color} icon={selected.icon} />
+            <Text style={styles.balanceText}>{formatCurrency(selected.balance)}</Text>
+          </View>
         ) : (
           <Text style={styles.placeholder}>Select an account</Text>
         )}
@@ -100,7 +104,10 @@ export function AccountPicker({ selectedAccountId, onSelect }: Props) {
                 }}
               >
                 <AccountBadge name={item.name} color={item.color} icon={item.icon} />
-                {item.id === selectedAccountId ? <Text style={styles.checkmark}>✓</Text> : null}
+                <View style={styles.optionRowRight}>
+                  <Text style={styles.balanceText}>{formatCurrency(item.balance)}</Text>
+                  {item.id === selectedAccountId ? <Text style={styles.checkmark}>✓</Text> : null}
+                </View>
               </Pressable>
             )}
           />
@@ -122,7 +129,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
+  triggerSelected: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1 },
   placeholder: { fontSize: 14, color: PALETTE.textSecondary },
+  balanceText: { fontSize: 14, fontWeight: '600', color: PALETTE.textSecondary },
   chevron: { fontSize: 16, color: PALETTE.textSecondary },
   modal: { flex: 1, backgroundColor: PALETTE.background },
   modalHeader: {
@@ -180,5 +189,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   optionRowSelected: { borderColor: PALETTE.net },
+  optionRowRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   checkmark: { fontSize: 16, fontWeight: '700', color: PALETTE.net },
 });
