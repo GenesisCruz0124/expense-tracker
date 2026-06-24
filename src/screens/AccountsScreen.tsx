@@ -18,6 +18,9 @@ import type { AccountsStackParamList, RootStackParamList } from '../navigation/t
 
 const COLLAPSED_GROUPS_KEY = 'accountsCollapsedGroups';
 const SELECTED_CATEGORY_IDS_KEY = 'accountsSelectedCategoryIds';
+const NET_WORTH_FILTER_KEY = 'accountsNetWorthFilter';
+
+type NetWorthFilter = 'all' | 'included' | 'excluded';
 
 
 interface AccountSection {
@@ -70,6 +73,8 @@ export default function AccountsScreen() {
   const [showArchived, setShowArchived] = useState(false);
   const [hideAmounts, setHideAmounts] = useState(false);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
+  const [netWorthFilter, setNetWorthFilter] = useState<NetWorthFilter>('all');
+  const [netWorthFilterLoaded, setNetWorthFilterLoaded] = useState(false);
   const [menuAccount, setMenuAccount] = useState<AccountWithBalance | null>(null);
   const [sortOption, setSortOption] = useState<SortOption>('balance_desc');
   const [showSortPicker, setShowSortPicker] = useState(false);
@@ -125,6 +130,21 @@ export default function AccountsScreen() {
     setSetting(db, SELECTED_CATEGORY_IDS_KEY, JSON.stringify(selectedCategoryIds));
   }, [selectedCategoryIds, categoryFilterLoaded, db]);
 
+  useEffect(() => {
+    (async () => {
+      const stored = await getSetting(db, NET_WORTH_FILTER_KEY);
+      if (stored === 'included' || stored === 'excluded') {
+        setNetWorthFilter(stored);
+      }
+      setNetWorthFilterLoaded(true);
+    })();
+  }, [db]);
+
+  useEffect(() => {
+    if (!netWorthFilterLoaded) return;
+    setSetting(db, NET_WORTH_FILTER_KEY, netWorthFilter);
+  }, [netWorthFilter, netWorthFilterLoaded, db]);
+
   const { accounts, error, setArchived } = useAccounts({ includeArchived: true });
   const { accountCategories } = useAccountCategories({ includeArchived: true });
 
@@ -135,10 +155,13 @@ export default function AccountsScreen() {
     [accountCategories, visible],
   );
 
-  const filtered =
-    selectedCategoryIds.length === 0
-      ? visible
-      : visible.filter((account) => account.categoryId != null && selectedCategoryIds.includes(account.categoryId));
+  const filtered = visible
+    .filter((account) => selectedCategoryIds.length === 0 || (account.categoryId != null && selectedCategoryIds.includes(account.categoryId)))
+    .filter((account) => {
+      if (netWorthFilter === 'included') return account.includeInNetWorth;
+      if (netWorthFilter === 'excluded') return !account.includeInNetWorth;
+      return true;
+    });
 
   function toggleCategoryFilter(id: number) {
     setSelectedCategoryIds((prev) => (prev.includes(id) ? prev.filter((existing) => existing !== id) : [...prev, id]));
@@ -264,6 +287,31 @@ export default function AccountsScreen() {
                 })}
               </ScrollView>
             ) : null}
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.filterRow}
+            >
+              {(
+                [
+                  { key: 'all', label: 'All' },
+                  { key: 'included', label: 'In net worth' },
+                  { key: 'excluded', label: 'Excluded' },
+                ] as { key: NetWorthFilter; label: string }[]
+              ).map(({ key, label }) => {
+                const selected = netWorthFilter === key;
+                return (
+                  <Pressable
+                    key={key}
+                    onPress={() => setNetWorthFilter(key)}
+                    style={[styles.filterChip, selected && styles.filterChipAllSelected]}
+                  >
+                    <Text style={[styles.filterChipText, selected && styles.filterChipTextSelected]}>{label}</Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
 
             <View style={styles.controlsRow}>
               <Pressable style={styles.sortButton} onPress={() => setGrouped((value) => !value)}>
