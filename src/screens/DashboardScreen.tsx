@@ -12,7 +12,6 @@ import { SummaryCard } from '../components/SummaryCard';
 import { PALETTE } from '../constants/colors';
 import type { BillWithDetails } from '../db/queries/bills';
 import { useBills } from '../hooks/useBills';
-import { useBudgets } from '../hooks/useBudgets';
 import { useReportsData } from '../hooks/useReportsData';
 import { formatCurrency } from '../utils/currency';
 import {
@@ -91,15 +90,11 @@ export default function DashboardScreen() {
   }
 
   const { totals, categoryData, loading, refresh } = useReportsData(range, 6);
-  const { budgets } = useBudgets(monthRangeFor(new Date()));
   const { bills } = useBills();
 
   const net = totals.income - totals.expense;
-  const upcomingBills = bills.filter((bill) => !bill.isPaid).slice(0, 3);
-  const attentionBudgets = budgets
-    .filter((budget) => budget.percentUsed >= budget.alertThresholdPct)
-    .sort((a, b) => b.percentUsed - a.percentUsed)
-    .slice(0, 3);
+  const upcomingBills = bills.filter((bill) => !bill.isPaid);
+  const upcomingBillsTotal = upcomingBills.reduce((sum, bill) => sum + bill.amount, 0);
 
   return (
     <ScrollView
@@ -183,7 +178,9 @@ export default function DashboardScreen() {
 
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Upcoming bills</Text>
+          <Text style={styles.sectionTitle}>
+            Upcoming bills {upcomingBills.length > 0 ? `(${upcomingBills.length}) −${formatCurrency(upcomingBillsTotal)}` : ''}
+          </Text>
           <View style={styles.sectionHeaderActions}>
             <Pressable onPress={() => navigation.navigate('AddEditBill')}>
               <Text style={styles.sectionLink}>+ Add</Text>
@@ -214,34 +211,6 @@ export default function DashboardScreen() {
                 </View>
               );
             })}
-          </View>
-        )}
-      </View>
-
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Budgets needing attention</Text>
-          <Pressable onPress={() => navigation.navigate('Tabs', { screen: 'Budgets' })}>
-            <Text style={styles.sectionLink}>View all →</Text>
-          </Pressable>
-        </View>
-        {attentionBudgets.length === 0 ? (
-          <EmptyState icon="🎯" title="On track" message="No budgets are nearing their limits this month." />
-        ) : (
-          <View style={styles.list}>
-            {attentionBudgets.map((budget) => (
-              <View key={budget.id} style={styles.listRow}>
-                <View style={styles.listRowMain}>
-                  <Text style={styles.listRowTitle}>{budget.categoryName}</Text>
-                  <Text style={styles.listRowSubtitle}>
-                    {formatCurrency(budget.spend)} of {formatCurrency(budget.amountLimit)}
-                  </Text>
-                </View>
-                <Text style={[styles.listRowAmount, { color: budget.percentUsed >= 100 ? PALETTE.danger : PALETTE.warning }]}>
-                  {budget.percentUsed}%
-                </Text>
-              </View>
-            ))}
           </View>
         )}
       </View>
