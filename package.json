@@ -1,6 +1,6 @@
 {
   "name": "expense-tracker",
-  "version": "1.0.79",
+  "version": "1.0.80",
   "main": "index.ts",
   "dependencies": {
     "@react-native-community/datetimepicker": "8.4.4",

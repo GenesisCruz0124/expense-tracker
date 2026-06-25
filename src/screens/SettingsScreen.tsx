@@ -20,8 +20,10 @@ import { useLicense } from '../context/LicenseProvider';
 import { setPreference } from '../db/themePreferences';
 import { TRIAL_DAYS } from '../utils/license';
 import { deleteAllTransactions } from '../db/queries/transactions';
+import { setSetting } from '../db/queries/settings';
 import type { MoreStackParamList } from '../navigation/types';
 import { createBackupFile, pickBackupFile, restoreBackupFromFile, shareBackupFile } from '../utils/backup';
+import { formatIsoDate } from '../utils/dateRanges';
 import { getNotificationPermissionStatus, requestNotificationPermissions } from '../utils/notifications';
 
 const DEVELOPER_EMAIL = 'genesiscruz.dev@gmail.com';
@@ -99,6 +101,7 @@ export default function SettingsScreen() {
     try {
       const fileUri = await createBackupFile(db);
       await shareBackupFile(fileUri);
+      await setSetting(db, 'lastBackupCompletedAt', formatIsoDate(new Date()));
     } catch (error) {
       Alert.alert('Backup failed', error instanceof Error ? error.message : 'Something went wrong while creating the backup.');
     } finally {

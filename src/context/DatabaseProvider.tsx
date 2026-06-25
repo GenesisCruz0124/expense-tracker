@@ -11,6 +11,7 @@ import { initSettingsTable } from '../db/queries/settings';
 import { checkBudgetAlerts } from '../db/budgetAlerts';
 import { checkBillReminders } from '../db/billReminders';
 import { configureNotificationChannel, requestNotificationPermissions } from '../utils/notifications';
+import { BackupReminderProvider } from './BackupReminderProvider';
 import { LicenseProvider } from './LicenseProvider';
 import { PALETTE } from '../constants/colors';
 
@@ -89,7 +90,9 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <DatabaseContext.Provider value={{ db, refreshSignal, notifyDataChanged }}>
-      <LicenseProvider>{children}</LicenseProvider>
+      <BackupReminderProvider>
+        <LicenseProvider>{children}</LicenseProvider>
+      </BackupReminderProvider>
     </DatabaseContext.Provider>
   );
 }
