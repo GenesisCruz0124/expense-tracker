@@ -1,4 +1,4 @@
-import { asc, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm';
 
 import type { Database } from '../client';
 import { accountCategories, accounts, transactions, type Account, type NewAccount } from '../schema';
@@ -56,6 +56,8 @@ export async function listAccounts(db: Database, options: ListAccountsOptions = 
       creditLimit: accounts.creditLimit,
       linkedCreditCardId: accounts.linkedCreditCardId,
       createdAt: accounts.createdAt,
+      updatedAt: accounts.updatedAt,
+      deletedAt: accounts.deletedAt,
       balance: balanceExpr,
       lastTransactionAt: lastTransactionAtExpr,
     })
@@ -69,8 +71,9 @@ export async function listAccounts(db: Database, options: ListAccountsOptions = 
         : asc(accounts.name),
     );
 
-  if (includeArchived) return query;
-  return query.where(eq(accounts.isArchived, false));
+  const conditions = [isNull(accounts.deletedAt)];
+  if (!includeArchived) conditions.push(eq(accounts.isArchived, false));
+  return query.where(and(...conditions));
 }
 
 /** Names of non-archived investment-kind accounts — used to suggest bill names like a savings/investment contribution. */
@@ -79,7 +82,7 @@ export async function listInvestmentAccountNames(db: Database): Promise<string[]
     .select({ name: accounts.name })
     .from(accounts)
     .innerJoin(accountCategories, eq(accountCategories.id, accounts.categoryId))
-    .where(sql`${accountCategories.kind} = 'investment' and ${accounts.isArchived} = 0`)
+    .where(sql`${accountCategories.kind} = 'investment' and ${accounts.isArchived} = 0 and ${accounts.deletedAt} is null`)
     .orderBy(asc(accounts.name));
   return rows.map((row) => row.name);
 }
@@ -106,12 +109,14 @@ export async function getAccountWithBalance(db: Database, id: number): Promise<A
       creditLimit: accounts.creditLimit,
       linkedCreditCardId: accounts.linkedCreditCardId,
       createdAt: accounts.createdAt,
+      updatedAt: accounts.updatedAt,
+      deletedAt: accounts.deletedAt,
       balance: balanceExpr,
     })
     .from(accounts)
     .leftJoin(transactions, eq(transactions.accountId, accounts.id))
     .leftJoin(accountCategories, eq(accountCategories.id, accounts.categoryId))
-    .where(eq(accounts.id, id))
+    .where(and(eq(accounts.id, id), isNull(accounts.deletedAt)))
     .groupBy(accounts.id)
     .limit(1);
   return row;
@@ -184,12 +189,13 @@ export async function updateAccount(db: Database, id: number, input: AccountInpu
       ...(input.totalMonths != null ? { totalMonths: input.totalMonths } : {}),
       creditLimit: input.creditLimit ?? null,
       linkedCreditCardId: input.linkedCreditCardId ?? null,
+      updatedAt: sql`(datetime('now'))`,
     })
     .where(eq(accounts.id, id));
 }
 
 export async function setAccountArchived(db: Database, id: number, isArchived: boolean): Promise<void> {
-  await db.update(accounts).set({ isArchived }).where(eq(accounts.id, id));
+  await db.update(accounts).set({ isArchived, updatedAt: sql`(datetime('now'))` }).where(eq(accounts.id, id));
 }
 
 /**
@@ -217,6 +223,7 @@ export async function markMonthlyDuePaid(db: Database, id: number, monthKey: str
         account.remainingMonths != null && account.remainingMonths > 0 ? account.remainingMonths - 1 : account.remainingMonths,
       startingBalance: account.startingBalance - (account.monthlyAmountDue ?? 0),
       totalMonths: account.totalMonths + 1,
+      updatedAt: sql`(datetime('now'))`,
     })
     .where(eq(accounts.id, id));
 }
@@ -243,6 +250,7 @@ export async function markMonthlyDueUnpaid(db: Database, id: number): Promise<vo
       monthlyDueLastPaidMonth: null,
       remainingMonths: account.remainingMonths != null ? account.remainingMonths + 1 : null,
       startingBalance: account.startingBalance + (account.monthlyAmountDue ?? 0),
+      updatedAt: sql`(datetime('now'))`,
     })
     .where(eq(accounts.id, id));
 }
@@ -264,6 +272,7 @@ export async function incrementAccountBalance(db: Database, id: number): Promise
       startingBalance: account.startingBalance + account.monthlyContribution,
       balanceLastUpdatedAt: formatIsoDate(new Date()),
       totalMonths: account.totalMonths + 1,
+      updatedAt: sql`(datetime('now'))`,
     })
     .where(eq(accounts.id, id));
 }

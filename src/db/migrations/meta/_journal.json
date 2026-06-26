@@ -218,6 +218,13 @@
       "when": 1783200000000,
       "tag": "0030_bill_to_account",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "6",
+      "when": 1783300000000,
+      "tag": "0031_sync_metadata_columns",
+      "breakpoints": true
     }
   ]
 }

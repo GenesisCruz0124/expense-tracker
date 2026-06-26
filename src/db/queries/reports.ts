@@ -1,4 +1,4 @@
-import { and, between, eq, sql } from 'drizzle-orm';
+import { and, between, eq, isNull, sql } from 'drizzle-orm';
 
 import type { Database } from '../client';
 import { categories, transactions } from '../schema';
@@ -34,6 +34,7 @@ export async function categoryBreakdown(
         eq(transactions.type, type),
         eq(transactions.excludeFromExpense, false),
         between(transactions.occurredAt, range.start, range.end),
+        isNull(transactions.deletedAt),
       ),
     )
     .groupBy(transactions.categoryId)
@@ -71,7 +72,11 @@ export async function incomeVsExpenseTrend(db: Database, ranges: MonthRange[]): 
     })
     .from(transactions)
     .where(
-      and(eq(transactions.excludeFromExpense, false), between(transactions.occurredAt, overallStart, overallEnd)),
+      and(
+        eq(transactions.excludeFromExpense, false),
+        between(transactions.occurredAt, overallStart, overallEnd),
+        isNull(transactions.deletedAt),
+      ),
     )
     .groupBy(monthKeyExpr, transactions.type);
 
@@ -103,7 +108,13 @@ export async function monthlyTotals(db: Database, range: { start: string; end: s
       total: sql<number>`coalesce(sum(${transactions.amount}), 0)`,
     })
     .from(transactions)
-    .where(and(eq(transactions.excludeFromExpense, false), between(transactions.occurredAt, range.start, range.end)))
+    .where(
+      and(
+        eq(transactions.excludeFromExpense, false),
+        between(transactions.occurredAt, range.start, range.end),
+        isNull(transactions.deletedAt),
+      ),
+    )
     .groupBy(transactions.type);
 
   const totals: MonthlyTotals = { income: 0, expense: 0 };

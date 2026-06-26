@@ -14,6 +14,11 @@ export const categories = sqliteTable(
     createdAt: text('created_at')
       .notNull()
       .default(sql`(datetime('now'))`),
+    updatedAt: text('updated_at')
+      .notNull()
+      .default(sql`(datetime('now'))`),
+    /** ISO timestamp set instead of a hard delete, so sync can propagate deletions across devices. */
+    deletedAt: text('deleted_at'),
   },
   (table) => [uniqueIndex('idx_categories_name').on(table.name)],
 );
@@ -30,6 +35,10 @@ export const accountCategories = sqliteTable(
     createdAt: text('created_at')
       .notNull()
       .default(sql`(datetime('now'))`),
+    updatedAt: text('updated_at')
+      .notNull()
+      .default(sql`(datetime('now'))`),
+    deletedAt: text('deleted_at'),
   },
   (table) => [uniqueIndex('idx_account_categories_name').on(table.name)],
 );
@@ -68,6 +77,10 @@ export const accounts = sqliteTable(
     createdAt: text('created_at')
       .notNull()
       .default(sql`(datetime('now'))`),
+    updatedAt: text('updated_at')
+      .notNull()
+      .default(sql`(datetime('now'))`),
+    deletedAt: text('deleted_at'),
   },
   (table) => [uniqueIndex('idx_accounts_name').on(table.name)],
 );
@@ -90,6 +103,10 @@ export const recurringTransactions = sqliteTable(
     createdAt: text('created_at')
       .notNull()
       .default(sql`(datetime('now'))`),
+    updatedAt: text('updated_at')
+      .notNull()
+      .default(sql`(datetime('now'))`),
+    deletedAt: text('deleted_at'),
   },
   (table) => [index('idx_recurring_next_run').on(table.nextRunDate, table.isActive)],
 );
@@ -118,6 +135,7 @@ export const transactions = sqliteTable(
     updatedAt: text('updated_at')
       .notNull()
       .default(sql`(datetime('now'))`),
+    deletedAt: text('deleted_at'),
   },
   (table) => [
     index('idx_transactions_occurred_at').on(table.occurredAt),
@@ -142,6 +160,10 @@ export const budgets = sqliteTable(
     createdAt: text('created_at')
       .notNull()
       .default(sql`(datetime('now'))`),
+    updatedAt: text('updated_at')
+      .notNull()
+      .default(sql`(datetime('now'))`),
+    deletedAt: text('deleted_at'),
   },
   (table) => [
     uniqueIndex('idx_budgets_category_month').on(table.categoryId, table.month),
@@ -176,6 +198,10 @@ export const bills = sqliteTable(
     createdAt: text('created_at')
       .notNull()
       .default(sql`(datetime('now'))`),
+    updatedAt: text('updated_at')
+      .notNull()
+      .default(sql`(datetime('now'))`),
+    deletedAt: text('deleted_at'),
   },
   (table) => [index('idx_bills_due_date').on(table.dueDate, table.isPaid)],
 );

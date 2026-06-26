@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, isNull } from 'drizzle-orm';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -64,13 +64,13 @@ async function readImageAsBackupEntry(uri: string): Promise<BackupImage | null> 
 export async function createBackupFile(db: Database): Promise<string> {
   const [categoryRows, accountCategoryRows, accountRows, recurringRows, transactionRows, budgetRows, billRows] =
     await Promise.all([
-      db.select().from(categories),
-      db.select().from(accountCategories),
-      db.select().from(accounts),
-      db.select().from(recurringTransactions),
-      db.select().from(transactions),
-      db.select().from(budgets),
-      db.select().from(bills),
+      db.select().from(categories).where(isNull(categories.deletedAt)),
+      db.select().from(accountCategories).where(isNull(accountCategories.deletedAt)),
+      db.select().from(accounts).where(isNull(accounts.deletedAt)),
+      db.select().from(recurringTransactions).where(isNull(recurringTransactions.deletedAt)),
+      db.select().from(transactions).where(isNull(transactions.deletedAt)),
+      db.select().from(budgets).where(isNull(budgets.deletedAt)),
+      db.select().from(bills).where(isNull(bills.deletedAt)),
     ]);
 
   const imageUris = new Set<string>();

@@ -1,4 +1,4 @@
-import { and, asc, eq, lte, sql } from 'drizzle-orm';
+import { and, asc, eq, isNull, lte, sql } from 'drizzle-orm';
 
 import type { Database } from '../client';
 import {
@@ -38,16 +38,23 @@ export async function listRecurringTransactions(db: Database): Promise<Recurring
       nextRunDate: recurringTransactions.nextRunDate,
       isActive: recurringTransactions.isActive,
       createdAt: recurringTransactions.createdAt,
+      updatedAt: recurringTransactions.updatedAt,
+      deletedAt: recurringTransactions.deletedAt,
       isPaid: isPaidExpr,
     })
     .from(recurringTransactions)
+    .where(isNull(recurringTransactions.deletedAt))
     .orderBy(asc(recurringTransactions.nextRunDate));
 
   return rows.map((row) => ({ ...row, isPaid: Boolean(row.isPaid) }));
 }
 
 export async function getRecurringTransaction(db: Database, id: number): Promise<RecurringTransaction | undefined> {
-  const [row] = await db.select().from(recurringTransactions).where(eq(recurringTransactions.id, id)).limit(1);
+  const [row] = await db
+    .select()
+    .from(recurringTransactions)
+    .where(and(eq(recurringTransactions.id, id), isNull(recurringTransactions.deletedAt)))
+    .limit(1);
   return row;
 }
 
@@ -95,16 +102,23 @@ export async function updateRecurringTransaction(db: Database, id: number, input
       intervalCount: input.intervalCount,
       startDate: input.startDate,
       endDate: input.endDate ?? null,
+      updatedAt: sql`(datetime('now'))`,
     })
     .where(eq(recurringTransactions.id, id));
 }
 
 export async function setRecurringActive(db: Database, id: number, isActive: boolean): Promise<void> {
-  await db.update(recurringTransactions).set({ isActive }).where(eq(recurringTransactions.id, id));
+  await db
+    .update(recurringTransactions)
+    .set({ isActive, updatedAt: sql`(datetime('now'))` })
+    .where(eq(recurringTransactions.id, id));
 }
 
 export async function deleteRecurringTransaction(db: Database, id: number): Promise<void> {
-  await db.delete(recurringTransactions).where(eq(recurringTransactions.id, id));
+  await db
+    .update(recurringTransactions)
+    .set({ deletedAt: sql`(datetime('now'))`, updatedAt: sql`(datetime('now'))` })
+    .where(eq(recurringTransactions.id, id));
 }
 
 export interface GeneratedOccurrenceSummary {
@@ -126,7 +140,13 @@ export async function generateDueRecurringTransactions(
   const dueRules = await db
     .select()
     .from(recurringTransactions)
-    .where(and(eq(recurringTransactions.isActive, true), lte(recurringTransactions.nextRunDate, todayIso)));
+    .where(
+      and(
+        eq(recurringTransactions.isActive, true),
+        lte(recurringTransactions.nextRunDate, todayIso),
+        isNull(recurringTransactions.deletedAt),
+      ),
+    );
 
   const summaries: GeneratedOccurrenceSummary[] = [];
 
@@ -165,6 +185,7 @@ export async function generateDueRecurringTransactions(
         .set({
           nextRunDate: result.nextRunDate,
           isActive: result.isExhausted ? false : rule.isActive,
+          updatedAt: sql`(datetime('now'))`,
         })
         .where(eq(recurringTransactions.id, rule.id));
     });

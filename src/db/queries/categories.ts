@@ -1,4 +1,4 @@
-import { and, asc, eq, or } from 'drizzle-orm';
+import { and, asc, eq, isNull, or, sql } from 'drizzle-orm';
 
 import type { Database } from '../client';
 import { categories, type Category, type NewCategory } from '../schema';
@@ -16,18 +16,20 @@ export interface ListCategoriesOptions {
 export async function listCategories(db: Database, options: ListCategoriesOptions = {}): Promise<Category[]> {
   const { forType, includeArchived = false, billersOnly = false } = options;
 
-  const conditions = [];
+  const conditions = [isNull(categories.deletedAt)];
   if (!includeArchived) conditions.push(eq(categories.isArchived, false));
-  if (forType) conditions.push(or(eq(categories.type, forType), eq(categories.type, 'both')));
+  if (forType) conditions.push(or(eq(categories.type, forType), eq(categories.type, 'both'))!);
   if (billersOnly) conditions.push(eq(categories.isBiller, true));
 
-  const query = db.select().from(categories).orderBy(asc(categories.name));
-  if (conditions.length === 0) return query;
-  return query.where(and(...conditions));
+  return db.select().from(categories).where(and(...conditions)).orderBy(asc(categories.name));
 }
 
 export async function getCategory(db: Database, id: number): Promise<Category | undefined> {
-  const [row] = await db.select().from(categories).where(eq(categories.id, id)).limit(1);
+  const [row] = await db
+    .select()
+    .from(categories)
+    .where(and(eq(categories.id, id), isNull(categories.deletedAt)))
+    .limit(1);
   return row;
 }
 
@@ -60,10 +62,11 @@ export async function updateCategory(db: Database, id: number, input: CategoryIn
       color: input.color,
       icon: input.icon ?? null,
       isBiller: input.isBiller ?? false,
+      updatedAt: sql`(datetime('now'))`,
     })
     .where(eq(categories.id, id));
 }
 
 export async function setCategoryArchived(db: Database, id: number, isArchived: boolean): Promise<void> {
-  await db.update(categories).set({ isArchived }).where(eq(categories.id, id));
+  await db.update(categories).set({ isArchived, updatedAt: sql`(datetime('now'))` }).where(eq(categories.id, id));
 }

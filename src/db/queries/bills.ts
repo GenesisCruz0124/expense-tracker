@@ -1,5 +1,5 @@
 import { addDays, addMonths, addYears, parseISO } from 'date-fns';
-import { asc, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 
 import type { Database } from '../client';
@@ -42,6 +42,8 @@ export async function listBills(db: Database): Promise<BillWithDetails[]> {
       paidTransactionId: bills.paidTransactionId,
       excludeFromExpense: bills.excludeFromExpense,
       createdAt: bills.createdAt,
+      updatedAt: bills.updatedAt,
+      deletedAt: bills.deletedAt,
       categoryName: categories.name,
       categoryColor: categories.color,
       categoryIcon: categories.icon,
@@ -56,11 +58,16 @@ export async function listBills(db: Database): Promise<BillWithDetails[]> {
     .leftJoin(categories, eq(bills.categoryId, categories.id))
     .leftJoin(billers, eq(bills.billerId, billers.id))
     .leftJoin(accounts, eq(bills.accountId, accounts.id))
+    .where(isNull(bills.deletedAt))
     .orderBy(asc(bills.isPaid), asc(bills.dueDate));
 }
 
 export async function getBill(db: Database, id: number): Promise<Bill | undefined> {
-  const [row] = await db.select().from(bills).where(eq(bills.id, id)).limit(1);
+  const [row] = await db
+    .select()
+    .from(bills)
+    .where(and(eq(bills.id, id), isNull(bills.deletedAt)))
+    .limit(1);
   return row;
 }
 
@@ -72,6 +79,7 @@ export async function listBillNames(db: Database, limit = 50): Promise<string[]>
       lastCreated: sql<string>`max(${bills.createdAt})`,
     })
     .from(bills)
+    .where(isNull(bills.deletedAt))
     .groupBy(bills.name)
     .orderBy(desc(sql`max(${bills.createdAt})`))
     .limit(limit);
@@ -138,11 +146,17 @@ export async function createBill(db: Database, input: BillInput): Promise<Bill> 
 }
 
 export async function updateBill(db: Database, id: number, input: BillInput): Promise<void> {
-  await db.update(bills).set(toNewBillValues(input)).where(eq(bills.id, id));
+  await db
+    .update(bills)
+    .set({ ...toNewBillValues(input), updatedAt: sql`(datetime('now'))` })
+    .where(eq(bills.id, id));
 }
 
 export async function deleteBill(db: Database, id: number): Promise<void> {
-  await db.delete(bills).where(eq(bills.id, id));
+  await db
+    .update(bills)
+    .set({ deletedAt: sql`(datetime('now'))`, updatedAt: sql`(datetime('now'))` })
+    .where(eq(bills.id, id));
 }
 
 /**
@@ -208,7 +222,12 @@ export async function markBillPaid(db: Database, id: number, occurredAt: string)
     if (bill.frequency === 'once') {
       await tx
         .update(bills)
-        .set({ isPaid: true, paidTransactionId: transactionId, lastPaidAt: occurredAt })
+        .set({
+          isPaid: true,
+          paidTransactionId: transactionId,
+          lastPaidAt: occurredAt,
+          updatedAt: sql`(datetime('now'))`,
+        })
         .where(eq(bills.id, id));
     } else {
       await tx
@@ -219,6 +238,7 @@ export async function markBillPaid(db: Database, id: number, occurredAt: string)
           remindedAt: null,
           lastPaidAt: occurredAt,
           dueDate: getNextDueDate(bill.dueDate, bill.frequency, bill.intervalDays),
+          updatedAt: sql`(datetime('now'))`,
         })
         .where(eq(bills.id, id));
     }
@@ -238,16 +258,28 @@ export async function markBillUnpaid(db: Database, id: number): Promise<void> {
         .where(eq(transactions.id, bill.paidTransactionId))
         .limit(1);
       if (paidTransaction?.transferId != null) {
-        await tx.delete(transactions).where(eq(transactions.transferId, paidTransaction.transferId));
+        await tx
+          .update(transactions)
+          .set({ deletedAt: sql`(datetime('now'))`, updatedAt: sql`(datetime('now'))` })
+          .where(eq(transactions.transferId, paidTransaction.transferId));
       } else {
-        await tx.delete(transactions).where(eq(transactions.id, bill.paidTransactionId));
+        await tx
+          .update(transactions)
+          .set({ deletedAt: sql`(datetime('now'))`, updatedAt: sql`(datetime('now'))` })
+          .where(eq(transactions.id, bill.paidTransactionId));
       }
     }
-    await tx.update(bills).set({ isPaid: false, paidTransactionId: null, lastPaidAt: null }).where(eq(bills.id, id));
+    await tx
+      .update(bills)
+      .set({ isPaid: false, paidTransactionId: null, lastPaidAt: null, updatedAt: sql`(datetime('now'))` })
+      .where(eq(bills.id, id));
   });
 }
 
 /** Records that a due-date reminder has been sent so `checkBillReminders` doesn't repeat it. */
 export async function markBillReminded(db: Database, id: number, remindedAt: string): Promise<void> {
-  await db.update(bills).set({ remindedAt }).where(eq(bills.id, id));
+  await db
+    .update(bills)
+    .set({ remindedAt, updatedAt: sql`(datetime('now'))` })
+    .where(eq(bills.id, id));
 }

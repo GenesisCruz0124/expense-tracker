@@ -1,7 +1,7 @@
-import { and, between, desc, eq, inArray, like, or, sql, type SQL } from 'drizzle-orm';
+import { and, between, desc, eq, inArray, isNull, like, or, sql, type SQL } from 'drizzle-orm';
 
 import type { Database } from '../client';
-import { accounts, categories, transactions, type NewTransaction, type Transaction } from '../schema';
+import { accounts, bills, categories, transactions, type NewTransaction, type Transaction } from '../schema';
 
 export interface TransactionWithCategory extends Transaction {
   categoryName: string | null;
@@ -24,7 +24,7 @@ export interface ListTransactionsFilter {
 }
 
 function buildFilterConditions(filter: ListTransactionsFilter): SQL[] {
-  const conditions: SQL[] = [];
+  const conditions: SQL[] = [isNull(transactions.deletedAt)];
   if (filter.type) conditions.push(eq(transactions.type, filter.type));
   if (filter.categoryIds && filter.categoryIds.length > 0) {
     conditions.push(inArray(transactions.categoryId, filter.categoryIds));
@@ -70,6 +70,7 @@ export async function listTransactions(
       recurringId: transactions.recurringId,
       createdAt: transactions.createdAt,
       updatedAt: transactions.updatedAt,
+      deletedAt: transactions.deletedAt,
       categoryName: categories.name,
       categoryColor: categories.color,
       categoryIcon: categories.icon,
@@ -85,7 +86,11 @@ export async function listTransactions(
 }
 
 export async function getTransaction(db: Database, id: number): Promise<Transaction | undefined> {
-  const [row] = await db.select().from(transactions).where(eq(transactions.id, id)).limit(1);
+  const [row] = await db
+    .select()
+    .from(transactions)
+    .where(and(eq(transactions.id, id), isNull(transactions.deletedAt)))
+    .limit(1);
   return row;
 }
 
@@ -182,7 +187,10 @@ export async function createTransfer(db: Database, input: TransferInput): Promis
 
 /** Fetches both legs of a transfer, identifying the expense (from) and income (to) sides. */
 export async function getTransferLegs(db: Database, transferId: number): Promise<TransferLegs | undefined> {
-  const rows = await db.select().from(transactions).where(eq(transactions.transferId, transferId));
+  const rows = await db
+    .select()
+    .from(transactions)
+    .where(and(eq(transactions.transferId, transferId), isNull(transactions.deletedAt)));
   const fromTransaction = rows.find((row) => row.type === 'expense');
   const toTransaction = rows.find((row) => row.type === 'income');
   if (!fromTransaction || !toTransaction) return undefined;
@@ -218,7 +226,14 @@ export async function updateTransfer(db: Database, transferId: number, input: Tr
 }
 
 export async function deleteTransfer(db: Database, transferId: number): Promise<void> {
-  await db.delete(transactions).where(eq(transactions.transferId, transferId));
+  await db
+    .update(transactions)
+    .set({ deletedAt: sql`(datetime('now'))`, updatedAt: sql`(datetime('now'))` })
+    .where(eq(transactions.transferId, transferId));
+  await db
+    .update(bills)
+    .set({ paidTransactionId: null, updatedAt: sql`(datetime('now'))` })
+    .where(eq(bills.paidTransactionId, transferId));
 }
 
 export async function createTransaction(db: Database, input: TransactionInput): Promise<Transaction> {
@@ -234,12 +249,26 @@ export async function updateTransaction(db: Database, id: number, input: Transac
 }
 
 export async function deleteTransaction(db: Database, id: number): Promise<void> {
-  await db.delete(transactions).where(eq(transactions.id, id));
+  await db
+    .update(transactions)
+    .set({ deletedAt: sql`(datetime('now'))`, updatedAt: sql`(datetime('now'))` })
+    .where(eq(transactions.id, id));
+  await db
+    .update(bills)
+    .set({ paidTransactionId: null, updatedAt: sql`(datetime('now'))` })
+    .where(eq(bills.paidTransactionId, id));
 }
 
 /** Wipes every logged transaction — used by the "Clear all transactions" reset in Settings. */
 export async function deleteAllTransactions(db: Database): Promise<void> {
-  await db.delete(transactions);
+  await db
+    .update(transactions)
+    .set({ deletedAt: sql`(datetime('now'))`, updatedAt: sql`(datetime('now'))` })
+    .where(isNull(transactions.deletedAt));
+  await db
+    .update(bills)
+    .set({ paidTransactionId: null, updatedAt: sql`(datetime('now'))` })
+    .where(sql`${bills.paidTransactionId} is not null`);
 }
 
 /** Distinct establishment names used before, most-recently-used first — powers the autocomplete suggestions. */
@@ -250,7 +279,9 @@ export async function listEstablishments(db: Database, limit = 50): Promise<stri
       lastUsed: sql<string>`max(${transactions.occurredAt})`,
     })
     .from(transactions)
-    .where(sql`${transactions.establishment} is not null and ${transactions.establishment} != ''`)
+    .where(
+      sql`${transactions.establishment} is not null and ${transactions.establishment} != '' and ${transactions.deletedAt} is null`,
+    )
     .groupBy(transactions.establishment)
     .orderBy(desc(sql`max(${transactions.occurredAt})`))
     .limit(limit);

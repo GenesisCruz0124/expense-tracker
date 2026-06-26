@@ -32,6 +32,7 @@ import m0027 from './0027_account_linked_credit_card.sql';
 import m0028 from './0028_bill_interval_days.sql';
 import m0029 from './0029_bill_last_paid_at.sql';
 import m0030 from './0030_bill_to_account.sql';
+import m0031 from './0031_sync_metadata_columns.sql';
 
   export default {
     journal,
@@ -66,7 +67,8 @@ m0026,
 m0027,
 m0028,
 m0029,
-m0030
+m0030,
+m0031
     }
   }
   
