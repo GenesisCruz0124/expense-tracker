@@ -3,6 +3,7 @@ import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import type { Database } from '../client';
 import { budgets, categories, type Budget, type NewBudget } from '../schema';
 import { sumTransactions } from './transactions';
+import { generateUuid } from '../../utils/uuid';
 
 export interface BudgetWithCategory extends Budget {
   categoryName: string;
@@ -22,6 +23,7 @@ export async function listBudgetsForMonth(db: Database, monthKey: string): Promi
       createdAt: budgets.createdAt,
       updatedAt: budgets.updatedAt,
       deletedAt: budgets.deletedAt,
+      uuid: budgets.uuid,
       categoryName: categories.name,
       categoryColor: categories.color,
       categoryIcon: categories.icon,
@@ -57,6 +59,7 @@ export async function upsertBudget(db: Database, input: BudgetInput): Promise<Bu
     amountLimit: input.amountLimit,
     alertThresholdPct: input.alertThresholdPct ?? 90,
     lastAlertPct: 0,
+    uuid: generateUuid(),
   };
 
   const [row] = await db
@@ -112,6 +115,7 @@ export async function copyBudgetsForward(db: Database, fromMonth: string, toMont
       amountLimit: budget.amountLimit,
       alertThresholdPct: budget.alertThresholdPct,
       lastAlertPct: 0,
+      uuid: generateUuid(),
     });
     copied += 1;
   }

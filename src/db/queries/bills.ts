@@ -5,6 +5,7 @@ import { alias } from 'drizzle-orm/sqlite-core';
 import type { Database } from '../client';
 import { accounts, bills, categories, transactions, type Bill, type NewBill } from '../schema';
 import { formatIsoDate } from '../../utils/dateRanges';
+import { generateUuid } from '../../utils/uuid';
 
 export type BillFrequency = Bill['frequency'];
 
@@ -44,6 +45,7 @@ export async function listBills(db: Database): Promise<BillWithDetails[]> {
       createdAt: bills.createdAt,
       updatedAt: bills.updatedAt,
       deletedAt: bills.deletedAt,
+      uuid: bills.uuid,
       categoryName: categories.name,
       categoryColor: categories.color,
       categoryIcon: categories.icon,
@@ -141,7 +143,10 @@ function getNextDueDate(dueDate: string, frequency: BillFrequency, intervalDays:
 }
 
 export async function createBill(db: Database, input: BillInput): Promise<Bill> {
-  const [row] = await db.insert(bills).values(toNewBillValues(input)).returning();
+  const [row] = await db
+    .insert(bills)
+    .values({ ...toNewBillValues(input), uuid: generateUuid() })
+    .returning();
   return row;
 }
 
@@ -188,6 +193,7 @@ export async function markBillPaid(db: Database, id: number, occurredAt: string)
           categoryId: bill.categoryId,
           accountId: bill.accountId,
           excludeFromExpense: bill.excludeFromExpense,
+          uuid: generateUuid(),
         })
         .returning();
       await tx.insert(transactions).values({
@@ -199,6 +205,7 @@ export async function markBillPaid(db: Database, id: number, occurredAt: string)
         transferId: fromTransaction.id,
         excludeFromExpense: true,
         categoryId: null,
+        uuid: generateUuid(),
       });
       await tx.update(transactions).set({ transferId: fromTransaction.id }).where(eq(transactions.id, fromTransaction.id));
       transactionId = fromTransaction.id;
@@ -214,6 +221,7 @@ export async function markBillPaid(db: Database, id: number, occurredAt: string)
           categoryId: bill.categoryId,
           accountId: bill.accountId,
           excludeFromExpense: bill.excludeFromExpense,
+          uuid: generateUuid(),
         })
         .returning();
       transactionId = transaction.id;

@@ -2,6 +2,7 @@ import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 
 import type { Database } from '../client';
 import { accountCategories, type AccountCategory, type NewAccountCategory } from '../schema';
+import { generateUuid } from '../../utils/uuid';
 
 export interface ListAccountCategoriesOptions {
   includeArchived?: boolean;
@@ -45,6 +46,7 @@ export async function createAccountCategory(db: Database, input: AccountCategory
     color: input.color,
     icon: input.icon ?? null,
     kind: input.kind ?? 'standard',
+    uuid: generateUuid(),
   };
   const [row] = await db.insert(accountCategories).values(values).returning();
   return row;

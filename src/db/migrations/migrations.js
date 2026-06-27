@@ -33,6 +33,7 @@ import m0028 from './0028_bill_interval_days.sql';
 import m0029 from './0029_bill_last_paid_at.sql';
 import m0030 from './0030_bill_to_account.sql';
 import m0031 from './0031_sync_metadata_columns.sql';
+import m0032 from './0032_table_uuids.sql';
 
   export default {
     journal,
@@ -68,7 +69,8 @@ m0027,
 m0028,
 m0029,
 m0030,
-m0031
+m0031,
+m0032
     }
   }
   

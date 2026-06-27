@@ -10,6 +10,7 @@ import {
 } from '../schema';
 import { generateOccurrencesUpTo } from '../../utils/recurrence';
 import { formatIsoDate } from '../../utils/dateRanges';
+import { generateUuid } from '../../utils/uuid';
 
 export interface RecurringWithStatus extends RecurringTransaction {
   /** True when a transaction has already been logged for this rule's upcoming due date */
@@ -40,6 +41,7 @@ export async function listRecurringTransactions(db: Database): Promise<Recurring
       createdAt: recurringTransactions.createdAt,
       updatedAt: recurringTransactions.updatedAt,
       deletedAt: recurringTransactions.deletedAt,
+      uuid: recurringTransactions.uuid,
       isPaid: isPaidExpr,
     })
     .from(recurringTransactions)
@@ -84,6 +86,7 @@ export async function createRecurringTransaction(db: Database, input: RecurringI
     endDate: input.endDate ?? null,
     nextRunDate: input.startDate,
     isActive: true,
+    uuid: generateUuid(),
   };
   const [row] = await db.insert(recurringTransactions).values(values).returning();
   return row;
@@ -178,6 +181,7 @@ export async function generateDueRecurringTransactions(
           establishment: billerName,
           categoryId: rule.categoryId,
           recurringId: rule.id,
+          uuid: generateUuid(),
         });
       }
       await tx

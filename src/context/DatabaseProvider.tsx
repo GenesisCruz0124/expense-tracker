@@ -8,6 +8,7 @@ import { repairAccountsSchema } from '../db/repair';
 import { seedAdditionalCategories, seedDefaultCategories } from '../db/seed';
 import { generateDueRecurringTransactions } from '../db/queries/recurring';
 import { initSettingsTable } from '../db/queries/settings';
+import { backfillRowUuids } from '../db/uuidBackfill';
 import { checkBudgetAlerts } from '../db/budgetAlerts';
 import { checkBillReminders } from '../db/billReminders';
 import { configureNotificationChannel, requestNotificationPermissions } from '../utils/notifications';
@@ -32,11 +33,12 @@ export function useDatabase(): DatabaseContextValue {
 
 /**
  * Opens the on-device SQLite database, runs pending migrations, then performs the
- * launch-time bootstrap in order: seed default categories (first run only), add any
- * newly-introduced categories that don't exist yet, generate any recurring transactions
- * that came due since the last open, check budgets for newly crossed alert thresholds,
- * and notify about bills entering their reminder window — in that order, so a freshly
- * generated rent/salary entry is reflected in this same session's budget evaluation.
+ * launch-time bootstrap in order: backfill sync uuids for any pre-existing rows (one-time),
+ * seed default categories (first run only), add any newly-introduced categories that don't
+ * exist yet, generate any recurring transactions that came due since the last open, check
+ * budgets for newly crossed alert thresholds, and notify about bills entering their reminder
+ * window — in that order, so a freshly generated rent/salary entry is reflected in this same
+ * session's budget evaluation.
  */
 export function DatabaseProvider({ children }: { children: React.ReactNode }) {
   const { success, error } = useMigrations(db, migrations);
@@ -53,6 +55,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       try {
         await repairAccountsSchema(db);
         await initSettingsTable(db);
+        await backfillRowUuids(db);
         await configureNotificationChannel();
         await requestNotificationPermissions();
         await seedDefaultCategories(db);

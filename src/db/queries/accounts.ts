@@ -3,6 +3,7 @@ import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm';
 import type { Database } from '../client';
 import { accountCategories, accounts, transactions, type Account, type NewAccount } from '../schema';
 import { formatIsoDate } from '../../utils/dateRanges';
+import { generateUuid } from '../../utils/uuid';
 
 export interface AccountWithBalance extends Account {
   /**
@@ -58,6 +59,7 @@ export async function listAccounts(db: Database, options: ListAccountsOptions = 
       createdAt: accounts.createdAt,
       updatedAt: accounts.updatedAt,
       deletedAt: accounts.deletedAt,
+      uuid: accounts.uuid,
       balance: balanceExpr,
       lastTransactionAt: lastTransactionAtExpr,
     })
@@ -111,6 +113,7 @@ export async function getAccountWithBalance(db: Database, id: number): Promise<A
       createdAt: accounts.createdAt,
       updatedAt: accounts.updatedAt,
       deletedAt: accounts.deletedAt,
+      uuid: accounts.uuid,
       balance: balanceExpr,
     })
     .from(accounts)
@@ -165,6 +168,7 @@ export async function createAccount(db: Database, input: AccountInput): Promise<
     totalMonths: input.totalMonths ?? 0,
     creditLimit: input.creditLimit ?? null,
     linkedCreditCardId: input.linkedCreditCardId ?? null,
+    uuid: generateUuid(),
   };
   const [row] = await db.insert(accounts).values(values).returning();
   return row;

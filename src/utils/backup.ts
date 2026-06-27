@@ -20,8 +20,9 @@ import {
   type RecurringTransaction,
   type Transaction,
 } from '../db/schema';
+import { generateUuid } from './uuid';
 
-const BACKUP_VERSION = 1;
+const BACKUP_VERSION = 2;
 
 interface BackupImage {
   data: string;
@@ -133,7 +134,7 @@ function isBackupFile(value: unknown): value is BackupFile {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Partial<BackupFile>;
   return (
-    candidate.version === BACKUP_VERSION &&
+    (candidate.version === 1 || candidate.version === 2) &&
     typeof candidate.tables === 'object' &&
     candidate.tables !== null &&
     Array.isArray(candidate.tables.categories) &&
@@ -188,20 +189,20 @@ export async function restoreBackupFromFile(db: Database, fileUri: string): Prom
     await tx.delete(categories);
 
     const categoryIdMap = new Map<number, number>();
-    for (const { id, ...rest } of backup.tables.categories) {
-      const [inserted] = await tx.insert(categories).values(rest).returning();
+    for (const { id, uuid, ...rest } of backup.tables.categories) {
+      const [inserted] = await tx.insert(categories).values({ ...rest, uuid: generateUuid() }).returning();
       categoryIdMap.set(id, inserted.id);
     }
 
     const accountCategoryIdMap = new Map<number, number>();
-    for (const { id, ...rest } of backup.tables.accountCategories) {
-      const [inserted] = await tx.insert(accountCategories).values(rest).returning();
+    for (const { id, uuid, ...rest } of backup.tables.accountCategories) {
+      const [inserted] = await tx.insert(accountCategories).values({ ...rest, uuid: generateUuid() }).returning();
       accountCategoryIdMap.set(id, inserted.id);
     }
 
     const accountIdMap = new Map<number, number>();
     const linkedCreditCardPairs: { newId: number; oldLinkedCreditCardId: number }[] = [];
-    for (const { id, categoryId, qrImageUri, linkedCreditCardId, ...rest } of backup.tables.accounts) {
+    for (const { id, uuid, categoryId, qrImageUri, linkedCreditCardId, ...rest } of backup.tables.accounts) {
       const [inserted] = await tx
         .insert(accounts)
         .values({
@@ -209,6 +210,7 @@ export async function restoreBackupFromFile(db: Database, fileUri: string): Prom
           categoryId: accountCategoryIdMap.get(categoryId) ?? categoryId,
           qrImageUri: qrImageUri ? uriMap.get(qrImageUri) ?? qrImageUri : null,
           linkedCreditCardId: null,
+          uuid: generateUuid(),
         })
         .returning();
       accountIdMap.set(id, inserted.id);
@@ -223,28 +225,30 @@ export async function restoreBackupFromFile(db: Database, fileUri: string): Prom
     }
 
     const recurringIdMap = new Map<number, number>();
-    for (const { id, categoryId, billerId, ...rest } of backup.tables.recurringTransactions) {
+    for (const { id, uuid, categoryId, billerId, ...rest } of backup.tables.recurringTransactions) {
       const [inserted] = await tx
         .insert(recurringTransactions)
         .values({
           ...rest,
           categoryId: categoryId != null ? categoryIdMap.get(categoryId) ?? null : null,
           billerId: billerId != null ? categoryIdMap.get(billerId) ?? null : null,
+          uuid: generateUuid(),
         })
         .returning();
       recurringIdMap.set(id, inserted.id);
     }
 
-    for (const { id, categoryId, ...rest } of backup.tables.budgets) {
+    for (const { id, uuid, categoryId, ...rest } of backup.tables.budgets) {
       await tx.insert(budgets).values({
         ...rest,
         categoryId: categoryIdMap.get(categoryId) ?? categoryId,
+        uuid: generateUuid(),
       });
     }
 
     const transactionIdMap = new Map<number, number>();
     const transferPairs: { newId: number; oldTransferId: number }[] = [];
-    for (const { id, categoryId, accountId, recurringId, receiptImageUri, transferId, ...rest } of backup.tables
+    for (const { id, uuid, categoryId, accountId, recurringId, receiptImageUri, transferId, ...rest } of backup.tables
       .transactions) {
       const [inserted] = await tx
         .insert(transactions)
@@ -255,6 +259,7 @@ export async function restoreBackupFromFile(db: Database, fileUri: string): Prom
           recurringId: recurringId != null ? recurringIdMap.get(recurringId) ?? null : null,
           receiptImageUri: receiptImageUri ? uriMap.get(receiptImageUri) ?? receiptImageUri : null,
           transferId: null,
+          uuid: generateUuid(),
         })
         .returning();
       transactionIdMap.set(id, inserted.id);
@@ -268,13 +273,14 @@ export async function restoreBackupFromFile(db: Database, fileUri: string): Prom
       }
     }
 
-    for (const { id, categoryId, billerId, accountId, paidTransactionId, ...rest } of backup.tables.bills ?? []) {
+    for (const { id, uuid, categoryId, billerId, accountId, paidTransactionId, ...rest } of backup.tables.bills ?? []) {
       await tx.insert(bills).values({
         ...rest,
         categoryId: categoryId != null ? categoryIdMap.get(categoryId) ?? null : null,
         billerId: billerId != null ? categoryIdMap.get(billerId) ?? null : null,
         accountId: accountId != null ? accountIdMap.get(accountId) ?? null : null,
         paidTransactionId: paidTransactionId != null ? transactionIdMap.get(paidTransactionId) ?? null : null,
+        uuid: generateUuid(),
       });
     }
   });

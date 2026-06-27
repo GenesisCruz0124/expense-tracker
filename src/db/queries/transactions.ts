@@ -2,6 +2,7 @@ import { and, between, desc, eq, inArray, isNull, like, or, sql, type SQL } from
 
 import type { Database } from '../client';
 import { accounts, bills, categories, transactions, type NewTransaction, type Transaction } from '../schema';
+import { generateUuid } from '../../utils/uuid';
 
 export interface TransactionWithCategory extends Transaction {
   categoryName: string | null;
@@ -71,6 +72,7 @@ export async function listTransactions(
       createdAt: transactions.createdAt,
       updatedAt: transactions.updatedAt,
       deletedAt: transactions.deletedAt,
+      uuid: transactions.uuid,
       categoryName: categories.name,
       categoryColor: categories.color,
       categoryIcon: categories.icon,
@@ -167,6 +169,7 @@ export async function createTransfer(db: Database, input: TransferInput): Promis
       fee: input.fee ?? 0,
       excludeFromExpense: !input.includeAsExpense,
       categoryId: input.includeAsExpense ? input.categoryId ?? null : null,
+      uuid: generateUuid(),
     })
     .returning();
   const [toTransaction] = await db
@@ -178,6 +181,7 @@ export async function createTransfer(db: Database, input: TransferInput): Promis
       transferId: fromTransaction.id,
       excludeFromExpense: true,
       categoryId: null,
+      uuid: generateUuid(),
     })
     .returning();
   await db.update(transactions).set({ transferId: fromTransaction.id }).where(eq(transactions.id, fromTransaction.id));
@@ -237,7 +241,10 @@ export async function deleteTransfer(db: Database, transferId: number): Promise<
 }
 
 export async function createTransaction(db: Database, input: TransactionInput): Promise<Transaction> {
-  const [row] = await db.insert(transactions).values(toNewTransactionValues(input)).returning();
+  const [row] = await db
+    .insert(transactions)
+    .values({ ...toNewTransactionValues(input), uuid: generateUuid() })
+    .returning();
   return row;
 }
 

@@ -2,6 +2,7 @@ import { and, asc, eq, isNull, or, sql } from 'drizzle-orm';
 
 import type { Database } from '../client';
 import { categories, type Category, type NewCategory } from '../schema';
+import { generateUuid } from '../../utils/uuid';
 
 export type CategoryType = 'expense' | 'income' | 'both';
 
@@ -48,6 +49,7 @@ export async function createCategory(db: Database, input: CategoryInput): Promis
     color: input.color,
     icon: input.icon ?? null,
     isBiller: input.isBiller ?? false,
+    uuid: generateUuid(),
   };
   const [row] = await db.insert(categories).values(values).returning();
   return row;

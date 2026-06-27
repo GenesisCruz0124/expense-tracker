@@ -19,8 +19,10 @@ export const categories = sqliteTable(
       .default(sql`(datetime('now'))`),
     /** ISO timestamp set instead of a hard delete, so sync can propagate deletions across devices. */
     deletedAt: text('deleted_at'),
+    /** Stable cross-device identity for sync, separate from the local autoincrement `id`. */
+    uuid: text('uuid'),
   },
-  (table) => [uniqueIndex('idx_categories_name').on(table.name)],
+  (table) => [uniqueIndex('idx_categories_name').on(table.name), uniqueIndex('idx_categories_uuid').on(table.uuid)],
 );
 
 export const accountCategories = sqliteTable(
@@ -39,8 +41,12 @@ export const accountCategories = sqliteTable(
       .notNull()
       .default(sql`(datetime('now'))`),
     deletedAt: text('deleted_at'),
+    uuid: text('uuid'),
   },
-  (table) => [uniqueIndex('idx_account_categories_name').on(table.name)],
+  (table) => [
+    uniqueIndex('idx_account_categories_name').on(table.name),
+    uniqueIndex('idx_account_categories_uuid').on(table.uuid),
+  ],
 );
 
 export const accounts = sqliteTable(
@@ -81,8 +87,9 @@ export const accounts = sqliteTable(
       .notNull()
       .default(sql`(datetime('now'))`),
     deletedAt: text('deleted_at'),
+    uuid: text('uuid'),
   },
-  (table) => [uniqueIndex('idx_accounts_name').on(table.name)],
+  (table) => [uniqueIndex('idx_accounts_name').on(table.name), uniqueIndex('idx_accounts_uuid').on(table.uuid)],
 );
 
 export const recurringTransactions = sqliteTable(
@@ -107,8 +114,12 @@ export const recurringTransactions = sqliteTable(
       .notNull()
       .default(sql`(datetime('now'))`),
     deletedAt: text('deleted_at'),
+    uuid: text('uuid'),
   },
-  (table) => [index('idx_recurring_next_run').on(table.nextRunDate, table.isActive)],
+  (table) => [
+    index('idx_recurring_next_run').on(table.nextRunDate, table.isActive),
+    uniqueIndex('idx_recurring_transactions_uuid').on(table.uuid),
+  ],
 );
 
 export const transactions = sqliteTable(
@@ -136,6 +147,7 @@ export const transactions = sqliteTable(
       .notNull()
       .default(sql`(datetime('now'))`),
     deletedAt: text('deleted_at'),
+    uuid: text('uuid'),
   },
   (table) => [
     index('idx_transactions_occurred_at').on(table.occurredAt),
@@ -143,6 +155,7 @@ export const transactions = sqliteTable(
     index('idx_transactions_account_id').on(table.accountId),
     index('idx_transactions_type_occurred_at').on(table.type, table.occurredAt),
     index('idx_transactions_category_occurred').on(table.categoryId, table.occurredAt),
+    uniqueIndex('idx_transactions_uuid').on(table.uuid),
   ],
 );
 
@@ -164,10 +177,12 @@ export const budgets = sqliteTable(
       .notNull()
       .default(sql`(datetime('now'))`),
     deletedAt: text('deleted_at'),
+    uuid: text('uuid'),
   },
   (table) => [
     uniqueIndex('idx_budgets_category_month').on(table.categoryId, table.month),
     index('idx_budgets_month').on(table.month),
+    uniqueIndex('idx_budgets_uuid').on(table.uuid),
   ],
 );
 
@@ -202,8 +217,12 @@ export const bills = sqliteTable(
       .notNull()
       .default(sql`(datetime('now'))`),
     deletedAt: text('deleted_at'),
+    uuid: text('uuid'),
   },
-  (table) => [index('idx_bills_due_date').on(table.dueDate, table.isPaid)],
+  (table) => [
+    index('idx_bills_due_date').on(table.dueDate, table.isPaid),
+    uniqueIndex('idx_bills_uuid').on(table.uuid),
+  ],
 );
 
 export type Category = typeof categories.$inferSelect;
