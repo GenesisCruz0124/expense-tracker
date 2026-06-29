@@ -12,6 +12,7 @@ import { backfillRowUuids } from '../db/uuidBackfill';
 import { checkBudgetAlerts } from '../db/budgetAlerts';
 import { checkBillReminders } from '../db/billReminders';
 import { configureNotificationChannel, requestNotificationPermissions } from '../utils/notifications';
+import { AuthProvider } from './AuthProvider';
 import { BackupReminderProvider } from './BackupReminderProvider';
 import { LicenseProvider } from './LicenseProvider';
 import { PALETTE } from '../constants/colors';
@@ -94,7 +95,9 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
   return (
     <DatabaseContext.Provider value={{ db, refreshSignal, notifyDataChanged }}>
       <BackupReminderProvider>
-        <LicenseProvider>{children}</LicenseProvider>
+        <LicenseProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </LicenseProvider>
       </BackupReminderProvider>
     </DatabaseContext.Provider>
   );

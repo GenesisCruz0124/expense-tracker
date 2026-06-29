@@ -15,6 +15,7 @@ import {
   type AccentKey,
   type ThemeMode,
 } from '../constants/colors';
+import { useAuth } from '../context/AuthProvider';
 import { useDatabase } from '../context/DatabaseProvider';
 import { useLicense } from '../context/LicenseProvider';
 import { setPreference } from '../db/themePreferences';
@@ -25,6 +26,8 @@ import type { MoreStackParamList } from '../navigation/types';
 import { createBackupFile, pickBackupFile, restoreBackupFromFile, shareBackupFile } from '../utils/backup';
 import { formatIsoDate } from '../utils/dateRanges';
 import { getNotificationPermissionStatus, requestNotificationPermissions } from '../utils/notifications';
+import { isSyncConfigured } from '../sync/supabaseClient';
+import { pushChanges, SyncNotSignedInError } from '../sync/pushChanges';
 
 const DEVELOPER_EMAIL = 'genesiscruz.dev@gmail.com';
 
@@ -38,10 +41,13 @@ export default function SettingsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<MoreStackParamList>>();
   const { db, notifyDataChanged } = useDatabase();
   const { status: licenseStatus, daysLeft } = useLicense();
+  const { session, showAuthModal, signOut } = useAuth();
   const [status, setStatus] = useState<Notifications.PermissionStatus | null>(null);
   const [clearing, setClearing] = useState(false);
   const [backingUp, setBackingUp] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [lastSyncResult, setLastSyncResult] = useState('');
   const [themeMode, setThemeMode] = useState<ThemeMode>(getStoredThemeMode);
   const [accentKey, setAccentKey] = useState<AccentKey>(getStoredAccentKey);
 
@@ -145,6 +151,29 @@ export default function SettingsScreen() {
     );
   }
 
+  async function handleSync() {
+    if (!session) {
+      showAuthModal();
+      return;
+    }
+    setSyncing(true);
+    setLastSyncResult('');
+    try {
+      const summary = await pushChanges(db);
+      setLastSyncResult(
+        summary.totalPushed > 0 ? `Synced ${summary.totalPushed} change${summary.totalPushed !== 1 ? 's' : ''}.` : 'Already up to date.',
+      );
+    } catch (error) {
+      if (error instanceof SyncNotSignedInError) {
+        showAuthModal();
+      } else {
+        Alert.alert('Sync failed', error instanceof Error ? error.message : 'Something went wrong while syncing.');
+      }
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.section}>
@@ -240,6 +269,29 @@ export default function SettingsScreen() {
           Restoring replaces all current data on this device with the contents of the chosen backup file.
         </Text>
       </View>
+
+      {isSyncConfigured ? (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Sync</Text>
+          <View style={styles.row}>
+            <Text style={styles.rowLabel}>Account</Text>
+            <Text style={styles.rowValue}>{session ? session.user.email : 'Not signed in'}</Text>
+          </View>
+          <Text style={styles.helperText}>
+            Push your transactions, accounts, categories, budgets, bills, and recurring rules to your account so they
+            can be restored on another device.
+          </Text>
+          <Pressable style={styles.button} onPress={handleSync} disabled={syncing}>
+            <Text style={styles.buttonText}>{syncing ? 'Syncing…' : session ? 'Sync now' : 'Sign in to sync'}</Text>
+          </Pressable>
+          {lastSyncResult ? <Text style={styles.helperText}>{lastSyncResult}</Text> : null}
+          {session ? (
+            <Pressable style={styles.button} onPress={() => signOut()}>
+              <Text style={styles.buttonText}>Sign out</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Your data</Text>
