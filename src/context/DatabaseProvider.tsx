@@ -4,7 +4,7 @@ import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
 
 import { db, type Database } from '../db/client';
 import migrations from '../db/migrations/migrations';
-import { repairAccountsSchema } from '../db/repair';
+import { repairAccountsSchema, repairSyncSchema } from '../db/repair';
 import { seedAdditionalCategories, seedDefaultCategories } from '../db/seed';
 import { generateDueRecurringTransactions } from '../db/queries/recurring';
 import { initSettingsTable } from '../db/queries/settings';
@@ -55,6 +55,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     (async () => {
       try {
         await repairAccountsSchema(db);
+        await repairSyncSchema(db);
         await initSettingsTable(db);
         await backfillRowUuids(db);
         await configureNotificationChannel();
