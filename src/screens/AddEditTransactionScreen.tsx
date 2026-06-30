@@ -268,7 +268,7 @@ export default function AddEditTransactionScreen() {
       {type !== 'transfer' ? (
         <View style={styles.field}>
           <Text style={styles.label}>Category</Text>
-          <CategoryPicker forType={type} selectedCategoryId={categoryId} onSelect={setCategoryId} />
+          <CategoryPicker forType={type} selectedCategoryId={categoryId} onSelect={setCategoryId} sortBy="recent" />
         </View>
       ) : null}
 
@@ -302,7 +302,7 @@ export default function AddEditTransactionScreen() {
           {includeTransferAsExpense ? (
             <View style={styles.field}>
               <Text style={styles.label}>Category</Text>
-              <CategoryPicker forType="expense" selectedCategoryId={categoryId} onSelect={setCategoryId} />
+              <CategoryPicker forType="expense" selectedCategoryId={categoryId} onSelect={setCategoryId} sortBy="recent" />
             </View>
           ) : null}
         </>

@@ -14,12 +14,14 @@ interface Props {
   onSelect: (categoryId: number | null) => void;
   /** Restrict options to categories flagged as billers (used by the Add/Edit Bill screen). */
   billersOnly?: boolean;
+  /** 'name' (default) sorts alphabetically; 'recent' sorts by most recently used in a transaction first. */
+  sortBy?: 'name' | 'recent';
 }
 
 /** Filters its options to categories matching `forType` (or 'both') so a user logging an
  * expense never sees income-only categories like "Salary", and vice versa. */
-export function CategoryPicker({ forType, selectedCategoryId, onSelect, billersOnly }: Props) {
-  const { categories, loading, createCategory } = useCategories({ forType, billersOnly });
+export function CategoryPicker({ forType, selectedCategoryId, onSelect, billersOnly, sortBy }: Props) {
+  const { categories, loading, createCategory } = useCategories({ forType, billersOnly, sortBy });
   const [visible, setVisible] = useState(false);
   const [query, setQuery] = useState('');
   const [creating, setCreating] = useState(false);

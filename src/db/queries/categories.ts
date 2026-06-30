@@ -1,7 +1,7 @@
 import { and, asc, eq, isNull, or, sql } from 'drizzle-orm';
 
 import type { Database } from '../client';
-import { categories, type Category, type NewCategory } from '../schema';
+import { categories, transactions, type Category, type NewCategory } from '../schema';
 import { generateUuid } from '../../utils/uuid';
 
 export type CategoryType = 'expense' | 'income' | 'both';
@@ -12,17 +12,43 @@ export interface ListCategoriesOptions {
   includeArchived?: boolean;
   /** Only categories flagged as billers (shown in the Billers tab). */
   billersOnly?: boolean;
+  /** 'name' (default) sorts alphabetically; 'recent' sorts by most recently used in a transaction first. */
+  sortBy?: 'name' | 'recent';
 }
 
+const lastUsedAtExpr = sql<string | null>`max(${transactions.occurredAt})`;
+
 export async function listCategories(db: Database, options: ListCategoriesOptions = {}): Promise<Category[]> {
-  const { forType, includeArchived = false, billersOnly = false } = options;
+  const { forType, includeArchived = false, billersOnly = false, sortBy = 'name' } = options;
 
   const conditions = [isNull(categories.deletedAt)];
   if (!includeArchived) conditions.push(eq(categories.isArchived, false));
   if (forType) conditions.push(or(eq(categories.type, forType), eq(categories.type, 'both'))!);
   if (billersOnly) conditions.push(eq(categories.isBiller, true));
 
-  return db.select().from(categories).where(and(...conditions)).orderBy(asc(categories.name));
+  if (sortBy !== 'recent') {
+    return db.select().from(categories).where(and(...conditions)).orderBy(asc(categories.name));
+  }
+
+  return db
+    .select({
+      id: categories.id,
+      name: categories.name,
+      type: categories.type,
+      color: categories.color,
+      icon: categories.icon,
+      isArchived: categories.isArchived,
+      isBiller: categories.isBiller,
+      createdAt: categories.createdAt,
+      updatedAt: categories.updatedAt,
+      deletedAt: categories.deletedAt,
+      uuid: categories.uuid,
+    })
+    .from(categories)
+    .leftJoin(transactions, and(eq(transactions.categoryId, categories.id), isNull(transactions.deletedAt)))
+    .where(and(...conditions))
+    .groupBy(categories.id)
+    .orderBy(sql`${lastUsedAtExpr} is null, ${lastUsedAtExpr} desc`);
 }
 
 export async function getCategory(db: Database, id: number): Promise<Category | undefined> {
