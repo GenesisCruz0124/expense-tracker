@@ -2,7 +2,7 @@ import { and, between, eq, isNull, sql } from 'drizzle-orm';
 
 import type { Database } from '../client';
 import { categories, transactions } from '../schema';
-import type { MonthRange } from '../../utils/dateRanges';
+import type { MonthRange, WeekRange } from '../../utils/dateRanges';
 
 export interface CategoryBreakdownEntry {
   categoryId: number | null;
@@ -91,6 +91,46 @@ export async function incomeVsExpenseTrend(db: Database, ranges: MonthRange[]): 
   return ranges.map((range) => {
     const totals = totalsByMonth.get(range.monthKey) ?? { income: 0, expense: 0 };
     return { monthKey: range.monthKey, label: range.label, income: totals.income, expense: totals.expense };
+  });
+}
+
+/** Income vs. expense totals per week — backs the weekly trend chart. Returns `MonthlyTrendEntry[]` since charts only need label/income/expense. */
+export async function incomeVsExpenseTrendWeekly(db: Database, ranges: WeekRange[]): Promise<MonthlyTrendEntry[]> {
+  if (ranges.length === 0) return [];
+
+  const overallStart = ranges[0].start;
+  const overallEnd = ranges[ranges.length - 1].end;
+  // Compute the Monday of the transaction's week: go back ((dayOfWeek + 6) % 7) days.
+  // strftime('%w') returns 0=Sunday … 6=Saturday, so (n+6)%7 gives 0 for Monday, 6 for Sunday.
+  const weekKeyExpr = sql<string>`date(${transactions.occurredAt}, '-' || cast((cast(strftime('%w', ${transactions.occurredAt}) as integer) + 6) % 7 as text) || ' days')`;
+
+  const rows = await db
+    .select({
+      weekKey: weekKeyExpr,
+      type: transactions.type,
+      total: sql<number>`coalesce(sum(${transactions.amount}), 0)`,
+    })
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.excludeFromExpense, false),
+        between(transactions.occurredAt, overallStart, overallEnd),
+        isNull(transactions.deletedAt),
+      ),
+    )
+    .groupBy(weekKeyExpr, transactions.type);
+
+  const totalsByWeek = new Map<string, { income: number; expense: number }>();
+  for (const row of rows) {
+    const entry = totalsByWeek.get(row.weekKey) ?? { income: 0, expense: 0 };
+    if (row.type === 'income') entry.income = row.total;
+    else entry.expense = row.total;
+    totalsByWeek.set(row.weekKey, entry);
+  }
+
+  return ranges.map((range) => {
+    const totals = totalsByWeek.get(range.weekKey) ?? { income: 0, expense: 0 };
+    return { monthKey: range.weekKey, label: range.label, income: totals.income, expense: totals.expense };
   });
 }
 

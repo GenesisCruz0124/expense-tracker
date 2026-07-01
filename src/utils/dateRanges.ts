@@ -91,6 +91,27 @@ export function lastMonthRanges(anchor: Date, count: number): MonthRange[] {
   return ranges;
 }
 
+export interface WeekRange extends DateRange {
+  /** 'YYYY-MM-DD' of the week's Monday — used as the bucket key for weekly trend queries. */
+  weekKey: string;
+}
+
+/** Builds the last `count` week ranges (Mon–Sun) ending with the week containing `anchor`, oldest first. */
+export function lastWeekRanges(anchor: Date, count: number): WeekRange[] {
+  const ranges: WeekRange[] = [];
+  for (let i = count - 1; i >= 0; i -= 1) {
+    const weekStart = startOfWeek(subWeeks(anchor, i), { weekStartsOn: 1 });
+    const weekEnd = endOfWeek(subWeeks(anchor, i), { weekStartsOn: 1 });
+    ranges.push({
+      weekKey: format(weekStart, ISO_DATE_FORMAT),
+      start: format(weekStart, ISO_DATE_FORMAT),
+      end: format(weekEnd, ISO_DATE_FORMAT),
+      label: format(weekStart, 'MMM d'),
+    });
+  }
+  return ranges;
+}
+
 export function formatIsoDate(date: Date): string {
   return format(date, ISO_DATE_FORMAT);
 }

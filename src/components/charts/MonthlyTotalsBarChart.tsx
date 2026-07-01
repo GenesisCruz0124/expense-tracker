@@ -12,7 +12,9 @@ interface Props {
 }
 
 function shortLabel(label: string): string {
-  return label.split(' ')[0]?.slice(0, 3) ?? label;
+  // Monthly "June 2026" -> "Jun"; weekly "Jun 23" already short, use as-is
+  if (/\d{4}/.test(label)) return label.split(' ')[0]?.slice(0, 3) ?? label;
+  return label;
 }
 
 /** Grouped income/expense bars per month — an alternate view of the same trend data as a line chart. */

@@ -5,16 +5,18 @@ import { useDatabase } from '../context/DatabaseProvider';
 import {
   categoryBreakdown,
   incomeVsExpenseTrend,
+  incomeVsExpenseTrendWeekly,
   monthlyTotals,
   type CategoryBreakdownEntry,
   type MonthlyTotals,
   type MonthlyTrendEntry,
 } from '../db/queries/reports';
-import { lastMonthRanges, type DateRange } from '../utils/dateRanges';
+import { lastMonthRanges, lastWeekRanges, type DateRange } from '../utils/dateRanges';
 
 export type ReportKind = 'expense' | 'income';
+export type TrendPeriod = 'monthly' | 'weekly';
 
-export function useReportsData(range: DateRange, monthsBack: number = 6) {
+export function useReportsData(range: DateRange, monthsBack: number = 6, trendPeriod: TrendPeriod = 'monthly') {
   const { db, refreshSignal } = useDatabase();
   const [breakdownKind, setBreakdownKind] = useState<ReportKind>('expense');
   const [categoryData, setCategoryData] = useState<CategoryBreakdownEntry[]>([]);
@@ -25,10 +27,13 @@ export function useReportsData(range: DateRange, monthsBack: number = 6) {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const ranges = lastMonthRanges(new Date(), monthsBack);
+      const monthRanges = lastMonthRanges(new Date(), monthsBack);
+      const weekRanges = lastWeekRanges(new Date(), 8);
       const [breakdown, trendData, totalsData] = await Promise.all([
         categoryBreakdown(db, breakdownKind, range),
-        incomeVsExpenseTrend(db, ranges),
+        trendPeriod === 'weekly'
+          ? incomeVsExpenseTrendWeekly(db, weekRanges)
+          : incomeVsExpenseTrend(db, monthRanges),
         monthlyTotals(db, range),
       ]);
       setCategoryData(breakdown);
@@ -38,7 +43,7 @@ export function useReportsData(range: DateRange, monthsBack: number = 6) {
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [db, range.start, range.end, monthsBack, breakdownKind]);
+  }, [db, range.start, range.end, monthsBack, breakdownKind, trendPeriod]);
 
   useFocusEffect(
     useCallback(() => {

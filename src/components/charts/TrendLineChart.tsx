@@ -12,8 +12,9 @@ interface Props {
 }
 
 function shortLabel(label: string): string {
-  // "June 2026" -> "Jun"
-  return label.split(' ')[0]?.slice(0, 3) ?? label;
+  // Monthly "June 2026" -> "Jun"; weekly "Jun 23" already short, use as-is
+  if (/\d{4}/.test(label)) return label.split(' ')[0]?.slice(0, 3) ?? label;
+  return label;
 }
 
 export function TrendLineChart({ entries }: Props) {

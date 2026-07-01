@@ -12,7 +12,7 @@ import { MonthSelector } from '../components/MonthSelector';
 import { PeriodTypeSelector } from '../components/PeriodTypeSelector';
 import { SummaryCard } from '../components/SummaryCard';
 import { PALETTE } from '../constants/colors';
-import { useReportsData, type ReportKind } from '../hooks/useReportsData';
+import { useReportsData, type ReportKind, type TrendPeriod } from '../hooks/useReportsData';
 import {
   customRangeFor,
   dayRangeFor,
@@ -44,6 +44,7 @@ export default function ReportsScreen() {
   const [customRange, setCustomRange] = useState(() => ({ start: new Date(), end: new Date() }));
   const [breakdownView, setBreakdownView] = useState<BreakdownView>('pie');
   const [trendView, setTrendView] = useState<TrendView>('line');
+  const [trendPeriod, setTrendPeriod] = useState<TrendPeriod>('monthly');
 
   const range =
     period === 'custom'
@@ -70,7 +71,7 @@ export default function ReportsScreen() {
     });
   }
 
-  const { categoryData, trend, totals, breakdownKind, setBreakdownKind } = useReportsData(range, 6);
+  const { categoryData, trend, totals, breakdownKind, setBreakdownKind } = useReportsData(range, 6, trendPeriod);
   const net = totals.income - totals.expense;
 
   return (
@@ -165,11 +166,26 @@ export default function ReportsScreen() {
 
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Income vs. expense (6 months)</Text>
+          <Text style={styles.sectionTitle}>
+            {trendPeriod === 'weekly' ? 'Income vs. expense (8 weeks)' : 'Income vs. expense (6 months)'}
+          </Text>
           <View style={styles.segmented}>
             <SegmentButton label="Line" active={trendView === 'line'} onPress={() => setTrendView('line')} />
             <SegmentButton label="Bar" active={trendView === 'bar'} onPress={() => setTrendView('bar')} />
           </View>
+        </View>
+        <View style={styles.kindToggle}>
+          {(['monthly', 'weekly'] as TrendPeriod[]).map((p) => (
+            <Pressable
+              key={p}
+              onPress={() => setTrendPeriod(p)}
+              style={[styles.kindChip, trendPeriod === p && styles.kindChipSelected]}
+            >
+              <Text style={[styles.kindChipText, trendPeriod === p && styles.kindChipTextSelected]}>
+                {p === 'monthly' ? 'Monthly' : 'Weekly'}
+              </Text>
+            </Pressable>
+          ))}
         </View>
         {trendView === 'line' ? <TrendLineChart entries={trend} /> : <MonthlyTotalsBarChart entries={trend} />}
       </View>
