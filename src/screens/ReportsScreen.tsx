@@ -71,7 +71,7 @@ export default function ReportsScreen() {
     });
   }
 
-  const { categoryData, trend, totals, breakdownKind, setBreakdownKind } = useReportsData(range, 4, trendPeriod);
+  const { categoryData, trend, totals, breakdownKind, setBreakdownKind } = useReportsData(range, 8, trendPeriod);
   const net = totals.income - totals.expense;
 
   return (
@@ -167,7 +167,7 @@ export default function ReportsScreen() {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>
-            {trendPeriod === 'daily' ? 'Income vs. expense (4 days)' : trendPeriod === 'weekly' ? 'Income vs. expense (4 weeks)' : 'Income vs. expense (4 months)'}
+            {trendPeriod === 'daily' ? 'Income vs. expense (8 days)' : trendPeriod === 'weekly' ? 'Income vs. expense (8 weeks)' : 'Income vs. expense (8 months)'}
           </Text>
           <View style={styles.segmented}>
             <SegmentButton label="Line" active={trendView === 'line'} onPress={() => setTrendView('line')} />

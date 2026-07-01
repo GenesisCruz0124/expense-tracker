@@ -28,9 +28,9 @@ export function useReportsData(range: DateRange, monthsBack: number = 6, trendPe
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const monthRanges = lastMonthRanges(new Date(), 4);
-      const weekRanges = lastWeekRanges(new Date(), 4);
-      const dayRanges = lastDayRanges(new Date(), 4);
+      const monthRanges = lastMonthRanges(new Date(), 8);
+      const weekRanges = lastWeekRanges(new Date(), 8);
+      const dayRanges = lastDayRanges(new Date(), 8);
       const [breakdown, trendData, totalsData] = await Promise.all([
         categoryBreakdown(db, breakdownKind, range),
         trendPeriod === 'daily'
