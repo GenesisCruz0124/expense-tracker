@@ -102,7 +102,7 @@ export function lastDayRanges(anchor: Date, count: number): DayRange[] {
   for (let i = count - 1; i >= 0; i -= 1) {
     const day = subDays(anchor, i);
     const iso = format(day, ISO_DATE_FORMAT);
-    ranges.push({ dayKey: iso, start: iso, end: iso, label: format(day, 'MMM d') });
+    ranges.push({ dayKey: iso, start: iso, end: iso, label: format(day, 'MM/dd') });
   }
   return ranges;
 }
@@ -122,7 +122,7 @@ export function lastWeekRanges(anchor: Date, count: number): WeekRange[] {
       weekKey: format(weekStart, ISO_DATE_FORMAT),
       start: format(weekStart, ISO_DATE_FORMAT),
       end: format(weekEnd, ISO_DATE_FORMAT),
-      label: format(weekStart, 'MMM d'),
+      label: format(weekStart, "'W'II"),
     });
   }
   return ranges;
