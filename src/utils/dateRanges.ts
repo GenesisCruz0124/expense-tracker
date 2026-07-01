@@ -91,6 +91,22 @@ export function lastMonthRanges(anchor: Date, count: number): MonthRange[] {
   return ranges;
 }
 
+export interface DayRange extends DateRange {
+  /** 'YYYY-MM-DD' of the day — used as the bucket key for daily trend queries. */
+  dayKey: string;
+}
+
+/** Builds the last `count` day ranges ending with (and including) `anchor`, oldest first. */
+export function lastDayRanges(anchor: Date, count: number): DayRange[] {
+  const ranges: DayRange[] = [];
+  for (let i = count - 1; i >= 0; i -= 1) {
+    const day = subDays(anchor, i);
+    const iso = format(day, ISO_DATE_FORMAT);
+    ranges.push({ dayKey: iso, start: iso, end: iso, label: format(day, 'MMM d') });
+  }
+  return ranges;
+}
+
 export interface WeekRange extends DateRange {
   /** 'YYYY-MM-DD' of the week's Monday — used as the bucket key for weekly trend queries. */
   weekKey: string;

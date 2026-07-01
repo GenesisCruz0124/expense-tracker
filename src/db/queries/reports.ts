@@ -2,7 +2,7 @@ import { and, between, eq, isNull, sql } from 'drizzle-orm';
 
 import type { Database } from '../client';
 import { categories, transactions } from '../schema';
-import type { MonthRange, WeekRange } from '../../utils/dateRanges';
+import type { DayRange, MonthRange, WeekRange } from '../../utils/dateRanges';
 
 export interface CategoryBreakdownEntry {
   categoryId: number | null;
@@ -131,6 +131,44 @@ export async function incomeVsExpenseTrendWeekly(db: Database, ranges: WeekRange
   return ranges.map((range) => {
     const totals = totalsByWeek.get(range.weekKey) ?? { income: 0, expense: 0 };
     return { monthKey: range.weekKey, label: range.label, income: totals.income, expense: totals.expense };
+  });
+}
+
+/** Income vs. expense totals per day — backs the daily trend chart. Returns `MonthlyTrendEntry[]` since charts only need label/income/expense. */
+export async function incomeVsExpenseTrendDaily(db: Database, ranges: DayRange[]): Promise<MonthlyTrendEntry[]> {
+  if (ranges.length === 0) return [];
+
+  const overallStart = ranges[0].start;
+  const overallEnd = ranges[ranges.length - 1].end;
+  const dayKeyExpr = sql<string>`strftime('%Y-%m-%d', ${transactions.occurredAt})`;
+
+  const rows = await db
+    .select({
+      dayKey: dayKeyExpr,
+      type: transactions.type,
+      total: sql<number>`coalesce(sum(${transactions.amount}), 0)`,
+    })
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.excludeFromExpense, false),
+        between(transactions.occurredAt, overallStart, overallEnd),
+        isNull(transactions.deletedAt),
+      ),
+    )
+    .groupBy(dayKeyExpr, transactions.type);
+
+  const totalsByDay = new Map<string, { income: number; expense: number }>();
+  for (const row of rows) {
+    const entry = totalsByDay.get(row.dayKey) ?? { income: 0, expense: 0 };
+    if (row.type === 'income') entry.income = row.total;
+    else entry.expense = row.total;
+    totalsByDay.set(row.dayKey, entry);
+  }
+
+  return ranges.map((range) => {
+    const totals = totalsByDay.get(range.dayKey) ?? { income: 0, expense: 0 };
+    return { monthKey: range.dayKey, label: range.label, income: totals.income, expense: totals.expense };
   });
 }
 

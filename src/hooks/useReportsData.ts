@@ -5,16 +5,17 @@ import { useDatabase } from '../context/DatabaseProvider';
 import {
   categoryBreakdown,
   incomeVsExpenseTrend,
+  incomeVsExpenseTrendDaily,
   incomeVsExpenseTrendWeekly,
   monthlyTotals,
   type CategoryBreakdownEntry,
   type MonthlyTotals,
   type MonthlyTrendEntry,
 } from '../db/queries/reports';
-import { lastMonthRanges, lastWeekRanges, type DateRange } from '../utils/dateRanges';
+import { lastDayRanges, lastMonthRanges, lastWeekRanges, type DateRange } from '../utils/dateRanges';
 
 export type ReportKind = 'expense' | 'income';
-export type TrendPeriod = 'monthly' | 'weekly';
+export type TrendPeriod = 'daily' | 'weekly' | 'monthly';
 
 export function useReportsData(range: DateRange, monthsBack: number = 6, trendPeriod: TrendPeriod = 'monthly') {
   const { db, refreshSignal } = useDatabase();
@@ -29,11 +30,14 @@ export function useReportsData(range: DateRange, monthsBack: number = 6, trendPe
     try {
       const monthRanges = lastMonthRanges(new Date(), monthsBack);
       const weekRanges = lastWeekRanges(new Date(), 8);
+      const dayRanges = lastDayRanges(new Date(), 30);
       const [breakdown, trendData, totalsData] = await Promise.all([
         categoryBreakdown(db, breakdownKind, range),
-        trendPeriod === 'weekly'
-          ? incomeVsExpenseTrendWeekly(db, weekRanges)
-          : incomeVsExpenseTrend(db, monthRanges),
+        trendPeriod === 'daily'
+          ? incomeVsExpenseTrendDaily(db, dayRanges)
+          : trendPeriod === 'weekly'
+            ? incomeVsExpenseTrendWeekly(db, weekRanges)
+            : incomeVsExpenseTrend(db, monthRanges),
         monthlyTotals(db, range),
       ]);
       setCategoryData(breakdown);

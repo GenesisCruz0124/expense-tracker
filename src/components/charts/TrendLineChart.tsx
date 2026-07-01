@@ -24,6 +24,7 @@ export function TrendLineChart({ entries }: Props) {
 
   const incomeData = entries.map((entry) => ({ value: fromMinorUnits(entry.income), label: shortLabel(entry.label) }));
   const expenseData = entries.map((entry) => ({ value: fromMinorUnits(entry.expense) }));
+  const spacing = entries.length >= 20 ? 22 : entries.length >= 10 ? 36 : 48;
 
   return (
     <View>
@@ -56,7 +57,7 @@ export function TrendLineChart({ entries }: Props) {
           xAxisLabelTextStyle={{ color: PALETTE.textSecondary, fontSize: 10 }}
           curved
           isAnimated
-          spacing={48}
+          spacing={spacing}
           initialSpacing={16}
         />
       </View>

@@ -23,6 +23,10 @@ export function MonthlyTotalsBarChart({ entries }: Props) {
     return <EmptyState icon="📊" title="Nothing to show yet" message="Log income and expenses to see your monthly totals." />;
   }
 
+  const compact = entries.length >= 20;
+  const barWidth = compact ? 8 : 14;
+  const outerSpacing = compact ? 6 : 18;
+
   const data = entries.flatMap((entry, index) => [
     {
       value: fromMinorUnits(entry.income),
@@ -33,7 +37,7 @@ export function MonthlyTotalsBarChart({ entries }: Props) {
     {
       value: fromMinorUnits(entry.expense),
       frontColor: PALETTE.expense,
-      spacing: index === entries.length - 1 ? 0 : 18,
+      spacing: index === entries.length - 1 ? 0 : outerSpacing,
     },
   ]);
 
@@ -41,7 +45,7 @@ export function MonthlyTotalsBarChart({ entries }: Props) {
     <View style={styles.chartWrap}>
       <BarChart
         data={data}
-        barWidth={14}
+        barWidth={barWidth}
         roundedTop
         noOfSections={4}
         yAxisThickness={0}

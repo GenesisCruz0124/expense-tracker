@@ -167,7 +167,7 @@ export default function ReportsScreen() {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>
-            {trendPeriod === 'weekly' ? 'Income vs. expense (8 weeks)' : 'Income vs. expense (6 months)'}
+            {trendPeriod === 'daily' ? 'Income vs. expense (30 days)' : trendPeriod === 'weekly' ? 'Income vs. expense (8 weeks)' : 'Income vs. expense (6 months)'}
           </Text>
           <View style={styles.segmented}>
             <SegmentButton label="Line" active={trendView === 'line'} onPress={() => setTrendView('line')} />
@@ -175,14 +175,14 @@ export default function ReportsScreen() {
           </View>
         </View>
         <View style={styles.kindToggle}>
-          {(['monthly', 'weekly'] as TrendPeriod[]).map((p) => (
+          {(['daily', 'weekly', 'monthly'] as TrendPeriod[]).map((p) => (
             <Pressable
               key={p}
               onPress={() => setTrendPeriod(p)}
               style={[styles.kindChip, trendPeriod === p && styles.kindChipSelected]}
             >
               <Text style={[styles.kindChipText, trendPeriod === p && styles.kindChipTextSelected]}>
-                {p === 'monthly' ? 'Monthly' : 'Weekly'}
+                {p === 'daily' ? 'Daily' : p === 'weekly' ? 'Weekly' : 'Monthly'}
               </Text>
             </Pressable>
           ))}
