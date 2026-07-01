@@ -17,7 +17,7 @@ import { lastDayRanges, lastMonthRanges, lastWeekRanges, type DateRange } from '
 export type ReportKind = 'expense' | 'income';
 export type TrendPeriod = 'daily' | 'weekly' | 'monthly';
 
-export function useReportsData(range: DateRange, monthsBack: number = 6, trendPeriod: TrendPeriod = 'monthly') {
+export function useReportsData(range: DateRange, monthsBack: number = 8, trendPeriod: TrendPeriod = 'monthly', periodCount: number = 8) {
   const { db, refreshSignal } = useDatabase();
   const [breakdownKind, setBreakdownKind] = useState<ReportKind>('expense');
   const [categoryData, setCategoryData] = useState<CategoryBreakdownEntry[]>([]);
@@ -28,9 +28,9 @@ export function useReportsData(range: DateRange, monthsBack: number = 6, trendPe
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const monthRanges = lastMonthRanges(new Date(), 8);
-      const weekRanges = lastWeekRanges(new Date(), 8);
-      const dayRanges = lastDayRanges(new Date(), 8);
+      const monthRanges = lastMonthRanges(new Date(), periodCount);
+      const weekRanges = lastWeekRanges(new Date(), periodCount);
+      const dayRanges = lastDayRanges(new Date(), periodCount);
       const [breakdown, trendData, totalsData] = await Promise.all([
         categoryBreakdown(db, breakdownKind, range),
         trendPeriod === 'daily'
@@ -47,7 +47,7 @@ export function useReportsData(range: DateRange, monthsBack: number = 6, trendPe
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [db, range.start, range.end, monthsBack, breakdownKind, trendPeriod]);
+  }, [db, range.start, range.end, monthsBack, breakdownKind, trendPeriod, periodCount]);
 
   useFocusEffect(
     useCallback(() => {

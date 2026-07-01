@@ -45,6 +45,7 @@ export default function ReportsScreen() {
   const [breakdownView, setBreakdownView] = useState<BreakdownView>('pie');
   const [trendView, setTrendView] = useState<TrendView>('line');
   const [trendPeriod, setTrendPeriod] = useState<TrendPeriod>('monthly');
+  const [periodCount, setPeriodCount] = useState(8);
 
   const range =
     period === 'custom'
@@ -71,7 +72,7 @@ export default function ReportsScreen() {
     });
   }
 
-  const { categoryData, trend, totals, breakdownKind, setBreakdownKind } = useReportsData(range, 8, trendPeriod);
+  const { categoryData, trend, totals, breakdownKind, setBreakdownKind } = useReportsData(range, 8, trendPeriod, periodCount);
   const net = totals.income - totals.expense;
 
   return (
@@ -167,25 +168,44 @@ export default function ReportsScreen() {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>
-            {trendPeriod === 'daily' ? 'Income vs. expense (8 days)' : trendPeriod === 'weekly' ? 'Income vs. expense (8 weeks)' : 'Income vs. expense (8 months)'}
+            {`Income vs. expense (${periodCount} ${trendPeriod === 'daily' ? 'days' : trendPeriod === 'weekly' ? 'weeks' : 'months'})`}
           </Text>
           <View style={styles.segmented}>
             <SegmentButton label="Line" active={trendView === 'line'} onPress={() => setTrendView('line')} />
             <SegmentButton label="Bar" active={trendView === 'bar'} onPress={() => setTrendView('bar')} />
           </View>
         </View>
-        <View style={styles.kindToggle}>
-          {(['daily', 'weekly', 'monthly'] as TrendPeriod[]).map((p) => (
+        <View style={styles.trendControls}>
+          <View style={styles.kindToggle}>
+            {(['daily', 'weekly', 'monthly'] as TrendPeriod[]).map((p) => (
+              <Pressable
+                key={p}
+                onPress={() => setTrendPeriod(p)}
+                style={[styles.kindChip, trendPeriod === p && styles.kindChipSelected]}
+              >
+                <Text style={[styles.kindChipText, trendPeriod === p && styles.kindChipTextSelected]}>
+                  {p === 'daily' ? 'Daily' : p === 'weekly' ? 'Weekly' : 'Monthly'}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <View style={styles.stepper}>
             <Pressable
-              key={p}
-              onPress={() => setTrendPeriod(p)}
-              style={[styles.kindChip, trendPeriod === p && styles.kindChipSelected]}
+              style={styles.stepperButton}
+              onPress={() => setPeriodCount((n) => Math.max(1, n - 1))}
+              hitSlop={8}
             >
-              <Text style={[styles.kindChipText, trendPeriod === p && styles.kindChipTextSelected]}>
-                {p === 'daily' ? 'Daily' : p === 'weekly' ? 'Weekly' : 'Monthly'}
-              </Text>
+              <Text style={styles.stepperButtonText}>−</Text>
             </Pressable>
-          ))}
+            <Text style={styles.stepperCount}>{periodCount}</Text>
+            <Pressable
+              style={styles.stepperButton}
+              onPress={() => setPeriodCount((n) => Math.min(24, n + 1))}
+              hitSlop={8}
+            >
+              <Text style={styles.stepperButtonText}>+</Text>
+            </Pressable>
+          </View>
         </View>
         {trendView === 'line' ? <TrendLineChart entries={trend} /> : <MonthlyTotalsBarChart entries={trend} />}
       </View>
@@ -207,7 +227,21 @@ const styles = StyleSheet.create({
   segmentButtonActive: { backgroundColor: PALETTE.net },
   segmentButtonText: { fontSize: 12, fontWeight: '600', color: PALETTE.textSecondary },
   segmentButtonTextActive: { color: '#fff' },
+  trendControls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   kindToggle: { flexDirection: 'row', gap: 8 },
+  stepper: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  stepperButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: PALETTE.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepperButtonText: { fontSize: 16, fontWeight: '600', color: PALETTE.textPrimary, lineHeight: 20 },
+  stepperCount: { fontSize: 14, fontWeight: '700', color: PALETTE.textPrimary, minWidth: 20, textAlign: 'center' },
   kindChip: {
     paddingVertical: 6,
     paddingHorizontal: 14,
