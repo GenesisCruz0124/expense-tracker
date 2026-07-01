@@ -39,13 +39,14 @@ type AccountsScreenNavigationProp = CompositeNavigationProp<
 
 const AMOUNT_MASK = '••••••';
 
-type SortOption = 'name_asc' | 'name_desc' | 'balance_desc' | 'balance_asc';
+type SortOption = 'name_asc' | 'name_desc' | 'balance_desc' | 'balance_asc' | 'recent';
 
 const SORT_LABELS: Record<SortOption, string> = {
   name_asc: 'Name (A–Z)',
   name_desc: 'Name (Z–A)',
   balance_desc: 'Balance (high to low)',
   balance_asc: 'Balance (low to high)',
+  recent: 'Recent',
 };
 
 function sortAccounts(accounts: AccountWithBalance[], sort: SortOption): AccountWithBalance[] {
@@ -59,6 +60,13 @@ function sortAccounts(accounts: AccountWithBalance[], sort: SortOption): Account
       return sorted.sort((a, b) => b.balance - a.balance);
     case 'balance_asc':
       return sorted.sort((a, b) => a.balance - b.balance);
+    case 'recent':
+      return sorted.sort((a, b) => {
+        if (!a.lastTransactionAt && !b.lastTransactionAt) return 0;
+        if (!a.lastTransactionAt) return 1;
+        if (!b.lastTransactionAt) return -1;
+        return b.lastTransactionAt.localeCompare(a.lastTransactionAt);
+      });
   }
 }
 

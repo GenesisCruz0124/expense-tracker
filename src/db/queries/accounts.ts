@@ -12,6 +12,8 @@ export interface AccountWithBalance extends Account {
    * represents the amount owed, so expenses (purchases) add and income (payments/refunds) subtract.
    */
   balance: number;
+  /** ISO datetime of the most recent transaction on this account, or null if the account has no transactions. */
+  lastTransactionAt: string | null;
 }
 
 export interface ListAccountsOptions {
@@ -115,6 +117,7 @@ export async function getAccountWithBalance(db: Database, id: number): Promise<A
       deletedAt: accounts.deletedAt,
       uuid: accounts.uuid,
       balance: balanceExpr,
+      lastTransactionAt: lastTransactionAtExpr,
     })
     .from(accounts)
     .leftJoin(transactions, eq(transactions.accountId, accounts.id))
