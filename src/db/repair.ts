@@ -18,6 +18,7 @@ const ACCOUNT_COLUMNS: AccountColumnSpec[] = [
   { name: 'monthly_due_last_paid_month', type: 'text' },
   { name: 'monthly_contribution', type: 'integer' },
   { name: 'balance_last_updated_at', type: 'text' },
+  { name: 'subscription_due_day', type: 'integer' },
 ];
 
 /** Adds back any of `ACCOUNT_COLUMNS` that are missing from the `accounts` table, regardless of migration history. */

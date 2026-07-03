@@ -18,6 +18,12 @@ import { formatCurrency, fromMinorUnits, toMinorUnits } from '../utils/currency'
 import { formatDisplayDate, formatIsoDate, monthKeyFor } from '../utils/dateRanges';
 import type { RootStackParamList } from '../navigation/types';
 
+function ordinal(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] ?? s[v] ?? s[0]);
+}
+
 export default function AddEditAccountScreen() {
   const navigation = useNavigation();
   const route = useRoute<RouteProp<RootStackParamList, 'AddEditAccount'>>();
@@ -48,6 +54,7 @@ export default function AddEditAccountScreen() {
   const [monthlyContributionText, setMonthlyContributionText] = useState('');
   const [balanceLastUpdatedAt, setBalanceLastUpdatedAt] = useState<string | null>(null);
   const [totalMonths, setTotalMonths] = useState(0);
+  const [subscriptionDueDay, setSubscriptionDueDay] = useState<number | null>(null);
   const [transactionEffect, setTransactionEffect] = useState(0);
   const [loading, setLoading] = useState(isEditing);
   const [saving, setSaving] = useState(false);
@@ -80,6 +87,7 @@ export default function AddEditAccountScreen() {
       setMonthlyContributionText(existing.monthlyContribution != null ? String(fromMinorUnits(existing.monthlyContribution)) : '');
       setBalanceLastUpdatedAt(existing.balanceLastUpdatedAt ?? null);
       setTotalMonths(existing.totalMonths ?? 0);
+      setSubscriptionDueDay(existing.subscriptionDueDay ?? null);
       setTransactionEffect(existing.balance - existing.startingBalance);
       setLoading(false);
     })();
@@ -149,6 +157,7 @@ export default function AddEditAccountScreen() {
         creditLimit,
         linkedCreditCardId: isCreditCardKind ? linkedCreditCardId : null,
         remainingMonths: isCreditCardKind ? remainingMonths : null,
+        subscriptionDueDay: isCreditCardKind ? subscriptionDueDay : null,
         monthlyContribution,
         balanceLastUpdatedAt,
       };
@@ -304,6 +313,36 @@ export default function AddEditAccountScreen() {
               <Text style={styles.stepperButtonText}>+</Text>
             </Pressable>
             <Text style={styles.stepperUnit}>{remainingMonths === 1 ? 'month left' : 'months left'}</Text>
+          </View>
+        </View>
+      ) : null}
+
+      {isCreditCardKind ? (
+        <View style={styles.field}>
+          <Text style={styles.label}>Due day (optional)</Text>
+          <View style={styles.stepperRow}>
+            <Pressable
+              style={styles.stepperButton}
+              onPress={() => setSubscriptionDueDay((d) => (d != null && d > 1 ? d - 1 : d))}
+              disabled={subscriptionDueDay == null || subscriptionDueDay <= 1}
+            >
+              <Text style={styles.stepperButtonText}>−</Text>
+            </Pressable>
+            <Text style={styles.stepperValue}>{subscriptionDueDay != null ? subscriptionDueDay : '—'}</Text>
+            <Pressable
+              style={styles.stepperButton}
+              onPress={() => setSubscriptionDueDay((d) => (d != null ? Math.min(31, d + 1) : 1))}
+            >
+              <Text style={styles.stepperButtonText}>+</Text>
+            </Pressable>
+            <Text style={styles.stepperUnit}>
+              {subscriptionDueDay != null ? `${ordinal(subscriptionDueDay)} of each month` : 'not set'}
+            </Text>
+            {subscriptionDueDay != null ? (
+              <Pressable onPress={() => setSubscriptionDueDay(null)} hitSlop={8}>
+                <Text style={styles.pickerRowClear}>✕</Text>
+              </Pressable>
+            ) : null}
           </View>
         </View>
       ) : null}

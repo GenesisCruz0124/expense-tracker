@@ -68,6 +68,8 @@ export const accounts = sqliteTable(
     monthlyAmountDue: integer('monthly_amount_due'),
     /** Number of monthly payments left — shown for credit-card-kind accounts (credit cards, loans). */
     remainingMonths: integer('remaining_months'),
+    /** Day of the month (1–31) when the subscription renews — shown for subscription accounts. */
+    subscriptionDueDay: integer('subscription_due_day'),
     /** 'YYYY-MM' of the month whose monthly due was last marked as paid. */
     monthlyDueLastPaidMonth: text('monthly_due_last_paid_month'),
     /** Amount added to the balance on each manual update — shown for investment-kind accounts. */

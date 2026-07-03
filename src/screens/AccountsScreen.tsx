@@ -18,6 +18,12 @@ import type { AccountsStackParamList, RootStackParamList } from '../navigation/t
 
 const COLLAPSED_GROUPS_KEY = 'accountsCollapsedGroups';
 const SELECTED_CATEGORY_IDS_KEY = 'accountsSelectedCategoryIds';
+
+function accountOrdinal(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] ?? s[v] ?? s[0]);
+}
 const NET_WORTH_FILTER_KEY = 'accountsNetWorthFilter';
 
 type NetWorthFilter = 'all' | 'included' | 'excluded';
@@ -392,6 +398,9 @@ export default function AccountsScreen() {
                       return `${formatCurrency(item.creditLimit)} limit · ${formatCurrency(avail)} avail.`;
                     })()}
                   </Text>
+                ) : null}
+                {item.subscriptionDueDay != null ? (
+                  <Text style={styles.cardMeta}>Due: {accountOrdinal(item.subscriptionDueDay)} of month</Text>
                 ) : null}
               </View>
               <Text style={[styles.cardBalance, item.balance < 0 && styles.negative]}>

@@ -52,6 +52,7 @@ export async function listAccounts(db: Database, options: ListAccountsOptions = 
       includeInNetWorth: accounts.includeInNetWorth,
       monthlyAmountDue: accounts.monthlyAmountDue,
       remainingMonths: accounts.remainingMonths,
+      subscriptionDueDay: accounts.subscriptionDueDay,
       monthlyDueLastPaidMonth: accounts.monthlyDueLastPaidMonth,
       monthlyContribution: accounts.monthlyContribution,
       balanceLastUpdatedAt: accounts.balanceLastUpdatedAt,
@@ -106,6 +107,7 @@ export async function getAccountWithBalance(db: Database, id: number): Promise<A
       includeInNetWorth: accounts.includeInNetWorth,
       monthlyAmountDue: accounts.monthlyAmountDue,
       remainingMonths: accounts.remainingMonths,
+      subscriptionDueDay: accounts.subscriptionDueDay,
       monthlyDueLastPaidMonth: accounts.monthlyDueLastPaidMonth,
       monthlyContribution: accounts.monthlyContribution,
       balanceLastUpdatedAt: accounts.balanceLastUpdatedAt,
@@ -152,6 +154,8 @@ export interface AccountInput {
   creditLimit?: number | null;
   /** For loan accounts: the credit card account ID this loan is charged against. */
   linkedCreditCardId?: number | null;
+  /** Day of the month (1–31) when the subscription renews — for subscription accounts. */
+  subscriptionDueDay?: number | null;
 }
 
 export async function createAccount(db: Database, input: AccountInput): Promise<Account> {
@@ -171,6 +175,7 @@ export async function createAccount(db: Database, input: AccountInput): Promise<
     totalMonths: input.totalMonths ?? 0,
     creditLimit: input.creditLimit ?? null,
     linkedCreditCardId: input.linkedCreditCardId ?? null,
+    subscriptionDueDay: input.subscriptionDueDay ?? null,
     uuid: generateUuid(),
   };
   const [row] = await db.insert(accounts).values(values).returning();
@@ -196,6 +201,7 @@ export async function updateAccount(db: Database, id: number, input: AccountInpu
       ...(input.totalMonths != null ? { totalMonths: input.totalMonths } : {}),
       creditLimit: input.creditLimit ?? null,
       linkedCreditCardId: input.linkedCreditCardId ?? null,
+      subscriptionDueDay: input.subscriptionDueDay ?? null,
       updatedAt: sql`(datetime('now'))`,
     })
     .where(eq(accounts.id, id));

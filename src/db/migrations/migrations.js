@@ -34,6 +34,7 @@ import m0029 from './0029_bill_last_paid_at.sql';
 import m0030 from './0030_bill_to_account.sql';
 import m0031 from './0031_sync_metadata_columns.sql';
 import m0032 from './0032_table_uuids.sql';
+import m0033 from './0033_account_subscription_due_day.sql';
 
   export default {
     journal,
@@ -70,7 +71,8 @@ m0028,
 m0029,
 m0030,
 m0031,
-m0032
+m0032,
+m0033
     }
   }
   
