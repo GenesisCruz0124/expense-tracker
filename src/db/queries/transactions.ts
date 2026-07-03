@@ -160,33 +160,35 @@ export async function createTransfer(db: Database, input: TransferInput): Promis
     receiptImageUri: input.receiptImageUri ?? null,
   };
 
-  const [fromTransaction] = await db
-    .insert(transactions)
-    .values({
-      ...shared,
-      type: 'expense',
-      accountId: input.fromAccountId,
-      fee: input.fee ?? 0,
-      excludeFromExpense: !input.includeAsExpense,
-      categoryId: input.includeAsExpense ? input.categoryId ?? null : null,
-      uuid: generateUuid(),
-    })
-    .returning();
-  const [toTransaction] = await db
-    .insert(transactions)
-    .values({
-      ...shared,
-      type: 'income',
-      accountId: input.toAccountId,
-      transferId: fromTransaction.id,
-      excludeFromExpense: true,
-      categoryId: null,
-      uuid: generateUuid(),
-    })
-    .returning();
-  await db.update(transactions).set({ transferId: fromTransaction.id }).where(eq(transactions.id, fromTransaction.id));
+  return db.transaction(async (tx) => {
+    const [fromTransaction] = await tx
+      .insert(transactions)
+      .values({
+        ...shared,
+        type: 'expense',
+        accountId: input.fromAccountId,
+        fee: input.fee ?? 0,
+        excludeFromExpense: !input.includeAsExpense,
+        categoryId: input.includeAsExpense ? input.categoryId ?? null : null,
+        uuid: generateUuid(),
+      })
+      .returning();
+    const [toTransaction] = await tx
+      .insert(transactions)
+      .values({
+        ...shared,
+        type: 'income',
+        accountId: input.toAccountId,
+        transferId: fromTransaction.id,
+        excludeFromExpense: true,
+        categoryId: null,
+        uuid: generateUuid(),
+      })
+      .returning();
+    await tx.update(transactions).set({ transferId: fromTransaction.id }).where(eq(transactions.id, fromTransaction.id));
 
-  return { transferId: fromTransaction.id, fromTransaction: { ...fromTransaction, transferId: fromTransaction.id }, toTransaction };
+    return { transferId: fromTransaction.id, fromTransaction: { ...fromTransaction, transferId: fromTransaction.id }, toTransaction };
+  });
 }
 
 /** Fetches both legs of a transfer, identifying the expense (from) and income (to) sides. */
@@ -195,8 +197,19 @@ export async function getTransferLegs(db: Database, transferId: number): Promise
     .select()
     .from(transactions)
     .where(and(eq(transactions.transferId, transferId), isNull(transactions.deletedAt)));
-  const fromTransaction = rows.find((row) => row.type === 'expense');
+  let fromTransaction = rows.find((row) => row.type === 'expense');
   const toTransaction = rows.find((row) => row.type === 'income');
+
+  // Fallback: for legacy transfers where the expense leg has transferId=NULL (UPDATE didn't persist),
+  // the expense leg's id IS the transferId, so look it up directly.
+  if (!fromTransaction) {
+    const [fallback] = await db
+      .select()
+      .from(transactions)
+      .where(and(eq(transactions.id, transferId), isNull(transactions.deletedAt)));
+    if (fallback?.type === 'expense') fromTransaction = fallback;
+  }
+
   if (!fromTransaction || !toTransaction) return undefined;
   return { transferId, fromTransaction, toTransaction };
 }

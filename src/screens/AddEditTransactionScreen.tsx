@@ -52,11 +52,17 @@ export default function AddEditTransactionScreen() {
     let cancelled = false;
     (async () => {
       const existing = await getTransaction(db, transactionId);
-      if (!existing || cancelled) return;
+      if (!existing || cancelled) {
+        setLoading(false);
+        return;
+      }
 
       if (existing.transferId != null) {
         const legs = await getTransferLegs(db, existing.transferId);
-        if (!legs || cancelled) return;
+        if (!legs || cancelled) {
+          setLoading(false);
+          return;
+        }
         setType('transfer');
         setTransferId(legs.transferId);
         setAmountText(String(fromMinorUnits(legs.fromTransaction.amount)));
