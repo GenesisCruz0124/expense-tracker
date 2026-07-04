@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 
@@ -46,6 +46,7 @@ export default function AddEditTransactionScreen() {
   const [loading, setLoading] = useState(isEditing);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const handleSaveRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     if (!isEditing) return;
@@ -96,8 +97,22 @@ export default function AddEditTransactionScreen() {
   }, [db, isEditing, transactionId]);
 
   useEffect(() => {
-    navigation.setOptions({ title: isEditing ? 'Edit transaction' : 'Add transaction' });
-  }, [navigation, isEditing]);
+    navigation.setOptions({
+      title: isEditing ? 'Edit transaction' : 'Add transaction',
+      headerLeft: () => (
+        <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={styles.headerButton}>
+          <Text style={styles.headerButtonCancel}>Cancel</Text>
+        </Pressable>
+      ),
+      headerRight: () => (
+        <Pressable onPress={() => handleSaveRef.current()} disabled={saving} hitSlop={8} style={styles.headerButton}>
+          <Text style={[styles.headerButtonSave, saving && styles.headerButtonDisabled]}>
+            {saving ? 'Saving…' : 'Save'}
+          </Text>
+        </Pressable>
+      ),
+    });
+  }, [navigation, isEditing, saving]);
 
   useEffect(() => {
     listEstablishments(db).then(setEstablishmentSuggestions);
@@ -133,6 +148,7 @@ export default function AddEditTransactionScreen() {
     }
   }
 
+  handleSaveRef.current = handleSave;
   async function handleSave() {
     setError(null);
     const amount = toMinorUnits(amountText);
@@ -398,6 +414,10 @@ export default function AddEditTransactionScreen() {
 }
 
 const styles = StyleSheet.create({
+  headerButton: { paddingHorizontal: 4 },
+  headerButtonCancel: { fontSize: 15, color: '#fff' },
+  headerButtonSave: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  headerButtonDisabled: { opacity: 0.5 },
   screen: { flex: 1, backgroundColor: PALETTE.background },
   content: { padding: 20, gap: 18, paddingBottom: 40 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: PALETTE.background },
