@@ -6,6 +6,7 @@ import { isSameDay, isSameMonth, isSameWeek } from 'date-fns';
 import { CategoryBarChart } from '../components/charts/CategoryBarChart';
 import { CategoryPieChart } from '../components/charts/CategoryPieChart';
 import { MonthlyTotalsBarChart } from '../components/charts/MonthlyTotalsBarChart';
+import { NetWorthLineChart } from '../components/charts/NetWorthLineChart';
 import { TrendLineChart } from '../components/charts/TrendLineChart';
 import { DateField } from '../components/DateField';
 import { MonthSelector } from '../components/MonthSelector';
@@ -208,6 +209,15 @@ export default function ReportsScreen() {
           </View>
         </View>
         {trendView === 'line' ? <TrendLineChart entries={trend} /> : <MonthlyTotalsBarChart entries={trend} />}
+      </View>
+
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>
+            {`Net worth trend (${periodCount} ${trendPeriod === 'daily' ? 'days' : trendPeriod === 'weekly' ? 'weeks' : 'months'})`}
+          </Text>
+        </View>
+        <NetWorthLineChart entries={trend} />
       </View>
     </ScrollView>
   );
