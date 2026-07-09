@@ -1,8 +1,9 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Constants from 'expo-constants';
+import * as LocalAuthentication from 'expo-local-authentication';
 import * as Notifications from 'expo-notifications';
 
 import {
@@ -21,7 +22,7 @@ import { useLicense } from '../context/LicenseProvider';
 import { setPreference } from '../db/themePreferences';
 import { TRIAL_DAYS } from '../utils/license';
 import { deleteAllTransactions } from '../db/queries/transactions';
-import { setSetting } from '../db/queries/settings';
+import { getSetting, setSetting } from '../db/queries/settings';
 import type { MoreStackParamList } from '../navigation/types';
 import { createBackupFile, pickBackupFile, restoreBackupFromFile, shareBackupFile } from '../utils/backup';
 import { formatIsoDate } from '../utils/dateRanges';
@@ -50,10 +51,20 @@ export default function SettingsScreen() {
   const [lastSyncResult, setLastSyncResult] = useState('');
   const [themeMode, setThemeMode] = useState<ThemeMode>(getStoredThemeMode);
   const [accentKey, setAccentKey] = useState<AccentKey>(getStoredAccentKey);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
 
   const refreshStatus = useCallback(() => {
     getNotificationPermissionStatus().then(setStatus);
-  }, []);
+    Promise.all([
+      LocalAuthentication.hasHardwareAsync(),
+      LocalAuthentication.isEnrolledAsync(),
+      getSetting(db, 'biometricLockEnabled'),
+    ]).then(([hasHardware, isEnrolled, stored]) => {
+      setBiometricAvailable(hasHardware && isEnrolled);
+      setBiometricEnabled(stored === 'true');
+    });
+  }, [db]);
 
   useFocusEffect(refreshStatus);
 
@@ -77,6 +88,16 @@ export default function SettingsScreen() {
 
   async function handleRequestPermission() {
     setStatus(await requestNotificationPermissions());
+  }
+
+  async function handleBiometricToggle(value: boolean) {
+    const result = await LocalAuthentication.authenticateAsync({
+      promptMessage: value ? 'Authenticate to enable biometric lock' : 'Authenticate to disable biometric lock',
+      fallbackLabel: 'Use passcode',
+    });
+    if (!result.success) return;
+    await setSetting(db, 'biometricLockEnabled', String(value));
+    setBiometricEnabled(value);
   }
 
   function handleClearTransactions() {
@@ -231,6 +252,23 @@ export default function SettingsScreen() {
         </Pressable>
       </View>
 
+      {biometricAvailable ? (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Security</Text>
+          <View style={styles.row}>
+            <View style={styles.rowLabelGroup}>
+              <Text style={styles.rowLabel}>Biometric lock</Text>
+              <Text style={styles.rowSubLabel}>Require fingerprint or face to open the app</Text>
+            </View>
+            <Switch
+              value={biometricEnabled}
+              onValueChange={handleBiometricToggle}
+              trackColor={{ true: PALETTE.net }}
+            />
+          </View>
+        </View>
+      ) : null}
+
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Budget alerts</Text>
         <View style={styles.row}>
@@ -370,7 +408,9 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { fontSize: 13, fontWeight: '700', color: PALETTE.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4 },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  rowLabelGroup: { flex: 1, gap: 2 },
   rowLabel: { fontSize: 14, color: PALETTE.textPrimary, fontWeight: '600' },
+  rowSubLabel: { fontSize: 12, color: PALETTE.textSecondary },
   rowValue: { fontSize: 14, color: PALETTE.textSecondary },
   rowChevron: { fontSize: 18, color: PALETTE.textSecondary },
   rowValueLink: { color: PALETTE.net, fontWeight: '600' },
