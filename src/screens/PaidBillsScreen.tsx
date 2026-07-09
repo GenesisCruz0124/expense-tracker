@@ -5,15 +5,22 @@ import { useNavigation } from '@react-navigation/native';
 import { CategoryBadge, UncategorizedBadge } from '../components/CategoryBadge';
 import { EmptyState } from '../components/EmptyState';
 import { PALETTE } from '../constants/colors';
+import type { AccountWithBalance } from '../db/queries/accounts';
 import type { BillWithDetails } from '../db/queries/bills';
+import { useAccounts } from '../hooks/useAccounts';
 import { useBills } from '../hooks/useBills';
 import { formatCurrency } from '../utils/currency';
-import { formatDisplayDate, monthRangeFor } from '../utils/dateRanges';
+import { formatDisplayDate, monthKeyFor, monthRangeFor } from '../utils/dateRanges';
 import { frequencyLabelFor } from '../utils/bills';
+
+type PaidListItem =
+  | { kind: 'bill'; data: BillWithDetails }
+  | { kind: 'due'; data: AccountWithBalance };
 
 export default function PaidBillsScreen() {
   const navigation = useNavigation();
   const { bills, unpayBill } = useBills();
+  const { accounts, markMonthlyDueUnpaid } = useAccounts();
 
   const paidThisMonth = useMemo(() => {
     const { start, end } = monthRangeFor(new Date());
@@ -21,6 +28,19 @@ export default function PaidBillsScreen() {
       .filter((bill) => bill.lastPaidAt != null && bill.lastPaidAt >= start && bill.lastPaidAt <= end)
       .sort((a, b) => b.lastPaidAt!.localeCompare(a.lastPaidAt!));
   }, [bills]);
+
+  const paidDuesThisMonth = useMemo(() => {
+    const currentMonthKey = monthKeyFor(new Date());
+    return accounts.filter(
+      (account) => account.monthlyAmountDue != null && account.monthlyDueLastPaidMonth === currentMonthKey,
+    );
+  }, [accounts]);
+
+  const combinedList = useMemo((): PaidListItem[] => {
+    const billItems: PaidListItem[] = paidThisMonth.map((data) => ({ kind: 'bill', data }));
+    const dueItems: PaidListItem[] = paidDuesThisMonth.map((data) => ({ kind: 'due', data }));
+    return [...billItems, ...dueItems];
+  }, [paidThisMonth, paidDuesThisMonth]);
 
   function handleMarkUnpaid(bill: BillWithDetails) {
     Alert.alert(
@@ -33,12 +53,23 @@ export default function PaidBillsScreen() {
     );
   }
 
+  function handleMarkDueUnpaid(account: AccountWithBalance) {
+    Alert.alert(
+      'Mark as unpaid?',
+      `This restores "${account.name}" to the Recurring tab for this month.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Mark unpaid', style: 'destructive', onPress: () => markMonthlyDueUnpaid(account.id) },
+      ],
+    );
+  }
+
   return (
     <View style={styles.screen}>
       <FlatList
-        data={paidThisMonth}
-        keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={paidThisMonth.length === 0 ? styles.emptyContainer : styles.listContent}
+        data={combinedList}
+        keyExtractor={(item) => item.kind === 'bill' ? `bill-${item.data.id}` : `due-${item.data.id}`}
+        contentContainerStyle={combinedList.length === 0 ? styles.emptyContainer : styles.listContent}
         ListEmptyComponent={
           <EmptyState
             icon="✅"
@@ -47,29 +78,54 @@ export default function PaidBillsScreen() {
           />
         }
         renderItem={({ item }) => {
-          const frequencyLabel = frequencyLabelFor(item);
+          if (item.kind === 'due') {
+            const account = item.data;
+            return (
+              <Pressable
+                style={styles.card}
+                onPress={() => navigation.navigate('AddEditAccount', { accountId: account.id })}
+              >
+                <View style={styles.cardMain}>
+                  <View style={styles.accountRow}>
+                    <View style={[styles.accountDot, { backgroundColor: account.color ?? PALETTE.textSecondary }]} />
+                    <Text style={styles.cardTitle}>{account.name}</Text>
+                  </View>
+                  <Text style={styles.cardSubtitle}>Monthly due · Paid this month</Text>
+                </View>
+                <View style={styles.cardTrailing}>
+                  <Text style={styles.cardAmount}>{formatCurrency(account.monthlyAmountDue!)}</Text>
+                  <Pressable style={styles.undoButton} onPress={() => handleMarkDueUnpaid(account)}>
+                    <Text style={styles.undoButtonText}>Undo</Text>
+                  </Pressable>
+                </View>
+              </Pressable>
+            );
+          }
+
+          const bill = item.data;
+          const frequencyLabel = frequencyLabelFor(bill);
           return (
-            <Pressable style={styles.card} onPress={() => navigation.navigate('AddEditBill', { billId: item.id })}>
+            <Pressable style={styles.card} onPress={() => navigation.navigate('AddEditBill', { billId: bill.id })}>
               <View style={styles.cardMain}>
-                <Text style={styles.cardTitle}>{item.name}</Text>
-                {item.categoryName ? (
-                  <CategoryBadge name={item.categoryName} color={item.categoryColor ?? PALETTE.textSecondary} icon={item.categoryIcon} />
+                <Text style={styles.cardTitle}>{bill.name}</Text>
+                {bill.categoryName ? (
+                  <CategoryBadge name={bill.categoryName} color={bill.categoryColor ?? PALETTE.textSecondary} icon={bill.categoryIcon} />
                 ) : (
                   <UncategorizedBadge />
                 )}
-                {item.accountName ? (
+                {bill.accountName ? (
                   <View style={styles.accountRow}>
-                    <View style={[styles.accountDot, { backgroundColor: item.accountColor ?? PALETTE.textSecondary }]} />
-                    <Text style={styles.accountName}>{item.accountName}</Text>
+                    <View style={[styles.accountDot, { backgroundColor: bill.accountColor ?? PALETTE.textSecondary }]} />
+                    <Text style={styles.accountName}>{bill.accountName}</Text>
                   </View>
                 ) : null}
-                <Text style={styles.cardSubtitle}>Paid {formatDisplayDate(item.lastPaidAt!)}</Text>
+                <Text style={styles.cardSubtitle}>Paid {formatDisplayDate(bill.lastPaidAt!)}</Text>
                 {frequencyLabel ? <Text style={styles.cardFrequency}>{frequencyLabel}</Text> : null}
               </View>
               <View style={styles.cardTrailing}>
-                <Text style={styles.cardAmount}>{formatCurrency(item.amount)}</Text>
-                {item.frequency === 'once' ? (
-                  <Pressable style={styles.undoButton} onPress={() => handleMarkUnpaid(item)}>
+                <Text style={styles.cardAmount}>{formatCurrency(bill.amount)}</Text>
+                {bill.frequency === 'once' ? (
+                  <Pressable style={styles.undoButton} onPress={() => handleMarkUnpaid(bill)}>
                     <Text style={styles.undoButtonText}>Undo</Text>
                   </Pressable>
                 ) : null}
