@@ -57,6 +57,12 @@ export default function PaidBillsScreen() {
                 ) : (
                   <UncategorizedBadge />
                 )}
+                {item.accountName ? (
+                  <View style={styles.accountRow}>
+                    <View style={[styles.accountDot, { backgroundColor: item.accountColor ?? PALETTE.textSecondary }]} />
+                    <Text style={styles.accountName}>{item.accountName}</Text>
+                  </View>
+                ) : null}
                 <Text style={styles.cardSubtitle}>Paid {formatDisplayDate(item.lastPaidAt!)}</Text>
                 {frequencyLabel ? <Text style={styles.cardFrequency}>{frequencyLabel}</Text> : null}
               </View>
@@ -94,6 +100,9 @@ const styles = StyleSheet.create({
   cardMain: { flex: 1, gap: 6 },
   cardTitle: { fontSize: 14, fontWeight: '700', color: PALETTE.textPrimary },
   cardSubtitle: { fontSize: 12, color: PALETTE.textSecondary },
+  accountRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  accountDot: { width: 8, height: 8, borderRadius: 4 },
+  accountName: { fontSize: 12, color: PALETTE.textSecondary, fontWeight: '600' },
   cardFrequency: { fontSize: 11, fontWeight: '600', color: PALETTE.net },
   cardTrailing: { alignItems: 'flex-end', gap: 8 },
   cardAmount: { fontSize: 14, fontWeight: '700', color: PALETTE.textPrimary },
