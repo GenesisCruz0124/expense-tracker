@@ -17,6 +17,13 @@ export default function UnpaidBillsScreen() {
   const { bills, payBill } = useBills();
   const unpaidBills = useMemo(() => bills.filter((bill) => !bill.isPaid), [bills]);
 
+  const totalUpcoming = useMemo(() => unpaidBills.reduce((sum, bill) => sum + bill.amount, 0), [unpaidBills]);
+
+  const overdueCount = useMemo(
+    () => unpaidBills.filter((bill) => differenceInCalendarDays(parseISO(bill.dueDate), new Date()) < 0).length,
+    [unpaidBills],
+  );
+
   function handleMarkPaid(bill: BillWithDetails) {
     Alert.alert(
       'Mark as paid?',
@@ -34,6 +41,18 @@ export default function UnpaidBillsScreen() {
         data={unpaidBills}
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={unpaidBills.length === 0 ? styles.emptyContainer : styles.listContent}
+        ListHeaderComponent={
+          unpaidBills.length > 0 ? (
+            <View style={styles.summaryCard}>
+              <Text style={styles.summaryLabel}>Total upcoming</Text>
+              <Text style={styles.summaryAmount}>{formatCurrency(totalUpcoming)}</Text>
+              <Text style={styles.summaryCount}>
+                {unpaidBills.length} {unpaidBills.length === 1 ? 'bill' : 'bills'}
+                {overdueCount > 0 ? ` · ${overdueCount} overdue` : ''}
+              </Text>
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
           <EmptyState
             icon="🧾"
@@ -91,6 +110,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     gap: 12,
   },
+  summaryCard: {
+    backgroundColor: PALETTE.expense,
+    borderRadius: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    marginBottom: 4,
+    alignItems: 'center',
+    gap: 2,
+  },
+  summaryLabel: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: 0.4 },
+  summaryAmount: { fontSize: 28, fontWeight: '700', color: '#fff' },
+  summaryCount: { fontSize: 12, color: 'rgba(255,255,255,0.7)' },
   cardMain: { flex: 1, gap: 6 },
   cardTitle: { fontSize: 14, fontWeight: '700', color: PALETTE.textPrimary },
   cardSubtitle: { fontSize: 12, color: PALETTE.textSecondary },
