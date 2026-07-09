@@ -42,6 +42,12 @@ export default function PaidBillsScreen() {
     return [...billItems, ...dueItems];
   }, [paidThisMonth, paidDuesThisMonth]);
 
+  const totalPaid = useMemo(() => {
+    const billsTotal = paidThisMonth.reduce((sum, bill) => sum + bill.amount, 0);
+    const duesTotal = paidDuesThisMonth.reduce((sum, account) => sum + (account.monthlyAmountDue ?? 0), 0);
+    return billsTotal + duesTotal;
+  }, [paidThisMonth, paidDuesThisMonth]);
+
   function handleMarkUnpaid(bill: BillWithDetails) {
     Alert.alert(
       'Mark as unpaid?',
@@ -70,6 +76,15 @@ export default function PaidBillsScreen() {
         data={combinedList}
         keyExtractor={(item) => item.kind === 'bill' ? `bill-${item.data.id}` : `due-${item.data.id}`}
         contentContainerStyle={combinedList.length === 0 ? styles.emptyContainer : styles.listContent}
+        ListHeaderComponent={
+          combinedList.length > 0 ? (
+            <View style={styles.summaryCard}>
+              <Text style={styles.summaryLabel}>Total paid this month</Text>
+              <Text style={styles.summaryAmount}>{formatCurrency(totalPaid)}</Text>
+              <Text style={styles.summaryCount}>{combinedList.length} {combinedList.length === 1 ? 'item' : 'items'}</Text>
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
           <EmptyState
             icon="✅"
@@ -153,6 +168,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     gap: 12,
   },
+  summaryCard: {
+    backgroundColor: PALETTE.net,
+    borderRadius: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    marginBottom: 4,
+    alignItems: 'center',
+    gap: 2,
+  },
+  summaryLabel: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: 0.4 },
+  summaryAmount: { fontSize: 28, fontWeight: '700', color: '#fff' },
+  summaryCount: { fontSize: 12, color: 'rgba(255,255,255,0.7)' },
   cardMain: { flex: 1, gap: 6 },
   cardTitle: { fontSize: 14, fontWeight: '700', color: PALETTE.textPrimary },
   cardSubtitle: { fontSize: 12, color: PALETTE.textSecondary },
