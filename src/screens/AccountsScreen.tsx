@@ -398,46 +398,59 @@ export default function AccountsScreen() {
               style={[styles.card, item.isArchived && styles.cardArchived]}
               onPress={() => navigation.navigate('AccountTransactions', { accountId: item.id })}
             >
-              <View style={[styles.avatar, { backgroundColor: `${item.color}1A` }]}>
-                <AccountIcon icon={item.icon} size={20} textStyle={styles.avatarIcon} />
-              </View>
-              <View style={styles.cardMain}>
-                <Text style={styles.cardName} numberOfLines={1}>
-                  {item.name}
-                </Text>
-                {subtitle ? <Text style={styles.cardSubtitle}>•••• {subtitle}</Text> : null}
-                {isInvestment && item.totalMonths > 0 ? (
-                  <Text style={styles.cardMeta}>{item.totalMonths} {item.totalMonths === 1 ? 'month' : 'months'} contributed</Text>
-                ) : null}
-                {isLoan && item.remainingMonths != null && item.remainingMonths > 0 ? (
-                  <Text style={styles.cardMeta}>{item.remainingMonths} {item.remainingMonths === 1 ? 'month' : 'months'} remaining</Text>
-                ) : null}
-                {isLoan && item.creditLimit != null ? (
-                  <Text style={styles.cardMetaLimit}>
-                    {hideAmounts ? '••••••' : (() => {
-                      const used = item.balance + (linkedLoanTotals[item.id] ?? 0);
-                      const avail = Math.max(0, item.creditLimit - used);
-                      return `${formatCurrency(item.creditLimit)} limit · ${formatCurrency(avail)} avail.`;
-                    })()}
+              <View style={styles.cardTop}>
+                <View style={[styles.avatar, { backgroundColor: `${item.color}1A` }]}>
+                  <AccountIcon icon={item.icon} size={20} textStyle={styles.avatarIcon} />
+                </View>
+                <View style={styles.cardMain}>
+                  <Text style={styles.cardName} numberOfLines={1}>
+                    {item.name}
                   </Text>
-                ) : null}
-                {item.subscriptionDueDay != null ? (
-                  <Text style={styles.cardMeta}>Due: {accountOrdinal(item.subscriptionDueDay)} of month</Text>
-                ) : null}
-              </View>
-              <Text style={[styles.cardBalance, item.balance < 0 && styles.negative]}>
-                {hideAmounts ? AMOUNT_MASK : formatCurrency(item.balance)}
-              </Text>
-              <View style={styles.cardActions}>
-                <Pressable
-                  onPress={() => navigation.navigate('AddEditTransaction', { accountId: item.id })}
-                  hitSlop={8}
-                  style={styles.transactButton}
-                >
-                  <Text style={styles.transactButtonText}>+</Text>
-                </Pressable>
+                  {subtitle ? <Text style={styles.cardSubtitle}>•••• {subtitle}</Text> : null}
+                  {isInvestment && item.totalMonths > 0 ? (
+                    <Text style={styles.cardMeta}>{item.totalMonths} {item.totalMonths === 1 ? 'month' : 'months'} contributed</Text>
+                  ) : null}
+                  {isLoan && item.remainingMonths != null && item.remainingMonths > 0 ? (
+                    <Text style={styles.cardMeta}>{item.remainingMonths} {item.remainingMonths === 1 ? 'month' : 'months'} remaining</Text>
+                  ) : null}
+                  {isLoan && item.creditLimit != null ? (
+                    <Text style={styles.cardMetaLimit}>
+                      {hideAmounts ? '••••••' : (() => {
+                        const used = item.balance + (linkedLoanTotals[item.id] ?? 0);
+                        const avail = Math.max(0, item.creditLimit - used);
+                        return `${formatCurrency(item.creditLimit)} limit · ${formatCurrency(avail)} avail.`;
+                      })()}
+                    </Text>
+                  ) : null}
+                  {item.subscriptionDueDay != null ? (
+                    <Text style={styles.cardMeta}>Due: {accountOrdinal(item.subscriptionDueDay)} of month</Text>
+                  ) : null}
+                </View>
+                <Text style={[styles.cardBalance, item.balance < 0 && styles.negative]}>
+                  {hideAmounts ? AMOUNT_MASK : formatCurrency(item.balance)}
+                </Text>
                 <Pressable onPress={() => setMenuAccount(item)} hitSlop={8} style={styles.moreButton}>
                   <Text style={styles.moreButtonText}>⋯</Text>
+                </Pressable>
+              </View>
+              <View style={styles.cardActions}>
+                <Pressable
+                  style={[styles.actionBtn, styles.actionBtnExpense]}
+                  onPress={(e) => { e.stopPropagation(); navigation.navigate('AddEditTransaction', { accountId: item.id, transactionType: 'expense' }); }}
+                >
+                  <Text style={[styles.actionBtnText, styles.actionBtnTextExpense]}>− Expense</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.actionBtn, styles.actionBtnIncome]}
+                  onPress={(e) => { e.stopPropagation(); navigation.navigate('AddEditTransaction', { accountId: item.id, transactionType: 'income' }); }}
+                >
+                  <Text style={[styles.actionBtnText, styles.actionBtnTextIncome]}>+ Income</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.actionBtn, styles.actionBtnTransfer]}
+                  onPress={(e) => { e.stopPropagation(); navigation.navigate('AddEditTransaction', { accountId: item.id, transactionType: 'transfer' }); }}
+                >
+                  <Text style={[styles.actionBtnText, styles.actionBtnTextTransfer]}>⇄ Transfer</Text>
                 </Pressable>
               </View>
             </Pressable>
@@ -594,18 +607,22 @@ const styles = StyleSheet.create({
   },
   sectionTotal: { fontSize: 13, fontWeight: '700', color: PALETTE.textPrimary },
   card: {
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: PALETTE.surface,
     borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: PALETTE.border,
-    paddingVertical: 12,
+    paddingTop: 12,
     paddingHorizontal: 12,
     marginBottom: 10,
-    gap: 12,
+    overflow: 'hidden',
   },
   cardArchived: { opacity: 0.6 },
+  cardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingBottom: 10,
+  },
   avatar: {
     width: 44,
     height: 44,
@@ -621,16 +638,25 @@ const styles = StyleSheet.create({
   cardMetaLimit: { fontSize: 11, fontWeight: '600', color: PALETTE.textSecondary, marginTop: 1 },
   cardBalance: { fontSize: 15, fontWeight: '700', color: PALETTE.textPrimary },
   negative: { color: PALETTE.expense },
-  cardActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  transactButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+  cardActions: {
+    flexDirection: 'row',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: PALETTE.border,
+    marginHorizontal: -12,
+  },
+  actionBtn: {
+    flex: 1,
+    paddingVertical: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: `${PALETTE.net}1A`,
   },
-  transactButtonText: { fontSize: 18, fontWeight: '700', color: PALETTE.net, lineHeight: 20 },
+  actionBtnExpense: { backgroundColor: `${PALETTE.expense}0F` },
+  actionBtnIncome: { backgroundColor: `${PALETTE.income}0F`, borderLeftWidth: StyleSheet.hairlineWidth, borderRightWidth: StyleSheet.hairlineWidth, borderColor: PALETTE.border },
+  actionBtnTransfer: { backgroundColor: `${PALETTE.net}0F` },
+  actionBtnText: { fontSize: 12, fontWeight: '700' },
+  actionBtnTextExpense: { color: PALETTE.expense },
+  actionBtnTextIncome: { color: PALETTE.income },
+  actionBtnTextTransfer: { color: PALETTE.net },
   moreButton: {
     width: 30,
     height: 30,
