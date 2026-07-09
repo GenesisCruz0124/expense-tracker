@@ -428,9 +428,18 @@ export default function AccountsScreen() {
               <Text style={[styles.cardBalance, item.balance < 0 && styles.negative]}>
                 {hideAmounts ? AMOUNT_MASK : formatCurrency(item.balance)}
               </Text>
-              <Pressable onPress={() => setMenuAccount(item)} hitSlop={8} style={styles.moreButton}>
-                <Text style={styles.moreButtonText}>⋯</Text>
-              </Pressable>
+              <View style={styles.cardActions}>
+                <Pressable
+                  onPress={() => navigation.navigate('AddEditTransaction', { accountId: item.id })}
+                  hitSlop={8}
+                  style={styles.transactButton}
+                >
+                  <Text style={styles.transactButtonText}>+</Text>
+                </Pressable>
+                <Pressable onPress={() => setMenuAccount(item)} hitSlop={8} style={styles.moreButton}>
+                  <Text style={styles.moreButtonText}>⋯</Text>
+                </Pressable>
+              </View>
             </Pressable>
           );
         }}
@@ -612,6 +621,16 @@ const styles = StyleSheet.create({
   cardMetaLimit: { fontSize: 11, fontWeight: '600', color: PALETTE.textSecondary, marginTop: 1 },
   cardBalance: { fontSize: 15, fontWeight: '700', color: PALETTE.textPrimary },
   negative: { color: PALETTE.expense },
+  cardActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  transactButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: `${PALETTE.net}1A`,
+  },
+  transactButtonText: { fontSize: 18, fontWeight: '700', color: PALETTE.net, lineHeight: 20 },
   moreButton: {
     width: 30,
     height: 30,
