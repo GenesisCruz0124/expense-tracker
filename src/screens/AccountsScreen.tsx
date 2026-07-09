@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, SectionList, StyleSheet, Switch, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, ScrollView, SectionList, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useNavigation, type CompositeNavigationProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -93,6 +93,7 @@ export default function AccountsScreen() {
   const [sortOption, setSortOption] = useState<SortOption>('balance_desc');
   const [showSortPicker, setShowSortPicker] = useState(false);
   const [grouped, setGrouped] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [groupsLoaded, setGroupsLoaded] = useState(false);
   const [categoryFilterLoaded, setCategoryFilterLoaded] = useState(false);
@@ -175,7 +176,8 @@ export default function AccountsScreen() {
       if (netWorthFilter === 'included') return account.includeInNetWorth;
       if (netWorthFilter === 'excluded') return !account.includeInNetWorth;
       return true;
-    });
+    })
+    .filter((account) => !searchQuery.trim() || account.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
   function toggleCategoryFilter(id: number) {
     setSelectedCategoryIds((prev) => (prev.includes(id) ? prev.filter((existing) => existing !== id) : [...prev, id]));
@@ -262,6 +264,26 @@ export default function AccountsScreen() {
               <View style={styles.heroIconWrap}>
                 <Text style={styles.heroIcon}>💰</Text>
               </View>
+            </View>
+
+            <View style={styles.searchRow}>
+              <Text style={styles.searchIcon}>🔍</Text>
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search accounts…"
+                placeholderTextColor={PALETTE.textSecondary}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                returnKeyType="search"
+                clearButtonMode="while-editing"
+                autoCorrect={false}
+                autoCapitalize="none"
+              />
+              {searchQuery.length > 0 ? (
+                <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
+                  <Text style={styles.searchClear}>✕</Text>
+                </Pressable>
+              ) : null}
             </View>
 
             {filterableCategories.length > 0 ? (
@@ -489,6 +511,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   heroIcon: { fontSize: 22 },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: PALETTE.surface,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.border,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 12,
+    gap: 8,
+  },
+  searchIcon: { fontSize: 14 },
+  searchInput: { flex: 1, fontSize: 14, color: PALETTE.textPrimary, padding: 0 },
+  searchClear: { fontSize: 13, color: PALETTE.textSecondary, fontWeight: '600' },
   filterRow: { gap: 8, paddingBottom: 12 },
   filterChip: {
     flexDirection: 'row',
