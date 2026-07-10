@@ -6,9 +6,6 @@ import { isSameDay, isSameMonth, isSameWeek } from 'date-fns';
 import { CategoryBarChart } from '../components/charts/CategoryBarChart';
 import { CategoryPieChart } from '../components/charts/CategoryPieChart';
 import { MonthlyTotalsBarChart } from '../components/charts/MonthlyTotalsBarChart';
-import { ExpenseTrendLineChart } from '../components/charts/ExpenseTrendLineChart';
-import { IncomeTrendLineChart } from '../components/charts/IncomeTrendLineChart';
-import { NetWorthLineChart } from '../components/charts/NetWorthLineChart';
 import { TrendLineChart } from '../components/charts/TrendLineChart';
 import { DateField } from '../components/DateField';
 import { MonthSelector } from '../components/MonthSelector';
@@ -213,32 +210,6 @@ export default function ReportsScreen() {
         {trendView === 'line' ? <TrendLineChart entries={trend} /> : <MonthlyTotalsBarChart entries={trend} />}
       </View>
 
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>
-            {`Net worth trend (${periodCount} ${trendPeriod === 'daily' ? 'days' : trendPeriod === 'weekly' ? 'weeks' : 'months'})`}
-          </Text>
-        </View>
-        <NetWorthLineChart entries={trend} />
-      </View>
-
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>
-            {`Expense trend (${periodCount} ${trendPeriod === 'daily' ? 'days' : trendPeriod === 'weekly' ? 'weeks' : 'months'})`}
-          </Text>
-        </View>
-        <ExpenseTrendLineChart entries={trend} />
-      </View>
-
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>
-            {`Income trend (${periodCount} ${trendPeriod === 'daily' ? 'days' : trendPeriod === 'weekly' ? 'weeks' : 'months'})`}
-          </Text>
-        </View>
-        <IncomeTrendLineChart entries={trend} />
-      </View>
     </ScrollView>
   );
 }
