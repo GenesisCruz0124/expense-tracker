@@ -99,8 +99,14 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
   const { success, error } = useMigrations(db, migrations);
   const [bootstrapped, setBootstrapped] = useState(false);
   const [bootstrapError, setBootstrapError] = useState<Error | null>(null);
+  const [splashReady, setSplashReady] = useState(false);
   const [refreshSignal, setRefreshSignal] = useState(0);
   const ranBootstrap = useRef(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setSplashReady(true), 10000);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (!success || ranBootstrap.current) return;
@@ -144,7 +150,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!success || !bootstrapped) {
+  if (!success || !bootstrapped || !splashReady) {
     return <SplashLoadingScreen />;
   }
 
