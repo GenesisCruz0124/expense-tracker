@@ -17,7 +17,7 @@ const MONTHLY_FACTOR: Record<'weekly' | 'monthly', number> = { weekly: 52 / 12, 
 
 export default function RecurringTransactionsScreen() {
   const navigation = useNavigation();
-  const { rules, setActive } = useRecurringTransactions();
+  const { rules, setActive, markPaid } = useRecurringTransactions();
   const { accounts, markMonthlyDuePaid, incrementBalance } = useAccounts();
   const { accountCategories } = useAccountCategories();
   const currentMonthKey = monthKeyFor(new Date());
@@ -72,6 +72,18 @@ export default function RecurringTransactionsScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Mark paid', onPress: () => markMonthlyDuePaid(account.id, currentMonthKey) },
     ]);
+  }
+
+  function handleMarkRecurringPaid(item: (typeof rules)[number]) {
+    const label = item.note || (item.type === 'income' ? 'Income' : 'Expense');
+    Alert.alert(
+      'Mark as paid?',
+      `Log "${label}" for ${formatDisplayDate(item.nextRunDate)} and advance to the next occurrence.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Mark paid', onPress: () => markPaid(item) },
+      ],
+    );
   }
 
   function handleAddContribution(account: AccountWithBalance) {
@@ -210,6 +222,7 @@ export default function RecurringTransactionsScreen() {
             : item.intervalCount === 1
               ? `Every ${unit}`
               : `Every ${item.intervalCount} ${unit}s`;
+          const showMarkPaid = item.isActive && !isOneTime && !item.isPaid;
           return (
             <Pressable
               style={[styles.card, !item.isActive && styles.cardInactive]}
@@ -221,10 +234,24 @@ export default function RecurringTransactionsScreen() {
                   {cadence} · Next: {formatDisplayDate(item.nextRunDate)}
                 </Text>
               </View>
-              <Text style={[styles.cardAmount, { color: isIncome ? PALETTE.income : PALETTE.expense }]}>
-                {isIncome ? '+' : '−'}
-                {formatCurrency(item.amount)}
-              </Text>
+              <View style={styles.amountColumn}>
+                <Text style={[styles.cardAmount, { color: isIncome ? PALETTE.income : PALETTE.expense }]}>
+                  {isIncome ? '+' : '−'}{formatCurrency(item.amount)}
+                </Text>
+                {showMarkPaid ? (
+                  <Pressable
+                    style={styles.actionButton}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      handleMarkRecurringPaid(item);
+                    }}
+                  >
+                    <Text style={styles.actionButtonText}>Mark paid</Text>
+                  </Pressable>
+                ) : item.isPaid ? (
+                  <Text style={styles.paidBadge}>✓ Paid</Text>
+                ) : null}
+              </View>
               <Switch
                 value={item.isActive}
                 onValueChange={(value) => setActive(item.id, value)}
@@ -299,6 +326,7 @@ const styles = StyleSheet.create({
     backgroundColor: `${PALETTE.net}1A`,
   },
   actionButtonText: { fontSize: 11, fontWeight: '700', color: PALETTE.net },
+  paidBadge: { fontSize: 11, fontWeight: '700', color: PALETTE.income },
   fab: {
     position: 'absolute',
     right: 20,

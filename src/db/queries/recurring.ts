@@ -9,7 +9,7 @@ import {
   type RecurringTransaction,
 } from '../schema';
 import { generateOccurrencesUpTo } from '../../utils/recurrence';
-import { formatIsoDate } from '../../utils/dateRanges';
+import { formatIsoDate, parseIsoDate } from '../../utils/dateRanges';
 import { generateUuid } from '../../utils/uuid';
 
 export interface RecurringWithStatus extends RecurringTransaction {
@@ -122,6 +122,52 @@ export async function deleteRecurringTransaction(db: Database, id: number): Prom
     .update(recurringTransactions)
     .set({ deletedAt: sql`(datetime('now'))`, updatedAt: sql`(datetime('now'))` })
     .where(eq(recurringTransactions.id, id));
+}
+
+/**
+ * Manually marks one occurrence of a recurring rule as paid: inserts a transaction dated
+ * to the rule's current `nextRunDate`, then advances the cursor to the next occurrence.
+ * Idempotent — exits early if a transaction already exists for that date.
+ */
+export async function markRecurringPaid(db: Database, rule: RecurringWithStatus): Promise<void> {
+  if (rule.isPaid) return;
+
+  await db.transaction(async (tx) => {
+    let billerName: string | null = null;
+    if (rule.billerId != null) {
+      const [biller] = await tx
+        .select({ name: categories.name })
+        .from(categories)
+        .where(eq(categories.id, rule.billerId))
+        .limit(1);
+      billerName = biller?.name ?? null;
+    }
+
+    await tx.insert(transactions).values({
+      type: rule.type,
+      amount: rule.amount,
+      occurredAt: rule.nextRunDate,
+      note: rule.note,
+      establishment: billerName,
+      categoryId: rule.categoryId,
+      recurringId: rule.id,
+      uuid: generateUuid(),
+    });
+
+    const result = generateOccurrencesUpTo(
+      { frequency: rule.frequency, intervalCount: rule.intervalCount, endDate: rule.endDate, nextRunDate: rule.nextRunDate },
+      parseIsoDate(rule.nextRunDate),
+    );
+
+    await tx
+      .update(recurringTransactions)
+      .set({
+        nextRunDate: result.nextRunDate,
+        isActive: result.isExhausted ? false : rule.isActive,
+        updatedAt: sql`(datetime('now'))`,
+      })
+      .where(eq(recurringTransactions.id, rule.id));
+  });
 }
 
 export interface GeneratedOccurrenceSummary {

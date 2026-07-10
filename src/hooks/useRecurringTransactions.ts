@@ -6,6 +6,7 @@ import {
   createRecurringTransaction as createRecurringQuery,
   deleteRecurringTransaction as deleteRecurringQuery,
   listRecurringTransactions,
+  markRecurringPaid as markRecurringPaidQuery,
   setRecurringActive as setRecurringActiveQuery,
   updateRecurringTransaction as updateRecurringQuery,
   type RecurringInput,
@@ -69,5 +70,14 @@ export function useRecurringTransactions() {
     [db, notifyDataChanged, refresh],
   );
 
-  return { rules, loading, refresh, createRule, updateRule, setActive, removeRule };
+  const markPaid = useCallback(
+    async (rule: RecurringWithStatus) => {
+      await markRecurringPaidQuery(db, rule);
+      notifyDataChanged();
+      await refresh();
+    },
+    [db, notifyDataChanged, refresh],
+  );
+
+  return { rules, loading, refresh, createRule, updateRule, setActive, removeRule, markPaid };
 }
