@@ -32,6 +32,7 @@ export async function listRecurringTransactions(db: Database): Promise<Recurring
       note: recurringTransactions.note,
       categoryId: recurringTransactions.categoryId,
       billerId: recurringTransactions.billerId,
+      accountId: recurringTransactions.accountId,
       frequency: recurringTransactions.frequency,
       intervalCount: recurringTransactions.intervalCount,
       startDate: recurringTransactions.startDate,
@@ -67,6 +68,7 @@ export interface RecurringInput {
   note?: string | null;
   categoryId?: number | null;
   billerId?: number | null;
+  accountId?: number | null;
   frequency: 'weekly' | 'monthly';
   intervalCount: number;
   startDate: string;
@@ -80,6 +82,7 @@ export async function createRecurringTransaction(db: Database, input: RecurringI
     note: input.note?.trim() || null,
     categoryId: input.categoryId ?? null,
     billerId: input.billerId ?? null,
+    accountId: input.accountId ?? null,
     frequency: input.frequency,
     intervalCount: input.intervalCount,
     startDate: input.startDate,
@@ -101,6 +104,7 @@ export async function updateRecurringTransaction(db: Database, id: number, input
       note: input.note?.trim() || null,
       categoryId: input.categoryId ?? null,
       billerId: input.billerId ?? null,
+      accountId: input.accountId ?? null,
       frequency: input.frequency,
       intervalCount: input.intervalCount,
       startDate: input.startDate,
@@ -150,6 +154,7 @@ export async function markRecurringPaid(db: Database, rule: RecurringWithStatus)
       note: rule.note,
       establishment: billerName,
       categoryId: rule.categoryId,
+      accountId: rule.accountId ?? null,
       recurringId: rule.id,
       uuid: generateUuid(),
     });
@@ -226,6 +231,7 @@ export async function generateDueRecurringTransactions(
           note: rule.note,
           establishment: billerName,
           categoryId: rule.categoryId,
+          accountId: rule.accountId ?? null,
           recurringId: rule.id,
           uuid: generateUuid(),
         });

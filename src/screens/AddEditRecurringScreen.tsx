@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 
+import { AccountPicker } from '../components/AccountPicker';
 import { AmountInput } from '../components/AmountInput';
 import { CategoryPicker } from '../components/CategoryPicker';
 import { DateField } from '../components/DateField';
@@ -29,6 +30,7 @@ const REPEAT_PRESETS: RepeatPreset[] = [
   { key: 'weekly', label: 'Weekly', recurrence: { frequency: 'weekly', intervalCount: 1 } },
   { key: 'biweekly', label: 'Every 2 weeks', recurrence: { frequency: 'weekly', intervalCount: 2 } },
   { key: 'monthly', label: 'Monthly', recurrence: { frequency: 'monthly', intervalCount: 1 } },
+  { key: 'yearly', label: 'Yearly', recurrence: { frequency: 'monthly', intervalCount: 12 } },
 ];
 
 export default function AddEditRecurringScreen() {
@@ -44,6 +46,7 @@ export default function AddEditRecurringScreen() {
   const [amountText, setAmountText] = useState('');
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [billerId, setBillerId] = useState<number | null>(null);
+  const [accountId, setAccountId] = useState<number | null>(null);
   const [isOneTime, setIsOneTime] = useState(false);
   const [frequency, setFrequency] = useState<Frequency>('monthly');
   const [intervalText, setIntervalText] = useState('1');
@@ -65,6 +68,7 @@ export default function AddEditRecurringScreen() {
       setAmountText(String(fromMinorUnits(existing.amount)));
       setCategoryId(existing.categoryId);
       setBillerId(existing.billerId);
+      setAccountId(existing.accountId ?? null);
       setFrequency(existing.frequency);
       setIntervalText(String(existing.intervalCount));
       setStartDate(existing.startDate);
@@ -123,6 +127,7 @@ export default function AddEditRecurringScreen() {
         note: note.trim() || null,
         categoryId,
         billerId: type === 'expense' ? billerId : null,
+        accountId,
         frequency: saveFrequency,
         intervalCount: saveIntervalCount,
         startDate,
@@ -186,6 +191,11 @@ export default function AddEditRecurringScreen() {
           <CategoryPicker forType="expense" selectedCategoryId={billerId} onSelect={setBillerId} billersOnly />
         </View>
       ) : null}
+
+      <View style={styles.field}>
+        <Text style={styles.label}>Account (optional)</Text>
+        <AccountPicker selectedAccountId={accountId} onSelect={setAccountId} />
+      </View>
 
       <View style={styles.field}>
         <Text style={styles.label}>Repeats</Text>

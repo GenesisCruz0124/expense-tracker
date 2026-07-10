@@ -21,6 +21,10 @@ const ACCOUNT_COLUMNS: AccountColumnSpec[] = [
   { name: 'subscription_due_day', type: 'integer' },
 ];
 
+const RECURRING_COLUMNS: AccountColumnSpec[] = [
+  { name: 'account_id', type: 'integer' },
+];
+
 /** Adds back any of `ACCOUNT_COLUMNS` that are missing from the `accounts` table, regardless of migration history. */
 export async function repairAccountsSchema(db: Database): Promise<void> {
   const columns = await db.all<{ name: string }>(sql`PRAGMA table_info(accounts)`);
@@ -29,6 +33,13 @@ export async function repairAccountsSchema(db: Database): Promise<void> {
   for (const column of ACCOUNT_COLUMNS) {
     if (existing.has(column.name)) continue;
     await db.run(sql.raw(`ALTER TABLE \`accounts\` ADD \`${column.name}\` ${column.type}`));
+  }
+
+  const recurringColumns = await db.all<{ name: string }>(sql`PRAGMA table_info(recurring_transactions)`);
+  const existingRecurring = new Set(recurringColumns.map((column) => column.name));
+  for (const column of RECURRING_COLUMNS) {
+    if (existingRecurring.has(column.name)) continue;
+    await db.run(sql.raw(`ALTER TABLE \`recurring_transactions\` ADD \`${column.name}\` ${column.type}`));
   }
 }
 

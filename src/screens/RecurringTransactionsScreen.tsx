@@ -219,9 +219,11 @@ export default function RecurringTransactionsScreen() {
           const unit = FREQUENCY_UNIT[item.frequency];
           const cadence = isOneTime
             ? 'One-time'
-            : item.intervalCount === 1
-              ? `Every ${unit}`
-              : `Every ${item.intervalCount} ${unit}s`;
+            : item.frequency === 'monthly' && item.intervalCount === 12
+              ? 'Every year'
+              : item.intervalCount === 1
+                ? `Every ${unit}`
+                : `Every ${item.intervalCount} ${unit}s`;
           const showMarkPaid = item.isActive && !isOneTime && !item.isPaid;
           return (
             <Pressable
