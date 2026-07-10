@@ -104,7 +104,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
   const ranBootstrap = useRef(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => setSplashReady(true), 10000);
+    const timer = setTimeout(() => setSplashReady(true), 5000);
     return () => clearTimeout(timer);
   }, []);
 
