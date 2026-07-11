@@ -191,6 +191,13 @@ export default function AccountsScreen() {
     }, 0);
   }, [visible, accountCategories]);
 
+  const totalBalance = useMemo(() => {
+    return visible.reduce((sum, account) => {
+      const category = accountCategories.find((item) => item.id === account.categoryId);
+      return sum + (category?.kind === 'credit_card' ? -account.balance : account.balance);
+    }, 0);
+  }, [visible, accountCategories]);
+
   const linkedLoanTotals = useMemo(() => {
     const totals: Record<number, number> = {};
     for (const acc of visible) {
@@ -252,7 +259,7 @@ export default function AccountsScreen() {
         ListHeaderComponent={
           <>
             <View style={styles.heroCard}>
-              <View>
+              <View style={{ flex: 1 }}>
                 <View style={styles.heroLabelRow}>
                   <Text style={styles.heroLabel}>{showArchived ? 'Archived balance' : 'Net worth'}</Text>
                   <Pressable onPress={() => setHideAmounts((value) => !value)} hitSlop={8}>
@@ -260,6 +267,12 @@ export default function AccountsScreen() {
                   </Pressable>
                 </View>
                 <Text style={styles.heroAmount}>{hideAmounts ? AMOUNT_MASK : formatCurrency(netWorth)}</Text>
+                {!showArchived && (
+                  <View style={styles.heroTotalRow}>
+                    <Text style={styles.heroTotalLabel}>Total</Text>
+                    <Text style={styles.heroTotalAmount}>{hideAmounts ? AMOUNT_MASK : formatCurrency(totalBalance)}</Text>
+                  </View>
+                )}
               </View>
               <View style={styles.heroIconWrap}>
                 <Text style={styles.heroIcon}>💰</Text>
@@ -524,6 +537,9 @@ const styles = StyleSheet.create({
   },
   eyeIcon: { fontSize: 13 },
   heroAmount: { fontSize: 28, fontWeight: '800', color: '#fff', marginTop: 4 },
+  heroTotalRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+  heroTotalLabel: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.65)', textTransform: 'uppercase', letterSpacing: 0.5 },
+  heroTotalAmount: { fontSize: 13, fontWeight: '700', color: 'rgba(255,255,255,0.85)' },
   heroIconWrap: {
     width: 48,
     height: 48,
