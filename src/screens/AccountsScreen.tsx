@@ -563,7 +563,7 @@ const styles = StyleSheet.create({
   filterChipContent: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   filterChipText: { fontSize: 13, fontWeight: '600', color: PALETTE.textSecondary },
   filterChipTextSelected: { color: '#fff' },
-  controlsRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, paddingBottom: 10 },
+  controlsRow: { flexDirection: 'row', justifyContent: 'flex-start', gap: 8, paddingBottom: 10 },
   sortButton: {
     paddingHorizontal: 12,
     paddingVertical: 7,
