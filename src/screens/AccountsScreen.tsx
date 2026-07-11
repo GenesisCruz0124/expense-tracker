@@ -171,7 +171,7 @@ export default function AccountsScreen() {
 
   useEffect(() => {
     const d = new Date();
-    d.setDate(d.getDate() - 30);
+    d.setDate(d.getDate() - 1);
     getHistoricalTotals(db, formatIsoDate(d)).then(setPrevTotals).catch(() => {});
   }, [db, refreshSignal]);
 
