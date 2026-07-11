@@ -335,3 +335,23 @@ export async function getHistoricalTotals(
   }
   return { netWorth, totalBalance };
 }
+
+export async function getHistoricalAccountBalances(
+  db: Database,
+  asOfDate: string,
+): Promise<Record<number, number>> {
+  const rows = await db
+    .select({ id: accounts.id, balance: balanceExpr })
+    .from(accounts)
+    .leftJoin(
+      transactions,
+      and(eq(transactions.accountId, accounts.id), isNull(transactions.deletedAt), lte(transactions.occurredAt, asOfDate)),
+    )
+    .leftJoin(accountCategories, eq(accountCategories.id, accounts.categoryId))
+    .where(and(isNull(accounts.deletedAt), eq(accounts.isArchived, false)))
+    .groupBy(accounts.id);
+
+  const result: Record<number, number> = {};
+  for (const row of rows) result[row.id] = row.balance;
+  return result;
+}

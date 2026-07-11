@@ -9,7 +9,7 @@ import { EmptyState } from '../components/EmptyState';
 import { DEFAULT_ACCOUNT_ICON } from '../constants/accountIcons';
 import { PALETTE } from '../constants/colors';
 import { useDatabase } from '../context/DatabaseProvider';
-import { getHistoricalTotals, type AccountWithBalance } from '../db/queries/accounts';
+import { getHistoricalAccountBalances, getHistoricalTotals, type AccountWithBalance } from '../db/queries/accounts';
 import { getSetting, setSetting } from '../db/queries/settings';
 import { formatIsoDate } from '../utils/dateRanges';
 import { useAccountCategories } from '../hooks/useAccountCategories';
@@ -106,6 +106,7 @@ export default function AccountsScreen() {
   const [groupsLoaded, setGroupsLoaded] = useState(false);
   const [categoryFilterLoaded, setCategoryFilterLoaded] = useState(false);
   const [prevTotals, setPrevTotals] = useState<{ netWorth: number; totalBalance: number } | null>(null);
+  const [prevBalances, setPrevBalances] = useState<Record<number, number>>({});
   const { db, refreshSignal } = useDatabase();
 
   function toggleGroup(key: string) {
@@ -172,7 +173,14 @@ export default function AccountsScreen() {
   useEffect(() => {
     const d = new Date();
     d.setDate(d.getDate() - 1);
-    getHistoricalTotals(db, formatIsoDate(d)).then(setPrevTotals).catch(() => {});
+    const asOfDate = formatIsoDate(d);
+    Promise.all([
+      getHistoricalTotals(db, asOfDate),
+      getHistoricalAccountBalances(db, asOfDate),
+    ]).then(([totals, balances]) => {
+      setPrevTotals(totals);
+      setPrevBalances(balances);
+    }).catch(() => {});
   }, [db, refreshSignal]);
 
   const { accounts, error, setArchived } = useAccounts({ includeArchived: true });
@@ -474,9 +482,21 @@ export default function AccountsScreen() {
                     <Text style={styles.cardMeta}>Due: {accountOrdinal(item.subscriptionDueDay)} of month</Text>
                   ) : null}
                 </View>
-                <Text style={[styles.cardBalance, item.balance < 0 && styles.negative]}>
-                  {hideAmounts ? AMOUNT_MASK : formatCurrency(item.balance)}
-                </Text>
+                <View style={styles.cardBalanceCol}>
+                  <Text style={[styles.cardBalance, item.balance < 0 && styles.negative]}>
+                    {hideAmounts ? AMOUNT_MASK : formatCurrency(item.balance)}
+                  </Text>
+                  {!hideAmounts && prevBalances[item.id] != null && (() => {
+                    const t = computeTrend(item.balance, prevBalances[item.id]);
+                    return t ? (
+                      <View style={[styles.cardTrendBadge, t.up ? styles.cardTrendUp : styles.cardTrendDown]}>
+                        <Text style={[styles.cardTrendText, t.up ? styles.cardTrendTextUp : styles.cardTrendTextDown]}>
+                          {t.up ? '▲' : '▼'} {t.up ? '+' : '-'}{t.pct}
+                        </Text>
+                      </View>
+                    ) : null;
+                  })()}
+                </View>
                 <Pressable onPress={() => setMenuAccount(item)} hitSlop={8} style={styles.moreButton}>
                   <Text style={styles.moreButtonText}>⋯</Text>
                 </Pressable>
@@ -693,7 +713,14 @@ const styles = StyleSheet.create({
   cardSubtitle: { fontSize: 12, color: PALETTE.textSecondary, letterSpacing: 0.5 },
   cardMeta: { fontSize: 11, fontWeight: '600', color: PALETTE.net, marginTop: 1 },
   cardMetaLimit: { fontSize: 11, fontWeight: '600', color: PALETTE.textSecondary, marginTop: 1 },
+  cardBalanceCol: { alignItems: 'flex-end', gap: 2 },
   cardBalance: { fontSize: 15, fontWeight: '700', color: PALETTE.textPrimary },
+  cardTrendBadge: { borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 },
+  cardTrendUp: { backgroundColor: '#dcfce7' },
+  cardTrendDown: { backgroundColor: '#fee2e2' },
+  cardTrendText: { fontSize: 9, fontWeight: '700' },
+  cardTrendTextUp: { color: '#16a34a' },
+  cardTrendTextDown: { color: '#dc2626' },
   negative: { color: PALETTE.expense },
   cardActions: {
     flexDirection: 'row',
