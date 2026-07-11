@@ -9,8 +9,9 @@ import { EmptyState } from '../components/EmptyState';
 import { DEFAULT_ACCOUNT_ICON } from '../constants/accountIcons';
 import { PALETTE } from '../constants/colors';
 import { useDatabase } from '../context/DatabaseProvider';
-import type { AccountWithBalance } from '../db/queries/accounts';
+import { getHistoricalTotals, type AccountWithBalance } from '../db/queries/accounts';
 import { getSetting, setSetting } from '../db/queries/settings';
+import { formatIsoDate } from '../utils/dateRanges';
 import { useAccountCategories } from '../hooks/useAccountCategories';
 import { useAccounts } from '../hooks/useAccounts';
 import { formatCurrency } from '../utils/currency';
@@ -44,6 +45,13 @@ type AccountsScreenNavigationProp = CompositeNavigationProp<
 >;
 
 const AMOUNT_MASK = '••••••';
+
+function computeTrend(current: number, prev: number): { pct: string; up: boolean } | null {
+  if (prev === 0) return null;
+  const change = ((current - prev) / Math.abs(prev)) * 100;
+  if (Math.abs(change) < 0.005) return null;
+  return { pct: Math.abs(change).toFixed(2) + '%', up: change > 0 };
+}
 
 type SortOption = 'name_asc' | 'name_desc' | 'balance_desc' | 'balance_asc' | 'recent';
 
@@ -97,7 +105,8 @@ export default function AccountsScreen() {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [groupsLoaded, setGroupsLoaded] = useState(false);
   const [categoryFilterLoaded, setCategoryFilterLoaded] = useState(false);
-  const { db } = useDatabase();
+  const [prevTotals, setPrevTotals] = useState<{ netWorth: number; totalBalance: number } | null>(null);
+  const { db, refreshSignal } = useDatabase();
 
   function toggleGroup(key: string) {
     setCollapsedGroups((prev) => {
@@ -159,6 +168,12 @@ export default function AccountsScreen() {
     if (!netWorthFilterLoaded) return;
     setSetting(db, NET_WORTH_FILTER_KEY, netWorthFilter);
   }, [netWorthFilter, netWorthFilterLoaded, db]);
+
+  useEffect(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    getHistoricalTotals(db, formatIsoDate(d)).then(setPrevTotals).catch(() => {});
+  }, [db, refreshSignal]);
 
   const { accounts, error, setArchived } = useAccounts({ includeArchived: true });
   const { accountCategories } = useAccountCategories({ includeArchived: true });
@@ -265,12 +280,32 @@ export default function AccountsScreen() {
                   <Pressable onPress={() => setHideAmounts((value) => !value)} hitSlop={8}>
                     <Text style={styles.eyeIcon}>{hideAmounts ? '🙈' : '👁️'}</Text>
                   </Pressable>
+                  {!hideAmounts && !showArchived && prevTotals != null && (() => {
+                    const t = computeTrend(netWorth, prevTotals.netWorth);
+                    return t ? (
+                      <View style={[styles.trendBadge, t.up ? styles.trendUp : styles.trendDown]}>
+                        <Text style={[styles.trendText, t.up ? styles.trendTextUp : styles.trendTextDown]}>
+                          {t.up ? '▲' : '▼'} {t.up ? '+' : '-'}{t.pct}
+                        </Text>
+                      </View>
+                    ) : null;
+                  })()}
                 </View>
                 <Text style={styles.heroAmount}>{hideAmounts ? AMOUNT_MASK : formatCurrency(netWorth)}</Text>
                 {!showArchived && (
                   <View style={styles.heroTotalRow}>
                     <Text style={styles.heroTotalLabel}>Total</Text>
                     <Text style={styles.heroTotalAmount}>{hideAmounts ? AMOUNT_MASK : formatCurrency(totalBalance)}</Text>
+                    {!hideAmounts && prevTotals != null && (() => {
+                      const t = computeTrend(totalBalance, prevTotals.totalBalance);
+                      return t ? (
+                        <View style={[styles.trendBadge, t.up ? styles.trendUp : styles.trendDown]}>
+                          <Text style={[styles.trendText, t.up ? styles.trendTextUp : styles.trendTextDown]}>
+                            {t.up ? '▲' : '▼'} {t.up ? '+' : '-'}{t.pct}
+                          </Text>
+                        </View>
+                      ) : null;
+                    })()}
                   </View>
                 )}
               </View>
@@ -540,6 +575,12 @@ const styles = StyleSheet.create({
   heroTotalRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
   heroTotalLabel: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.65)', textTransform: 'uppercase', letterSpacing: 0.5 },
   heroTotalAmount: { fontSize: 13, fontWeight: '700', color: 'rgba(255,255,255,0.85)' },
+  trendBadge: { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, marginLeft: 2 },
+  trendUp: { backgroundColor: 'rgba(34, 197, 94, 0.25)' },
+  trendDown: { backgroundColor: 'rgba(239, 68, 68, 0.25)' },
+  trendText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.2 },
+  trendTextUp: { color: '#4ade80' },
+  trendTextDown: { color: '#f87171' },
   heroIconWrap: {
     width: 48,
     height: 48,

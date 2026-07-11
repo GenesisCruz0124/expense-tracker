@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, lte, sql } from 'drizzle-orm';
 
 import type { Database } from '../client';
 import { accountCategories, accounts, transactions, type Account, type NewAccount } from '../schema';
@@ -296,4 +296,42 @@ export async function incrementAccountBalance(db: Database, id: number): Promise
       updatedAt: sql`(datetime('now'))`,
     })
     .where(eq(accounts.id, id));
+}
+
+export async function getHistoricalTotals(
+  db: Database,
+  asOfDate: string,
+): Promise<{ netWorth: number; totalBalance: number }> {
+  const rows = await db
+    .select({
+      balance: sql<number>`${accounts.startingBalance} + coalesce(sum(case
+        when ${accountCategories.kind} = 'credit_card' then
+          (case when ${transactions.type} = 'expense' then ${transactions.amount}
+            when ${transactions.type} = 'income' then -${transactions.amount}
+            else 0 end) + ${transactions.fee}
+        else
+          (case when ${transactions.type} = 'income' then ${transactions.amount}
+            when ${transactions.type} = 'expense' then -${transactions.amount}
+            else 0 end) - ${transactions.fee}
+        end), 0)`,
+      includeInNetWorth: accounts.includeInNetWorth,
+      kind: accountCategories.kind,
+    })
+    .from(accounts)
+    .leftJoin(
+      transactions,
+      and(eq(transactions.accountId, accounts.id), isNull(transactions.deletedAt), lte(transactions.occurredAt, asOfDate)),
+    )
+    .leftJoin(accountCategories, eq(accountCategories.id, accounts.categoryId))
+    .where(and(isNull(accounts.deletedAt), eq(accounts.isArchived, false)))
+    .groupBy(accounts.id);
+
+  let netWorth = 0;
+  let totalBalance = 0;
+  for (const row of rows) {
+    const signed = row.kind === 'credit_card' ? -row.balance : row.balance;
+    if (row.includeInNetWorth) netWorth += signed;
+    totalBalance += signed;
+  }
+  return { netWorth, totalBalance };
 }
