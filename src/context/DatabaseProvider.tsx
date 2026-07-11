@@ -7,6 +7,7 @@ import migrations from '../db/migrations/migrations';
 import { repairAccountsSchema, repairSyncSchema } from '../db/repair';
 import { seedAdditionalCategories, seedDefaultCategories } from '../db/seed';
 import { generateDueRecurringTransactions } from '../db/queries/recurring';
+import { generateDailyInterest } from '../db/interestAccrual';
 import { initSettingsTable } from '../db/queries/settings';
 import { backfillRowUuids } from '../db/uuidBackfill';
 import { checkBudgetAlerts } from '../db/budgetAlerts';
@@ -123,6 +124,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
         await seedDefaultCategories(db);
         await seedAdditionalCategories(db);
         await generateDueRecurringTransactions(db, new Date());
+        await generateDailyInterest(db, new Date());
         await checkBudgetAlerts(db, new Date());
         await checkBillReminders(db, new Date());
         setBootstrapped(true);

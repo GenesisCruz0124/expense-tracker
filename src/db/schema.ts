@@ -76,6 +76,10 @@ export const accounts = sqliteTable(
     monthlyContribution: integer('monthly_contribution'),
     /** ISO date ('YYYY-MM-DD') the balance was last updated via the increment button — for investment-kind accounts. */
     balanceLastUpdatedAt: text('balance_last_updated_at'),
+    /** Annual interest rate in centipercent (3.25% → 325) — for savings accounts earning daily interest. */
+    annualInterestRate: integer('annual_interest_rate'),
+    /** ISO date ('YYYY-MM-DD') through which daily interest has been accrued. */
+    lastInterestAccruedDate: text('last_interest_accrued_date'),
     /** Running count of how many times "Add to balance" or "Mark paid" has been clicked for this account. */
     totalMonths: integer('total_months').notNull().default(0),
     /** Credit limit for credit-card-kind accounts, in minor units (centavos). */

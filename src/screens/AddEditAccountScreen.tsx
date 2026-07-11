@@ -55,6 +55,7 @@ export default function AddEditAccountScreen() {
   const [balanceLastUpdatedAt, setBalanceLastUpdatedAt] = useState<string | null>(null);
   const [totalMonths, setTotalMonths] = useState(0);
   const [subscriptionDueDay, setSubscriptionDueDay] = useState<number | null>(null);
+  const [interestRateText, setInterestRateText] = useState('');
   const [transactionEffect, setTransactionEffect] = useState(0);
   const [loading, setLoading] = useState(isEditing);
   const [saving, setSaving] = useState(false);
@@ -88,6 +89,7 @@ export default function AddEditAccountScreen() {
       setBalanceLastUpdatedAt(existing.balanceLastUpdatedAt ?? null);
       setTotalMonths(existing.totalMonths ?? 0);
       setSubscriptionDueDay(existing.subscriptionDueDay ?? null);
+      setInterestRateText(existing.annualInterestRate != null ? String(existing.annualInterestRate / 100) : '');
       setTransactionEffect(existing.balance - existing.startingBalance);
       setLoading(false);
     })();
@@ -141,6 +143,14 @@ export default function AddEditAccountScreen() {
         return;
       }
     }
+    let annualInterestRate: number | null = null;
+    if (interestRateText.trim()) {
+      annualInterestRate = Math.round(parseFloat(interestRateText) * 100);
+      if (isNaN(annualInterestRate) || annualInterestRate <= 0) {
+        setError('Enter a valid annual interest rate (e.g. 3.25).');
+        return;
+      }
+    }
 
     setSaving(true);
     try {
@@ -160,6 +170,7 @@ export default function AddEditAccountScreen() {
         subscriptionDueDay: isCreditCardKind ? subscriptionDueDay : null,
         monthlyContribution,
         balanceLastUpdatedAt,
+        annualInterestRate,
       };
       if (isEditing) {
         await updateAccount(accountId, { ...input, totalMonths });
@@ -246,6 +257,22 @@ export default function AddEditAccountScreen() {
       <View style={styles.field}>
         <Text style={styles.label}>Balance</Text>
         <AmountInput value={balanceText} onChangeText={setBalanceText} />
+      </View>
+
+      <View style={styles.field}>
+        <Text style={styles.label}>Annual interest rate (optional)</Text>
+        <View style={styles.interestRateRow}>
+          <TextInput
+            style={[styles.input, styles.interestRateInput]}
+            value={interestRateText}
+            onChangeText={setInterestRateText}
+            placeholder="e.g. 3.25"
+            placeholderTextColor={PALETTE.textSecondary}
+            keyboardType="decimal-pad"
+          />
+          <Text style={styles.interestRateUnit}>% p.a.</Text>
+        </View>
+        <Text style={styles.helperText}>Leave blank if this account doesn't earn interest.</Text>
       </View>
 
       {isCreditCardKind ? (
@@ -554,6 +581,9 @@ const styles = StyleSheet.create({
   },
   iconOptionSelected: { borderColor: PALETTE.net, backgroundColor: `${PALETTE.net}1A` },
   iconOptionText: { fontSize: 20 },
+  interestRateRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  interestRateInput: { flex: 1 },
+  interestRateUnit: { fontSize: 14, color: PALETTE.textSecondary, fontWeight: '600' },
   accountNumberRow: { flexDirection: 'row', gap: 10, alignItems: 'center' },
   accountNumberInput: { flex: 1 },
   copyButton: {

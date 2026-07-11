@@ -56,6 +56,8 @@ export async function listAccounts(db: Database, options: ListAccountsOptions = 
       monthlyDueLastPaidMonth: accounts.monthlyDueLastPaidMonth,
       monthlyContribution: accounts.monthlyContribution,
       balanceLastUpdatedAt: accounts.balanceLastUpdatedAt,
+      annualInterestRate: accounts.annualInterestRate,
+      lastInterestAccruedDate: accounts.lastInterestAccruedDate,
       totalMonths: accounts.totalMonths,
       creditLimit: accounts.creditLimit,
       linkedCreditCardId: accounts.linkedCreditCardId,
@@ -111,6 +113,8 @@ export async function getAccountWithBalance(db: Database, id: number): Promise<A
       monthlyDueLastPaidMonth: accounts.monthlyDueLastPaidMonth,
       monthlyContribution: accounts.monthlyContribution,
       balanceLastUpdatedAt: accounts.balanceLastUpdatedAt,
+      annualInterestRate: accounts.annualInterestRate,
+      lastInterestAccruedDate: accounts.lastInterestAccruedDate,
       totalMonths: accounts.totalMonths,
       creditLimit: accounts.creditLimit,
       linkedCreditCardId: accounts.linkedCreditCardId,
@@ -156,6 +160,8 @@ export interface AccountInput {
   linkedCreditCardId?: number | null;
   /** Day of the month (1–31) when the subscription renews — for subscription accounts. */
   subscriptionDueDay?: number | null;
+  /** Annual interest rate in centipercent (3.25% → 325) — for savings accounts earning daily interest. */
+  annualInterestRate?: number | null;
 }
 
 export async function createAccount(db: Database, input: AccountInput): Promise<Account> {
@@ -176,6 +182,7 @@ export async function createAccount(db: Database, input: AccountInput): Promise<
     creditLimit: input.creditLimit ?? null,
     linkedCreditCardId: input.linkedCreditCardId ?? null,
     subscriptionDueDay: input.subscriptionDueDay ?? null,
+    annualInterestRate: input.annualInterestRate ?? null,
     uuid: generateUuid(),
   };
   const [row] = await db.insert(accounts).values(values).returning();
@@ -202,6 +209,7 @@ export async function updateAccount(db: Database, id: number, input: AccountInpu
       creditLimit: input.creditLimit ?? null,
       linkedCreditCardId: input.linkedCreditCardId ?? null,
       subscriptionDueDay: input.subscriptionDueDay ?? null,
+      annualInterestRate: input.annualInterestRate ?? null,
       updatedAt: sql`(datetime('now'))`,
     })
     .where(eq(accounts.id, id));
