@@ -21,6 +21,7 @@ const ACCOUNT_COLUMNS: AccountColumnSpec[] = [
   { name: 'subscription_due_day', type: 'integer' },
   { name: 'annual_interest_rate', type: 'integer' },
   { name: 'last_interest_accrued_date', type: 'text' },
+  { name: 'interest_frequency', type: 'text' },
 ];
 
 const RECURRING_COLUMNS: AccountColumnSpec[] = [

@@ -25,6 +25,7 @@ export async function seedDefaultCategories(db: Database): Promise<void> {
 
 const ADDITIONAL_CATEGORIES: NewCategory[] = [
   // Income
+  { name: 'Interest', type: 'income', color: '#0ea5e9', icon: '📈' },
   { name: 'Clothing Allowance for Officers', type: 'income', color: '#6366F1', icon: '💼' },
   { name: '1st Tranche of Rice Subsidy for Officers', type: 'income', color: '#84CC16', icon: '🎁' },
   { name: 'Monetization of Excess Unused Leave Credits', type: 'income', color: '#F59E0B', icon: '💰' },

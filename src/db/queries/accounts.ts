@@ -58,6 +58,7 @@ export async function listAccounts(db: Database, options: ListAccountsOptions = 
       balanceLastUpdatedAt: accounts.balanceLastUpdatedAt,
       annualInterestRate: accounts.annualInterestRate,
       lastInterestAccruedDate: accounts.lastInterestAccruedDate,
+      interestFrequency: accounts.interestFrequency,
       totalMonths: accounts.totalMonths,
       creditLimit: accounts.creditLimit,
       linkedCreditCardId: accounts.linkedCreditCardId,
@@ -115,6 +116,7 @@ export async function getAccountWithBalance(db: Database, id: number): Promise<A
       balanceLastUpdatedAt: accounts.balanceLastUpdatedAt,
       annualInterestRate: accounts.annualInterestRate,
       lastInterestAccruedDate: accounts.lastInterestAccruedDate,
+      interestFrequency: accounts.interestFrequency,
       totalMonths: accounts.totalMonths,
       creditLimit: accounts.creditLimit,
       linkedCreditCardId: accounts.linkedCreditCardId,
@@ -160,8 +162,10 @@ export interface AccountInput {
   linkedCreditCardId?: number | null;
   /** Day of the month (1–31) when the subscription renews — for subscription accounts. */
   subscriptionDueDay?: number | null;
-  /** Annual interest rate in centipercent (3.25% → 325) — for savings accounts earning daily interest. */
+  /** Annual interest rate in centipercent (3.25% → 325) — for savings accounts earning interest. */
   annualInterestRate?: number | null;
+  /** How often interest is credited: 'daily' | 'monthly' | 'yearly'. */
+  interestFrequency?: 'daily' | 'monthly' | 'yearly' | null;
 }
 
 export async function createAccount(db: Database, input: AccountInput): Promise<Account> {
@@ -183,6 +187,7 @@ export async function createAccount(db: Database, input: AccountInput): Promise<
     linkedCreditCardId: input.linkedCreditCardId ?? null,
     subscriptionDueDay: input.subscriptionDueDay ?? null,
     annualInterestRate: input.annualInterestRate ?? null,
+    interestFrequency: input.interestFrequency ?? null,
     uuid: generateUuid(),
   };
   const [row] = await db.insert(accounts).values(values).returning();
@@ -210,6 +215,7 @@ export async function updateAccount(db: Database, id: number, input: AccountInpu
       linkedCreditCardId: input.linkedCreditCardId ?? null,
       subscriptionDueDay: input.subscriptionDueDay ?? null,
       annualInterestRate: input.annualInterestRate ?? null,
+      interestFrequency: input.interestFrequency ?? null,
       updatedAt: sql`(datetime('now'))`,
     })
     .where(eq(accounts.id, id));

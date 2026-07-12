@@ -56,6 +56,7 @@ export default function AddEditAccountScreen() {
   const [totalMonths, setTotalMonths] = useState(0);
   const [subscriptionDueDay, setSubscriptionDueDay] = useState<number | null>(null);
   const [interestRateText, setInterestRateText] = useState('');
+  const [interestFrequency, setInterestFrequency] = useState<'daily' | 'monthly' | 'yearly'>('daily');
   const [transactionEffect, setTransactionEffect] = useState(0);
   const [loading, setLoading] = useState(isEditing);
   const [saving, setSaving] = useState(false);
@@ -90,6 +91,7 @@ export default function AddEditAccountScreen() {
       setTotalMonths(existing.totalMonths ?? 0);
       setSubscriptionDueDay(existing.subscriptionDueDay ?? null);
       setInterestRateText(existing.annualInterestRate != null ? String(existing.annualInterestRate / 100) : '');
+      setInterestFrequency((existing.interestFrequency as 'daily' | 'monthly' | 'yearly') ?? 'daily');
       setTransactionEffect(existing.balance - existing.startingBalance);
       setLoading(false);
     })();
@@ -171,6 +173,7 @@ export default function AddEditAccountScreen() {
         monthlyContribution,
         balanceLastUpdatedAt,
         annualInterestRate,
+        interestFrequency: annualInterestRate != null ? interestFrequency : null,
       };
       if (isEditing) {
         await updateAccount(accountId, { ...input, totalMonths });
@@ -274,6 +277,25 @@ export default function AddEditAccountScreen() {
         </View>
         <Text style={styles.helperText}>Leave blank if this account doesn't earn interest.</Text>
       </View>
+
+      {interestRateText.trim() ? (
+        <View style={styles.field}>
+          <Text style={styles.label}>Interest credited</Text>
+          <View style={styles.freqRow}>
+            {(['daily', 'monthly', 'yearly'] as const).map((freq) => (
+              <Pressable
+                key={freq}
+                style={[styles.freqChip, interestFrequency === freq && styles.freqChipSelected]}
+                onPress={() => setInterestFrequency(freq)}
+              >
+                <Text style={[styles.freqChipText, interestFrequency === freq && styles.freqChipTextSelected]}>
+                  {freq.charAt(0).toUpperCase() + freq.slice(1)}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      ) : null}
 
       {isCreditCardKind ? (
         <View style={styles.field}>
@@ -584,6 +606,11 @@ const styles = StyleSheet.create({
   interestRateRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   interestRateInput: { flex: 1 },
   interestRateUnit: { fontSize: 14, color: PALETTE.textSecondary, fontWeight: '600' },
+  freqRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  freqChip: { flex: 1, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5, borderColor: PALETTE.border, alignItems: 'center', backgroundColor: PALETTE.surface },
+  freqChipSelected: { borderColor: PALETTE.net, backgroundColor: PALETTE.net },
+  freqChipText: { fontSize: 13, fontWeight: '600', color: PALETTE.textSecondary },
+  freqChipTextSelected: { color: '#fff' },
   accountNumberRow: { flexDirection: 'row', gap: 10, alignItems: 'center' },
   accountNumberInput: { flex: 1 },
   copyButton: {
