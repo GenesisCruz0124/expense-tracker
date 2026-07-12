@@ -70,7 +70,7 @@ export async function listAccounts(db: Database, options: ListAccountsOptions = 
       lastTransactionAt: lastTransactionAtExpr,
     })
     .from(accounts)
-    .leftJoin(transactions, eq(transactions.accountId, accounts.id))
+    .leftJoin(transactions, and(eq(transactions.accountId, accounts.id), isNull(transactions.deletedAt)))
     .leftJoin(accountCategories, eq(accountCategories.id, accounts.categoryId))
     .groupBy(accounts.id)
     .orderBy(
@@ -128,7 +128,7 @@ export async function getAccountWithBalance(db: Database, id: number): Promise<A
       lastTransactionAt: lastTransactionAtExpr,
     })
     .from(accounts)
-    .leftJoin(transactions, eq(transactions.accountId, accounts.id))
+    .leftJoin(transactions, and(eq(transactions.accountId, accounts.id), isNull(transactions.deletedAt)))
     .leftJoin(accountCategories, eq(accountCategories.id, accounts.categoryId))
     .where(and(eq(accounts.id, id), isNull(accounts.deletedAt)))
     .groupBy(accounts.id)

@@ -1,6 +1,6 @@
 {
   "name": "expense-tracker",
-  "version": "1.1.20",
+  "version": "1.1.21",
   "main": "index.ts",
   "dependencies": {
     "@react-native-async-storage/async-storage": "^3.1.1",
