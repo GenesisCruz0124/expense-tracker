@@ -10,8 +10,9 @@ import { formatIsoDate } from '../utils/dateRanges';
  * Uses a lazy catch-up pattern: runs on each app launch and inserts one transaction per missed day
  * since the last run (or today if the account has never had interest accrued).
  *
- * Formula: dailyInterest = floor(balanceMinorUnits × rateCentipercent / 3_650_000)
- * Example: PHP 21,239.86 at 3.25% p.a. → floor(2,123,986 × 325 / 3,650,000) = 189 centavos = PHP 1.89/day
+ * Formula: net = floor(floor(balance × rate / 3_650_000) × 0.80)
+ * Applies 20% Philippine withholding tax on gross interest to match what MariBank actually credits.
+ * Example: PHP 21,239.86 at 3.25% → gross 189¢ → net 151¢ after 20% withholding tax
  */
 export async function generateDailyInterest(db: Database, today: Date): Promise<void> {
   const todayIso = formatIsoDate(today);
@@ -49,7 +50,8 @@ export async function generateDailyInterest(db: Database, today: Date): Promise<
       .groupBy(accounts.id);
 
     const balance = balRow?.balance ?? account.startingBalance;
-    const dailyInterest = Math.floor((balance * account.annualInterestRate!) / 3_650_000);
+    const grossInterest = Math.floor((balance * account.annualInterestRate!) / 3_650_000);
+    const dailyInterest = Math.floor(grossInterest * 80 / 100); // 20% withholding tax
 
     if (dailyInterest > 0) {
       const cursor = new Date(startIso + 'T00:00:00');
