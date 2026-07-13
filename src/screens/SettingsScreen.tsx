@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Constants from 'expo-constants';
@@ -29,6 +29,7 @@ import { formatIsoDate } from '../utils/dateRanges';
 import { getNotificationPermissionStatus, requestNotificationPermissions } from '../utils/notifications';
 import { isSyncConfigured } from '../sync/supabaseClient';
 import { pushChanges, SyncNotSignedInError } from '../sync/pushChanges';
+import { useAppUpdate } from '../hooks/useAppUpdate';
 
 const DEVELOPER_EMAIL = 'genesiscruz.dev@gmail.com';
 
@@ -49,6 +50,8 @@ export default function SettingsScreen() {
   const [restoring, setRestoring] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [lastSyncResult, setLastSyncResult] = useState('');
+  const { checking, downloading, progress, release, currentVersion, checkForUpdate, downloadAndInstall } = useAppUpdate();
+  const [updateModalVisible, setUpdateModalVisible] = useState(false);
   const [themeMode, setThemeMode] = useState<ThemeMode>(getStoredThemeMode);
   const [accentKey, setAccentKey] = useState<AccentKey>(getStoredAccentKey);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
@@ -192,6 +195,19 @@ export default function SettingsScreen() {
       }
     } finally {
       setSyncing(false);
+    }
+  }
+
+  async function handleCheckForUpdates() {
+    try {
+      const info = await checkForUpdate();
+      if (!info) {
+        Alert.alert("You're up to date", `Version ${currentVersion} is the latest.`);
+      } else {
+        setUpdateModalVisible(true);
+      }
+    } catch (err) {
+      Alert.alert('Update check failed', err instanceof Error ? err.message : 'Could not reach GitHub.');
     }
   }
 
@@ -390,7 +406,54 @@ export default function SettingsScreen() {
           <Text style={styles.rowLabel}>Developer</Text>
           <Text style={[styles.rowValue, styles.rowValueLink]}>{DEVELOPER_EMAIL}</Text>
         </Pressable>
+        {Platform.OS === 'android' ? (
+          <Pressable style={styles.row} onPress={handleCheckForUpdates} disabled={checking}>
+            <View style={styles.rowLabelGroup}>
+              <Text style={styles.rowLabel}>{checking ? 'Checking…' : 'Check for Updates'}</Text>
+              <Text style={styles.rowSubLabel}>Installed: v{currentVersion}</Text>
+            </View>
+            <Text style={styles.rowChevron}>›</Text>
+          </Pressable>
+        ) : null}
       </View>
+
+      {release ? (
+        <Modal visible={updateModalVisible} transparent animationType="fade" onRequestClose={() => setUpdateModalVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>Update available</Text>
+              <Text style={styles.modalVersionLine}>
+                v{currentVersion} → {release.tagName}
+              </Text>
+              {release.body ? (
+                <ScrollView style={styles.releaseNotes} nestedScrollEnabled>
+                  <Text style={styles.releaseNotesText}>{release.body}</Text>
+                </ScrollView>
+              ) : null}
+              {downloading ? (
+                <View style={styles.progressBarTrack}>
+                  <View style={[styles.progressBarFill, { width: `${Math.round(progress * 100)}%` }]} />
+                </View>
+              ) : null}
+              {downloading ? (
+                <Text style={styles.progressLabel}>{Math.round(progress * 100)}%</Text>
+              ) : null}
+              <View style={styles.modalButtons}>
+                <Pressable style={styles.modalCancel} onPress={() => setUpdateModalVisible(false)} disabled={downloading}>
+                  <Text style={styles.modalCancelText}>Later</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.modalInstall, downloading && styles.modalInstallDisabled]}
+                  onPress={() => downloadAndInstall(release.downloadUrl)}
+                  disabled={downloading}
+                >
+                  <Text style={styles.modalInstallText}>{downloading ? 'Downloading…' : 'Install Update'}</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      ) : null}
     </ScrollView>
   );
 }
@@ -442,4 +505,19 @@ const styles = StyleSheet.create({
   },
   accentSwatchSelected: { borderWidth: 2, borderColor: PALETTE.textPrimary },
   accentSwatchCheck: { color: PALETTE.onPrimary, fontWeight: '700', fontSize: 14 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  modalCard: { backgroundColor: PALETTE.surface, borderRadius: 16, padding: 20, width: '100%', gap: 12 },
+  modalTitle: { fontSize: 17, fontWeight: '700', color: PALETTE.textPrimary },
+  modalVersionLine: { fontSize: 14, color: PALETTE.textSecondary, fontWeight: '600' },
+  releaseNotes: { maxHeight: 180, backgroundColor: PALETTE.background, borderRadius: 8, padding: 10 },
+  releaseNotesText: { fontSize: 13, color: PALETTE.textSecondary, lineHeight: 20 },
+  progressBarTrack: { height: 6, borderRadius: 3, backgroundColor: PALETTE.border, overflow: 'hidden' },
+  progressBarFill: { height: 6, borderRadius: 3, backgroundColor: PALETTE.net },
+  progressLabel: { fontSize: 12, color: PALETTE.textSecondary, textAlign: 'center' },
+  modalButtons: { flexDirection: 'row', gap: 10, justifyContent: 'flex-end' },
+  modalCancel: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 10, borderWidth: 1, borderColor: PALETTE.border },
+  modalCancelText: { fontSize: 14, fontWeight: '600', color: PALETTE.textSecondary },
+  modalInstall: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 10, backgroundColor: PALETTE.net },
+  modalInstallDisabled: { opacity: 0.5 },
+  modalInstallText: { fontSize: 14, fontWeight: '700', color: '#fff' },
 });
