@@ -98,9 +98,9 @@ export default function AccountsScreen() {
   const [netWorthFilter, setNetWorthFilter] = useState<NetWorthFilter>('all');
   const [netWorthFilterLoaded, setNetWorthFilterLoaded] = useState(false);
   const [menuAccount, setMenuAccount] = useState<AccountWithBalance | null>(null);
-  const [sortOption, setSortOption] = useState<SortOption>('balance_desc');
+  const [sortOption, setSortOption] = useState<SortOption>('recent');
   const [showSortPicker, setShowSortPicker] = useState(false);
-  const [grouped, setGrouped] = useState(true);
+  const [grouped, setGrouped] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [groupsLoaded, setGroupsLoaded] = useState(false);
