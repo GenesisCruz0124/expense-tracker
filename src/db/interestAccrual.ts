@@ -110,7 +110,11 @@ async function accrueDailyInterest(
     d.setDate(d.getDate() + 1);
     startIso = formatIsoDate(d);
   } else {
-    startIso = todayIso;
+    // First run: back-fill from start of current month so no days this month
+    // are silently skipped when the feature is first activated mid-month.
+    const d = new Date(todayIso + 'T00:00:00');
+    d.setDate(1);
+    startIso = formatIsoDate(d);
   }
   if (startIso > todayIso) return;
 
