@@ -33,6 +33,7 @@ export default function TransactionsListScreen() {
   const [endDate, setEndDate] = useState('');
   const [typeFilter, setTypeFilter] = useState<'expense' | 'income' | undefined>(route.params?.type);
   const [runningBalanceMode, setRunningBalanceMode] = useState(route.params?.runningBalance ?? false);
+  const [uncategorizedSelected, setUncategorizedSelected] = useState(false);
   const [excludedFilter, setExcludedFilter] = useState<ExcludedFilter>('all');
   const [groupByDay, setGroupByDay] = useState(false);
   const [filterVisible, setFilterVisible] = useState(false);
@@ -44,6 +45,7 @@ export default function TransactionsListScreen() {
     setEndDate(route.params?.end ?? '');
     setSelectedCategoryIds([]);
     setSelectedAccountIds([]);
+    setUncategorizedSelected(false);
     setSearchText('');
     setExcludedFilter('all');
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -52,7 +54,8 @@ export default function TransactionsListScreen() {
   const filter = useMemo<ListTransactionsFilter>(() => {
     const next: ListTransactionsFilter = {};
     if (searchText.trim()) next.searchText = searchText.trim();
-    if (selectedCategoryIds.length > 0) next.categoryIds = selectedCategoryIds;
+    if (uncategorizedSelected) next.uncategorized = true;
+    else if (selectedCategoryIds.length > 0) next.categoryIds = selectedCategoryIds;
     if (selectedAccountIds.length > 0) next.accountIds = selectedAccountIds;
     if (startDate && endDate) {
       next.start = startDate;
@@ -63,7 +66,7 @@ export default function TransactionsListScreen() {
     else if (excludedFilter === 'only') next.excludeFromExpense = true;
     else if (typeFilter || runningBalanceMode) next.excludeFromExpense = false;
     return next;
-  }, [searchText, selectedCategoryIds, selectedAccountIds, startDate, endDate, typeFilter, runningBalanceMode, excludedFilter]);
+  }, [searchText, uncategorizedSelected, selectedCategoryIds, selectedAccountIds, startDate, endDate, typeFilter, runningBalanceMode, excludedFilter]);
 
   const { transactions, loading } = useTransactions(filter);
   const transactionsWithBalance = useMemo(() => {
@@ -97,6 +100,7 @@ export default function TransactionsListScreen() {
   }, [transactionsWithBalance]);
 
   const activeFilterCount =
+    (uncategorizedSelected ? 1 : 0) +
     selectedCategoryIds.length +
     selectedAccountIds.length +
     (startDate && endDate ? 1 : 0) +
@@ -113,6 +117,7 @@ export default function TransactionsListScreen() {
   }
 
   function clearFilters() {
+    setUncategorizedSelected(false);
     setSelectedCategoryIds([]);
     setSelectedAccountIds([]);
     setStartDate('');
@@ -234,6 +239,8 @@ export default function TransactionsListScreen() {
         onClose={() => setFilterVisible(false)}
         selectedCategoryIds={selectedCategoryIds}
         onToggleCategory={toggleCategory}
+        uncategorizedSelected={uncategorizedSelected}
+        onToggleUncategorized={() => setUncategorizedSelected((v) => !v)}
         selectedAccountIds={selectedAccountIds}
         onToggleAccount={toggleAccount}
         startDate={startDate}

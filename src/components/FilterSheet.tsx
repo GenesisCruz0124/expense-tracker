@@ -29,6 +29,8 @@ interface Props {
   onClose: () => void;
   selectedCategoryIds: number[];
   onToggleCategory: (id: number) => void;
+  uncategorizedSelected: boolean;
+  onToggleUncategorized: () => void;
   selectedAccountIds: number[];
   onToggleAccount: (id: number) => void;
   startDate: string;
@@ -48,6 +50,8 @@ export function FilterSheet({
   onClose,
   selectedCategoryIds,
   onToggleCategory,
+  uncategorizedSelected,
+  onToggleUncategorized,
   selectedAccountIds,
   onToggleAccount,
   startDate,
@@ -106,10 +110,20 @@ export function FilterSheet({
             })}
           </View>
 
-          {filteredCategories.length > 0 ? (
+          {(filteredCategories.length > 0 || (!search && !uncategorizedSelected) || uncategorizedSelected) ? (
             <>
               <Text style={styles.sectionLabel}>Categories</Text>
               <View style={styles.chips}>
+                {!search ? (
+                  <Pressable
+                    onPress={onToggleUncategorized}
+                    style={[styles.chip, styles.uncategorizedChip, uncategorizedSelected && styles.uncategorizedChipSelected]}
+                  >
+                    <Text style={[styles.chipText, uncategorizedSelected ? styles.uncategorizedChipTextSelected : styles.uncategorizedChipText]}>
+                      Uncategorized
+                    </Text>
+                  </Pressable>
+                ) : null}
                 {filteredCategories.map((category) => {
                   const selected = selectedCategoryIds.includes(category.id);
                   return (
@@ -217,6 +231,10 @@ const styles = StyleSheet.create({
   sectionLabel: { fontSize: 13, fontWeight: '700', color: PALETTE.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 8 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { borderWidth: 1.5, borderRadius: 999, paddingVertical: 6, paddingHorizontal: 12 },
+  uncategorizedChip: { borderColor: PALETTE.textSecondary, borderStyle: 'dashed' },
+  uncategorizedChipSelected: { backgroundColor: PALETTE.textSecondary, borderStyle: 'solid' },
+  uncategorizedChipText: { color: PALETTE.textSecondary },
+  uncategorizedChipTextSelected: { color: '#fff' },
   accountChip: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   chipText: { fontSize: 13, fontWeight: '600' },
   dateRow: { flexDirection: 'row', gap: 12 },

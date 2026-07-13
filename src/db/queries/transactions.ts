@@ -16,6 +16,8 @@ export interface TransactionWithCategory extends Transaction {
 export interface ListTransactionsFilter {
   type?: 'expense' | 'income';
   categoryIds?: number[];
+  /** When true, only return transactions with no category assigned. */
+  uncategorized?: boolean;
   accountIds?: number[];
   /** Inclusive ISO date range */
   start?: string;
@@ -27,7 +29,9 @@ export interface ListTransactionsFilter {
 function buildFilterConditions(filter: ListTransactionsFilter): SQL[] {
   const conditions: SQL[] = [isNull(transactions.deletedAt)];
   if (filter.type) conditions.push(eq(transactions.type, filter.type));
-  if (filter.categoryIds && filter.categoryIds.length > 0) {
+  if (filter.uncategorized) {
+    conditions.push(isNull(transactions.categoryId));
+  } else if (filter.categoryIds && filter.categoryIds.length > 0) {
     conditions.push(inArray(transactions.categoryId, filter.categoryIds));
   }
   if (filter.accountIds && filter.accountIds.length > 0) {
