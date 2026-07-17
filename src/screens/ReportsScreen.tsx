@@ -25,9 +25,26 @@ import {
   weekRangeFor,
   type PeriodType,
 } from '../utils/dateRanges';
+import { formatCurrency } from '../utils/currency';
 
 type BreakdownView = 'pie' | 'bar';
 type TrendView = 'line' | 'bar';
+type AvgPeriod = 'daily' | 'weekly' | 'monthly';
+
+const AVG_PERIOD_LABELS: Record<AvgPeriod, string> = { daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly' };
+const AVG_PERIOD_SUFFIX: Record<AvgPeriod, string> = { daily: '/day', weekly: '/wk', monthly: '/mo' };
+
+function daysInRange(start: string, end: string): number {
+  const s = new Date(start + 'T00:00:00');
+  const e = new Date(end + 'T00:00:00');
+  return Math.max(1, Math.round((e.getTime() - s.getTime()) / 86_400_000) + 1);
+}
+
+function periodAvg(totalMinorUnits: number, days: number, period: AvgPeriod): number {
+  if (period === 'daily') return Math.round(totalMinorUnits / days);
+  if (period === 'weekly') return Math.round((totalMinorUnits * 7) / days);
+  return Math.round((totalMinorUnits * 30.44) / days);
+}
 
 function SegmentButton({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
   return (
@@ -46,6 +63,7 @@ export default function ReportsScreen() {
   const [trendView, setTrendView] = useState<TrendView>('line');
   const [trendPeriod, setTrendPeriod] = useState<TrendPeriod>('monthly');
   const [periodCount, setPeriodCount] = useState(8);
+  const [avgPeriod, setAvgPeriod] = useState<AvgPeriod>('monthly');
 
   const range =
     period === 'custom'
@@ -210,6 +228,43 @@ export default function ReportsScreen() {
         {trendView === 'line' ? <TrendLineChart entries={trend} /> : <MonthlyTotalsBarChart entries={trend} />}
       </View>
 
+      {categoryData.length > 0 ? (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>
+              Avg {breakdownKind === 'expense' ? 'expense' : 'income'} per category
+            </Text>
+          </View>
+          <View style={styles.kindToggle}>
+            {(Object.keys(AVG_PERIOD_LABELS) as AvgPeriod[]).map((p) => (
+              <Pressable
+                key={p}
+                onPress={() => setAvgPeriod(p)}
+                style={[styles.kindChip, avgPeriod === p && styles.kindChipSelected]}
+              >
+                <Text style={[styles.kindChipText, avgPeriod === p && styles.kindChipTextSelected]}>
+                  {AVG_PERIOD_LABELS[p]}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          {(() => {
+            const days = daysInRange(range.start, range.end);
+            const suffix = AVG_PERIOD_SUFFIX[avgPeriod];
+            return categoryData.map((entry) => {
+              const avg = periodAvg(entry.total, days, avgPeriod);
+              return (
+                <View key={entry.categoryId ?? 'uncategorized'} style={styles.avgRow}>
+                  <View style={[styles.avgDot, { backgroundColor: entry.categoryColor }]} />
+                  <Text style={styles.avgName} numberOfLines={1}>{entry.categoryName}</Text>
+                  <Text style={styles.avgAmount}>{formatCurrency(avg)}<Text style={styles.avgSuffix}>{suffix}</Text></Text>
+                </View>
+              );
+            });
+          })()}
+        </View>
+      ) : null}
+
     </ScrollView>
   );
 }
@@ -254,4 +309,9 @@ const styles = StyleSheet.create({
   kindChipSelected: { borderColor: PALETTE.net, backgroundColor: `${PALETTE.net}1A` },
   kindChipText: { fontSize: 12, fontWeight: '600', color: PALETTE.textSecondary },
   kindChipTextSelected: { color: PALETTE.net },
+  avgRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: PALETTE.border },
+  avgDot: { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
+  avgName: { flex: 1, fontSize: 13, fontWeight: '600', color: PALETTE.textPrimary },
+  avgAmount: { fontSize: 13, fontWeight: '700', color: PALETTE.expense },
+  avgSuffix: { fontSize: 11, fontWeight: '500', color: PALETTE.textSecondary },
 });
