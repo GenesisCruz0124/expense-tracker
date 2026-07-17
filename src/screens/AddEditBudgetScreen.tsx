@@ -14,7 +14,7 @@ import type { RootStackParamList } from '../navigation/types';
 export default function AddEditBudgetScreen() {
   const navigation = useNavigation();
   const route = useRoute<RouteProp<RootStackParamList, 'AddEditBudget'>>();
-  const { budgetId, monthKey } = route.params;
+  const { budgetId, monthKey, prefillCategoryId, prefillAmount } = route.params;
   const isEditing = budgetId != null;
 
   const range = useMemo(() => monthRangeFor(parseISO(`${monthKey}-01`)), [monthKey]);
@@ -29,12 +29,17 @@ export default function AddEditBudgetScreen() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isEditing || hydrated || !existing) return;
-    setCategoryId(existing.categoryId);
-    setLimitText(String(fromMinorUnits(existing.amountLimit)));
-    setThresholdText(String(existing.alertThresholdPct));
-    setHydrated(true);
-  }, [isEditing, hydrated, existing]);
+    if (isEditing) {
+      if (hydrated || !existing) return;
+      setCategoryId(existing.categoryId);
+      setLimitText(String(fromMinorUnits(existing.amountLimit)));
+      setThresholdText(String(existing.alertThresholdPct));
+      setHydrated(true);
+    } else {
+      if (prefillCategoryId != null) setCategoryId(prefillCategoryId);
+      if (prefillAmount != null) setLimitText(String(fromMinorUnits(prefillAmount)));
+    }
+  }, [isEditing, hydrated, existing, prefillCategoryId, prefillAmount]);
 
   useEffect(() => {
     navigation.setOptions({ title: isEditing ? 'Edit budget' : 'Set a budget' });

@@ -32,7 +32,7 @@ export type RootStackParamList = {
   AddEditTransaction: { transactionId?: number; accountId?: number; transactionType?: 'expense' | 'income' | 'transfer' } | undefined;
   AddEditCategory: { categoryId?: number; lockType?: 'expense' | 'income' | 'both' } | undefined;
   AddEditAccountCategory: { accountCategoryId?: number } | undefined;
-  AddEditBudget: { budgetId?: number; monthKey: string };
+  AddEditBudget: { budgetId?: number; monthKey: string; prefillCategoryId?: number; prefillAmount?: number };
   AddEditRecurring: { recurringId?: number } | undefined;
   AddEditAccount: { accountId?: number } | undefined;
   AddEditBill: { billId?: number } | undefined;

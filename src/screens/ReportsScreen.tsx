@@ -251,13 +251,30 @@ export default function ReportsScreen() {
           {(() => {
             const days = daysInRange(range.start, range.end);
             const suffix = AVG_PERIOD_SUFFIX[avgPeriod];
+            const monthKey = `${anchorDate.getFullYear()}-${String(anchorDate.getMonth() + 1).padStart(2, '0')}`;
             return categoryData.map((entry) => {
               const avg = periodAvg(entry.total, days, avgPeriod);
+              const monthlyAvg = periodAvg(entry.total, days, 'monthly');
               return (
                 <View key={entry.categoryId ?? 'uncategorized'} style={styles.avgRow}>
                   <View style={[styles.avgDot, { backgroundColor: entry.categoryColor }]} />
                   <Text style={styles.avgName} numberOfLines={1}>{entry.categoryName}</Text>
                   <Text style={styles.avgAmount}>{formatCurrency(avg)}<Text style={styles.avgSuffix}>{suffix}</Text></Text>
+                  {entry.categoryId != null ? (
+                    <Pressable
+                      style={styles.avgAddBtn}
+                      hitSlop={8}
+                      onPress={() =>
+                        navigation.navigate('AddEditBudget', {
+                          monthKey,
+                          prefillCategoryId: entry.categoryId!,
+                          prefillAmount: monthlyAvg,
+                        })
+                      }
+                    >
+                      <Text style={styles.avgAddBtnText}>+</Text>
+                    </Pressable>
+                  ) : null}
                 </View>
               );
             });
@@ -314,4 +331,15 @@ const styles = StyleSheet.create({
   avgName: { flex: 1, fontSize: 13, fontWeight: '600', color: PALETTE.textPrimary },
   avgAmount: { fontSize: 13, fontWeight: '700', color: PALETTE.expense },
   avgSuffix: { fontSize: 11, fontWeight: '500', color: PALETTE.textSecondary },
+  avgAddBtn: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: PALETTE.expense,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  avgAddBtnText: { fontSize: 14, fontWeight: '700', color: PALETTE.expense, lineHeight: 18 },
 });
