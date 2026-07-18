@@ -490,7 +490,9 @@ export default function AccountsScreen() {
                     {hideAmounts ? AMOUNT_MASK : formatCurrency(isLoan ? -item.balance : item.balance)}
                   </Text>
                   {!hideAmounts && prevBalances[item.id] != null && (() => {
-                    const t = computeTrend(item.balance, prevBalances[item.id]);
+                    const displayBal = isLoan ? -item.balance : item.balance;
+                    const displayPrev = isLoan ? -prevBalances[item.id] : prevBalances[item.id];
+                    const t = computeTrend(displayBal, displayPrev);
                     return t ? (
                       <View style={[styles.cardTrendBadge, t.up ? styles.cardTrendUp : styles.cardTrendDown]}>
                         <Text style={[styles.cardTrendText, t.up ? styles.cardTrendTextUp : styles.cardTrendTextDown]}>
