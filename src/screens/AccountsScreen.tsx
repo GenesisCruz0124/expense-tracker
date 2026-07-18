@@ -241,7 +241,10 @@ export default function AccountsScreen() {
           title: 'All accounts',
           icon: '🏦',
           color: PALETTE.net,
-          total: data.reduce((sum, account) => sum + account.balance, 0),
+          total: data.reduce((sum, account) => {
+            const cat = accountCategories.find((c) => c.id === account.categoryId);
+            return sum + (cat?.kind === 'credit_card' ? -account.balance : account.balance);
+          }, 0),
           data,
         },
       ];
@@ -254,7 +257,7 @@ export default function AccountsScreen() {
           title: category.name,
           icon: category.icon ?? DEFAULT_ACCOUNT_ICON,
           color: category.color,
-          total: data.reduce((sum, account) => sum + account.balance, 0),
+          total: data.reduce((sum, account) => sum + (category.kind === 'credit_card' ? -account.balance : account.balance), 0),
           data,
         };
       })
@@ -483,8 +486,8 @@ export default function AccountsScreen() {
                   ) : null}
                 </View>
                 <View style={styles.cardBalanceCol}>
-                  <Text style={[styles.cardBalance, item.balance < 0 && styles.negative]}>
-                    {hideAmounts ? AMOUNT_MASK : formatCurrency(item.balance)}
+                  <Text style={[styles.cardBalance, (isLoan ? -item.balance : item.balance) < 0 && styles.negative]}>
+                    {hideAmounts ? AMOUNT_MASK : formatCurrency(isLoan ? -item.balance : item.balance)}
                   </Text>
                   {!hideAmounts && prevBalances[item.id] != null && (() => {
                     const t = computeTrend(item.balance, prevBalances[item.id]);
