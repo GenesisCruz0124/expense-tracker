@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { Alert, FlatList, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Alert, FlatList, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 
 import { AccountIcon } from '../components/AccountIcon';
@@ -21,6 +21,8 @@ export default function RecurringTransactionsScreen() {
   const { accounts, markMonthlyDuePaid, incrementBalance } = useAccounts();
   const { accountCategories } = useAccountCategories();
   const currentMonthKey = monthKeyFor(new Date());
+  const [searchText, setSearchText] = useState('');
+  const searchQ = searchText.trim().toLowerCase();
 
   const loanAccounts = useMemo(
     () =>
@@ -28,9 +30,10 @@ export default function RecurringTransactionsScreen() {
         if (account.monthlyAmountDue == null) return false;
         if (account.monthlyDueLastPaidMonth === currentMonthKey) return false;
         const category = accountCategories.find((item) => item.id === account.categoryId);
-        return category?.kind === 'credit_card';
+        if (category?.kind !== 'credit_card') return false;
+        return !searchQ || account.name.toLowerCase().includes(searchQ);
       }),
-    [accounts, accountCategories, currentMonthKey],
+    [accounts, accountCategories, currentMonthKey, searchQ],
   );
 
   const totalLoanDue = useMemo(
@@ -44,10 +47,11 @@ export default function RecurringTransactionsScreen() {
         if (account.monthlyContribution == null) return false;
         const category = accountCategories.find((item) => item.id === account.categoryId);
         if (category?.kind !== 'investment') return false;
-        if (!account.balanceLastUpdatedAt) return true;
-        return monthKeyFor(parseIsoDate(account.balanceLastUpdatedAt)) !== currentMonthKey;
+        if (!account.balanceLastUpdatedAt) return !searchQ || account.name.toLowerCase().includes(searchQ);
+        if (monthKeyFor(parseIsoDate(account.balanceLastUpdatedAt)) === currentMonthKey) return false;
+        return !searchQ || account.name.toLowerCase().includes(searchQ);
       }),
-    [accounts, accountCategories, currentMonthKey],
+    [accounts, accountCategories, currentMonthKey, searchQ],
   );
 
   const { recurringMonthlyIncome, recurringMonthlyExpense } = useMemo(() => {
@@ -97,16 +101,32 @@ export default function RecurringTransactionsScreen() {
     );
   }
 
+  const filteredRules = useMemo(
+    () => (searchQ ? rules.filter((r) => (r.note ?? '').toLowerCase().includes(searchQ)) : rules),
+    [rules, searchQ],
+  );
+
   return (
     <View style={styles.screen}>
+      <View style={styles.searchRow}>
+        <Text style={styles.searchIcon}>🔍</Text>
+        <TextInput
+          style={styles.searchInput}
+          value={searchText}
+          onChangeText={setSearchText}
+          placeholder="Search recurring"
+          placeholderTextColor={PALETTE.textSecondary}
+          clearButtonMode="while-editing"
+        />
+      </View>
       <Text style={styles.note}>
         Recurring entries are generated when you open the app — catching up on anything due since your last visit.
       </Text>
       <FlatList
-        data={rules}
+        data={filteredRules}
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={
-          rules.length === 0 && loanAccounts.length === 0 && investmentAccounts.length === 0
+          filteredRules.length === 0 && loanAccounts.length === 0 && investmentAccounts.length === 0
             ? styles.emptyContainer
             : styles.listContent
         }
@@ -273,11 +293,25 @@ export default function RecurringTransactionsScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: PALETTE.background },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: PALETTE.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.border,
+    borderRadius: 10,
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 4,
+    paddingHorizontal: 12,
+  },
+  searchIcon: { fontSize: 14, marginRight: 6 },
+  searchInput: { flex: 1, fontSize: 14, color: PALETTE.textPrimary, paddingVertical: 10 },
   note: {
     fontSize: 12,
     color: PALETTE.textSecondary,
     paddingHorizontal: 20,
-    paddingTop: 14,
+    paddingTop: 8,
     paddingBottom: 4,
   },
   listContent: { padding: 16, gap: 10 },

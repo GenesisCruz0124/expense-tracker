@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { Alert, Pressable, SectionList, StyleSheet, Text, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Alert, Pressable, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 
@@ -33,13 +33,18 @@ function monthKey(dueDate: string): string {
 export default function UnpaidBillsScreen() {
   const navigation = useNavigation();
   const { bills, payBill } = useBills();
-  const unpaidBills = useMemo(() => bills.filter((bill) => !bill.isPaid), [bills]);
+  const [searchText, setSearchText] = useState('');
+  const allUnpaidBills = useMemo(() => bills.filter((bill) => !bill.isPaid), [bills]);
+  const unpaidBills = useMemo(() => {
+    const q = searchText.trim().toLowerCase();
+    return q ? allUnpaidBills.filter((b) => b.name.toLowerCase().includes(q)) : allUnpaidBills;
+  }, [allUnpaidBills, searchText]);
 
   const totalUpcoming = useMemo(() => unpaidBills.reduce((sum, bill) => sum + bill.amount, 0), [unpaidBills]);
 
   const overdueCount = useMemo(
-    () => unpaidBills.filter((bill) => differenceInCalendarDays(parseISO(bill.dueDate), new Date()) < 0).length,
-    [unpaidBills],
+    () => allUnpaidBills.filter((bill) => differenceInCalendarDays(parseISO(bill.dueDate), new Date()) < 0).length,
+    [allUnpaidBills],
   );
 
   const monthSections = useMemo<MonthSection[]>(() => {
@@ -72,6 +77,17 @@ export default function UnpaidBillsScreen() {
 
   return (
     <View style={styles.screen}>
+      <View style={styles.searchRow}>
+        <Text style={styles.searchIcon}>🔍</Text>
+        <TextInput
+          style={styles.searchInput}
+          value={searchText}
+          onChangeText={setSearchText}
+          placeholder="Search bills"
+          placeholderTextColor={PALETTE.textSecondary}
+          clearButtonMode="while-editing"
+        />
+      </View>
       <SectionList
         sections={monthSections}
         keyExtractor={(item) => String(item.id)}
@@ -153,6 +169,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 2,
   },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: PALETTE.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.border,
+    borderRadius: 10,
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 4,
+    paddingHorizontal: 12,
+  },
+  searchIcon: { fontSize: 14, marginRight: 6 },
+  searchInput: { flex: 1, fontSize: 14, color: PALETTE.textPrimary, paddingVertical: 10 },
   summaryLabel: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: 0.4 },
   summaryAmount: { fontSize: 28, fontWeight: '700', color: '#fff' },
   summaryCount: { fontSize: 12, color: 'rgba(255,255,255,0.7)' },

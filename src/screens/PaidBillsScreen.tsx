@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 
 import { CategoryBadge, UncategorizedBadge } from '../components/CategoryBadge';
@@ -21,6 +21,7 @@ export default function PaidBillsScreen() {
   const navigation = useNavigation();
   const { bills, unpayBill } = useBills();
   const { accounts, markMonthlyDueUnpaid } = useAccounts();
+  const [searchText, setSearchText] = useState('');
 
   const paidThisMonth = useMemo(() => {
     const { start, end } = monthRangeFor(new Date());
@@ -37,10 +38,15 @@ export default function PaidBillsScreen() {
   }, [accounts]);
 
   const combinedList = useMemo((): PaidListItem[] => {
-    const billItems: PaidListItem[] = paidThisMonth.map((data) => ({ kind: 'bill', data }));
-    const dueItems: PaidListItem[] = paidDuesThisMonth.map((data) => ({ kind: 'due', data }));
+    const q = searchText.trim().toLowerCase();
+    const billItems: PaidListItem[] = paidThisMonth
+      .filter((b) => !q || b.name.toLowerCase().includes(q) || (b.accountName ?? '').toLowerCase().includes(q))
+      .map((data) => ({ kind: 'bill', data }));
+    const dueItems: PaidListItem[] = paidDuesThisMonth
+      .filter((a) => !q || a.name.toLowerCase().includes(q))
+      .map((data) => ({ kind: 'due', data }));
     return [...billItems, ...dueItems];
-  }, [paidThisMonth, paidDuesThisMonth]);
+  }, [paidThisMonth, paidDuesThisMonth, searchText]);
 
   const totalPaid = useMemo(() => {
     const billsTotal = paidThisMonth.reduce((sum, bill) => sum + bill.amount, 0);
@@ -72,6 +78,17 @@ export default function PaidBillsScreen() {
 
   return (
     <View style={styles.screen}>
+      <View style={styles.searchRow}>
+        <Text style={styles.searchIcon}>🔍</Text>
+        <TextInput
+          style={styles.searchInput}
+          value={searchText}
+          onChangeText={setSearchText}
+          placeholder="Search paid bills"
+          placeholderTextColor={PALETTE.textSecondary}
+          clearButtonMode="while-editing"
+        />
+      </View>
       <FlatList
         data={combinedList}
         keyExtractor={(item) => item.kind === 'bill' ? `bill-${item.data.id}` : `due-${item.data.id}`}
@@ -177,6 +194,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 2,
   },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: PALETTE.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.border,
+    borderRadius: 10,
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 4,
+    paddingHorizontal: 12,
+  },
+  searchIcon: { fontSize: 14, marginRight: 6 },
+  searchInput: { flex: 1, fontSize: 14, color: PALETTE.textPrimary, paddingVertical: 10 },
   summaryLabel: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: 0.4 },
   summaryAmount: { fontSize: 28, fontWeight: '700', color: '#fff' },
   summaryCount: { fontSize: 12, color: 'rgba(255,255,255,0.7)' },
