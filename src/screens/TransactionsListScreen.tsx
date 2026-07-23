@@ -35,6 +35,7 @@ export default function TransactionsListScreen() {
   const [runningBalanceMode, setRunningBalanceMode] = useState(route.params?.runningBalance ?? false);
   const [uncategorizedSelected, setUncategorizedSelected] = useState(false);
   const [excludedFilter, setExcludedFilter] = useState<ExcludedFilter>('hide');
+  const [transferCountAsExpense, setTransferCountAsExpense] = useState(false);
   const [groupByDay, setGroupByDay] = useState(false);
   const [filterVisible, setFilterVisible] = useState(false);
 
@@ -63,13 +64,14 @@ export default function TransactionsListScreen() {
     }
     if (typeFilter === 'transfer') {
       next.transferOnly = true;
+      if (transferCountAsExpense) next.excludeFromExpense = false;
     } else {
       if (typeFilter) next.type = typeFilter;
       if (excludedFilter === 'only') next.excludeFromExpense = true;
       else if (excludedFilter !== 'all') next.excludeFromExpense = false;
     }
     return next;
-  }, [searchText, uncategorizedSelected, selectedCategoryIds, selectedAccountIds, startDate, endDate, typeFilter, runningBalanceMode, excludedFilter]);
+  }, [searchText, uncategorizedSelected, selectedCategoryIds, selectedAccountIds, startDate, endDate, typeFilter, runningBalanceMode, excludedFilter, transferCountAsExpense]);
 
   const { transactions, loading } = useTransactions(filter);
   const transactionsWithBalance = useMemo(() => {
@@ -109,7 +111,8 @@ export default function TransactionsListScreen() {
     (startDate && endDate ? 1 : 0) +
     (typeFilter ? 1 : 0) +
     (runningBalanceMode ? 1 : 0) +
-    (excludedFilter === 'only' ? 1 : 0);
+    (excludedFilter === 'only' ? 1 : 0) +
+    (typeFilter === 'transfer' && transferCountAsExpense ? 1 : 0);
 
   function toggleCategory(id: number) {
     setSelectedCategoryIds((prev) => (prev.includes(id) ? prev.filter((existing) => existing !== id) : [...prev, id]));
@@ -128,6 +131,7 @@ export default function TransactionsListScreen() {
     setTypeFilter(undefined);
     setRunningBalanceMode(false);
     setExcludedFilter('hide');
+    setTransferCountAsExpense(false);
   }
 
   return (
@@ -252,6 +256,8 @@ export default function TransactionsListScreen() {
         onChangeEndDate={setEndDate}
         typeFilter={typeFilter}
         onChangeTypeFilter={setTypeFilter}
+        transferCountAsExpense={transferCountAsExpense}
+        onChangeTransferCountAsExpense={setTransferCountAsExpense}
         excludedFilter={excludedFilter}
         onChangeExcludedFilter={setExcludedFilter}
         onClear={clearFilters}

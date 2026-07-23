@@ -40,6 +40,8 @@ interface Props {
   onChangeEndDate: (value: string) => void;
   typeFilter: TypeFilter;
   onChangeTypeFilter: (value: TypeFilter) => void;
+  transferCountAsExpense: boolean;
+  onChangeTransferCountAsExpense: (value: boolean) => void;
   excludedFilter: ExcludedFilter;
   onChangeExcludedFilter: (value: ExcludedFilter) => void;
   onClear: () => void;
@@ -61,6 +63,8 @@ export function FilterSheet({
   onChangeEndDate,
   typeFilter,
   onChangeTypeFilter,
+  transferCountAsExpense,
+  onChangeTransferCountAsExpense,
   excludedFilter,
   onChangeExcludedFilter,
   onClear,
@@ -110,6 +114,17 @@ export function FilterSheet({
               );
             })}
           </View>
+
+          {typeFilter === 'transfer' ? (
+            <View style={styles.chips}>
+              <Pressable
+                onPress={() => onChangeTransferCountAsExpense(!transferCountAsExpense)}
+                style={[styles.chip, { borderColor: PALETTE.expense }, transferCountAsExpense && { backgroundColor: PALETTE.expense }]}
+              >
+                <Text style={[styles.chipText, { color: transferCountAsExpense ? '#fff' : PALETTE.expense }]}>Count as expense</Text>
+              </Pressable>
+            </View>
+          ) : null}
 
           {(filteredCategories.length > 0 || (!search && !uncategorizedSelected) || uncategorizedSelected) ? (
             <>
