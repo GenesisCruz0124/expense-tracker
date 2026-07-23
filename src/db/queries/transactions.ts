@@ -1,4 +1,4 @@
-import { and, between, desc, eq, inArray, isNull, like, or, sql, type SQL } from 'drizzle-orm';
+import { and, between, desc, eq, inArray, isNotNull, isNull, like, or, sql, type SQL } from 'drizzle-orm';
 
 import type { Database } from '../client';
 import { accounts, bills, categories, transactions, type NewTransaction, type Transaction } from '../schema';
@@ -24,11 +24,17 @@ export interface ListTransactionsFilter {
   end?: string;
   searchText?: string;
   excludeFromExpense?: boolean;
+  /** When true, only return transactions that are part of a transfer (transferId is not null). */
+  transferOnly?: boolean;
 }
 
 function buildFilterConditions(filter: ListTransactionsFilter): SQL[] {
   const conditions: SQL[] = [isNull(transactions.deletedAt)];
-  if (filter.type) conditions.push(eq(transactions.type, filter.type));
+  if (filter.transferOnly) {
+    conditions.push(isNotNull(transactions.transferId));
+  } else if (filter.type) {
+    conditions.push(eq(transactions.type, filter.type));
+  }
   if (filter.uncategorized) {
     conditions.push(isNull(transactions.categoryId));
   } else if (filter.categoryIds && filter.categoryIds.length > 0) {

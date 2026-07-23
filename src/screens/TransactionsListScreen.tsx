@@ -3,7 +3,7 @@ import { FlatList, Pressable, SectionList, StyleSheet, Text, TextInput, View } f
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 
 import { EmptyState } from '../components/EmptyState';
-import { FilterSheet, type ExcludedFilter } from '../components/FilterSheet';
+import { FilterSheet, type ExcludedFilter, type TypeFilter } from '../components/FilterSheet';
 import { TransactionListItem } from '../components/TransactionListItem';
 import { PALETTE } from '../constants/colors';
 import { useTransactions } from '../hooks/useTransactions';
@@ -31,7 +31,7 @@ export default function TransactionsListScreen() {
   const [selectedAccountIds, setSelectedAccountIds] = useState<number[]>([]);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [typeFilter, setTypeFilter] = useState<'expense' | 'income' | undefined>(route.params?.type);
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>(route.params?.type);
   const [runningBalanceMode, setRunningBalanceMode] = useState(route.params?.runningBalance ?? false);
   const [uncategorizedSelected, setUncategorizedSelected] = useState(false);
   const [excludedFilter, setExcludedFilter] = useState<ExcludedFilter>('hide');
@@ -61,9 +61,13 @@ export default function TransactionsListScreen() {
       next.start = startDate;
       next.end = endDate;
     }
-    if (typeFilter) next.type = typeFilter;
-    if (excludedFilter === 'only') next.excludeFromExpense = true;
-    else if (excludedFilter !== 'all') next.excludeFromExpense = false;
+    if (typeFilter === 'transfer') {
+      next.transferOnly = true;
+    } else {
+      if (typeFilter) next.type = typeFilter;
+      if (excludedFilter === 'only') next.excludeFromExpense = true;
+      else if (excludedFilter !== 'all') next.excludeFromExpense = false;
+    }
     return next;
   }, [searchText, uncategorizedSelected, selectedCategoryIds, selectedAccountIds, startDate, endDate, typeFilter, runningBalanceMode, excludedFilter]);
 
@@ -156,7 +160,7 @@ export default function TransactionsListScreen() {
         <View style={styles.typeFilterRow}>
           <View style={styles.typeFilterChip}>
             <Text style={styles.typeFilterChipText}>
-              Showing: {runningBalanceMode ? 'Net (running balance)' : typeFilter === 'income' ? 'Income' : 'Expense'}
+              Showing: {runningBalanceMode ? 'Net (running balance)' : typeFilter === 'income' ? 'Income' : typeFilter === 'transfer' ? 'Transfer' : 'Expense'}
             </Text>
             <Pressable onPress={() => (runningBalanceMode ? setRunningBalanceMode(false) : setTypeFilter(undefined))}>
               <Text style={styles.typeFilterChipClose}>✕</Text>

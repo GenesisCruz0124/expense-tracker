@@ -16,12 +16,13 @@ const EXCLUDED_FILTER_OPTIONS: { value: ExcludedFilter; label: string }[] = [
   { value: 'only', label: 'Only excluded' },
 ];
 
-type TypeFilter = 'expense' | 'income' | undefined;
+export type TypeFilter = 'expense' | 'income' | 'transfer' | undefined;
 
 const TYPE_FILTER_OPTIONS: { value: TypeFilter; label: string; color: string }[] = [
   { value: undefined, label: 'All', color: PALETTE.textSecondary },
   { value: 'income', label: 'Income', color: PALETTE.income },
   { value: 'expense', label: 'Expense', color: PALETTE.expense },
+  { value: 'transfer', label: 'Transfer', color: PALETTE.net },
 ];
 
 interface Props {
