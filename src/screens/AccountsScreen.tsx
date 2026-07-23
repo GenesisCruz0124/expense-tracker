@@ -16,7 +16,9 @@ import { getSetting, setSetting } from '../db/queries/settings';
 import { formatIsoDate } from '../utils/dateRanges';
 import { useAccountCategories } from '../hooks/useAccountCategories';
 import { useAccounts } from '../hooks/useAccounts';
+import { useBills } from '../hooks/useBills';
 import { formatCurrency } from '../utils/currency';
+import { formatDisplayDate } from '../utils/dateRanges';
 import type { AccountsStackParamList, RootStackParamList } from '../navigation/types';
 
 const COLLAPSED_GROUPS_KEY = 'accountsCollapsedGroups';
@@ -189,6 +191,20 @@ export default function AccountsScreen() {
 
   const { accounts, error, setArchived } = useAccounts({ includeArchived: true });
   const { accountCategories } = useAccountCategories({ includeArchived: true });
+  const { bills } = useBills();
+
+  // Map: credit card accountId → nearest upcoming bill (by toAccountId)
+  const upcomingBillByAccount = useMemo(() => {
+    const map = new Map<number, { dueDate: string; amount: number }>();
+    for (const bill of bills) {
+      if (bill.isPaid || bill.toAccountId == null) continue;
+      const existing = map.get(bill.toAccountId);
+      if (!existing || bill.dueDate < existing.dueDate) {
+        map.set(bill.toAccountId, { dueDate: bill.dueDate, amount: bill.amount });
+      }
+    }
+    return map;
+  }, [bills]);
 
   const visible = accounts.filter((account) => (showArchived ? account.isArchived : !account.isArchived));
 
@@ -456,6 +472,7 @@ export default function AccountsScreen() {
           const categoryKind = accountCategories.find((c) => c.id === item.categoryId)?.kind;
           const isInvestment = categoryKind === 'investment';
           const isLoan = categoryKind === 'credit_card';
+          const upcomingBill = isLoan ? upcomingBillByAccount.get(item.id) : undefined;
           return (
             <Pressable
               style={[styles.card, item.isArchived && styles.cardArchived]}
@@ -483,6 +500,11 @@ export default function AccountsScreen() {
                         const avail = Math.max(0, item.creditLimit - used);
                         return `${formatCurrency(item.creditLimit)} limit · ${formatCurrency(avail)} avail.`;
                       })()}
+                    </Text>
+                  ) : null}
+                  {upcomingBill ? (
+                    <Text style={styles.cardDue}>
+                      {'📅 Due '}{formatDisplayDate(upcomingBill.dueDate)}{'  ·  '}{hideAmounts ? AMOUNT_MASK : formatCurrency(upcomingBill.amount)}
                     </Text>
                   ) : null}
                   {item.subscriptionDueDay != null ? (
@@ -778,6 +800,7 @@ const styles = StyleSheet.create({
   cardSubtitle: { fontSize: 12, color: PALETTE.textSecondary, letterSpacing: 0.5 },
   cardMeta: { fontSize: 11, fontWeight: '600', color: PALETTE.net, marginTop: 1 },
   cardMetaLimit: { fontSize: 11, fontWeight: '600', color: PALETTE.textSecondary, marginTop: 1 },
+  cardDue: { fontSize: 11, fontWeight: '600', color: PALETTE.expense, marginTop: 1 },
   cardBalanceCol: { alignItems: 'flex-end', gap: 2 },
   cardBalance: { fontSize: 15, fontWeight: '700', color: PALETTE.textPrimary },
   cardTrendBadge: { borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 },
