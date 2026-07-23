@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, SectionList, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 
@@ -12,6 +12,24 @@ import { formatCurrency } from '../utils/currency';
 import { formatDisplayDate, formatIsoDate } from '../utils/dateRanges';
 import { frequencyLabelFor } from '../utils/bills';
 
+interface MonthSection {
+  title: string;
+  monthKey: string;
+  total: number;
+  data: BillWithDetails[];
+}
+
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+function monthLabel(dueDate: string): string {
+  const d = parseISO(dueDate);
+  return `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+function monthKey(dueDate: string): string {
+  return dueDate.slice(0, 7);
+}
+
 export default function UnpaidBillsScreen() {
   const navigation = useNavigation();
   const { bills, payBill } = useBills();
@@ -23,6 +41,23 @@ export default function UnpaidBillsScreen() {
     () => unpaidBills.filter((bill) => differenceInCalendarDays(parseISO(bill.dueDate), new Date()) < 0).length,
     [unpaidBills],
   );
+
+  const monthSections = useMemo<MonthSection[]>(() => {
+    const sections: MonthSection[] = [];
+    const byMonth = new Map<string, MonthSection>();
+    for (const bill of unpaidBills) {
+      const key = monthKey(bill.dueDate);
+      let section = byMonth.get(key);
+      if (!section) {
+        section = { title: monthLabel(bill.dueDate), monthKey: key, total: 0, data: [] };
+        byMonth.set(key, section);
+        sections.push(section);
+      }
+      section.total += bill.amount;
+      section.data.push(bill);
+    }
+    return sections;
+  }, [unpaidBills]);
 
   function handleMarkPaid(bill: BillWithDetails) {
     Alert.alert(
@@ -37,9 +72,10 @@ export default function UnpaidBillsScreen() {
 
   return (
     <View style={styles.screen}>
-      <FlatList
-        data={unpaidBills}
+      <SectionList
+        sections={monthSections}
         keyExtractor={(item) => String(item.id)}
+        stickySectionHeadersEnabled
         contentContainerStyle={unpaidBills.length === 0 ? styles.emptyContainer : styles.listContent}
         ListHeaderComponent={
           unpaidBills.length > 0 ? (
@@ -60,6 +96,15 @@ export default function UnpaidBillsScreen() {
             message="Add an upcoming bill to track it here and get reminded before it's due."
           />
         }
+        renderSectionHeader={({ section }) => (
+          <View style={styles.monthHeader}>
+            <Text style={styles.monthTitle}>{section.title}</Text>
+            <View style={styles.monthSummary}>
+              <Text style={styles.monthCount}>{section.data.length} {section.data.length === 1 ? 'bill' : 'bills'}</Text>
+              <Text style={styles.monthTotal}>{formatCurrency(section.total)}</Text>
+            </View>
+          </View>
+        )}
         renderItem={({ item }) => {
           const daysUntilDue = differenceInCalendarDays(parseISO(item.dueDate), new Date());
           const isOverdue = daysUntilDue < 0;
@@ -99,17 +144,6 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: PALETTE.background },
   listContent: { padding: 16, gap: 10 },
   emptyContainer: { flexGrow: 1, justifyContent: 'center' },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: PALETTE.surface,
-    borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: PALETTE.border,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    gap: 12,
-  },
   summaryCard: {
     backgroundColor: PALETTE.expense,
     borderRadius: 14,
@@ -122,6 +156,32 @@ const styles = StyleSheet.create({
   summaryLabel: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: 0.4 },
   summaryAmount: { fontSize: 28, fontWeight: '700', color: '#fff' },
   summaryCount: { fontSize: 12, color: 'rgba(255,255,255,0.7)' },
+  monthHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginHorizontal: -16,
+    backgroundColor: PALETTE.background,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: PALETTE.border,
+  },
+  monthTitle: { fontSize: 13, fontWeight: '700', color: PALETTE.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4 },
+  monthSummary: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  monthCount: { fontSize: 12, color: PALETTE.textSecondary },
+  monthTotal: { fontSize: 14, fontWeight: '700', color: PALETTE.expense },
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: PALETTE.surface,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.border,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    gap: 12,
+  },
   cardMain: { flex: 1, gap: 6 },
   cardTitle: { fontSize: 14, fontWeight: '700', color: PALETTE.textPrimary },
   cardSubtitle: { fontSize: 12, color: PALETTE.textSecondary },
