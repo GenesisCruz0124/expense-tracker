@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, SectionList, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Alert, Image, Modal, Pressable, ScrollView, SectionList, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useNavigation, type CompositeNavigationProp } from '@react-navigation/native';
+import * as MediaLibrary from 'expo-media-library';
+import * as Sharing from 'expo-sharing';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { AccountIcon } from '../components/AccountIcon';
@@ -98,6 +100,8 @@ export default function AccountsScreen() {
   const [netWorthFilter, setNetWorthFilter] = useState<NetWorthFilter>('all');
   const [netWorthFilterLoaded, setNetWorthFilterLoaded] = useState(false);
   const [menuAccount, setMenuAccount] = useState<AccountWithBalance | null>(null);
+  const [qrModalUri, setQrModalUri] = useState<string | null>(null);
+  const [qrModalName, setQrModalName] = useState<string>('');
   const [sortOption, setSortOption] = useState<SortOption>('recent');
   const [showSortPicker, setShowSortPicker] = useState(false);
   const [grouped, setGrouped] = useState(false);
@@ -502,6 +506,15 @@ export default function AccountsScreen() {
                     ) : null;
                   })()}
                 </View>
+                {item.qrImageUri ? (
+                  <Pressable
+                    style={styles.qrIconBtn}
+                    hitSlop={8}
+                    onPress={() => { setQrModalUri(item.qrImageUri!); setQrModalName(item.name); }}
+                  >
+                    <Text style={styles.qrIconText}>⊡</Text>
+                  </Pressable>
+                ) : null}
                 <Pressable onPress={() => setMenuAccount(item)} hitSlop={8} style={styles.moreButton}>
                   <Text style={styles.moreButtonText}>⋯</Text>
                 </Pressable>
@@ -561,6 +574,53 @@ export default function AccountsScreen() {
           onPress: () => { setSortOption(option); setShowSortPicker(false); },
         }))}
       />
+
+      <Modal visible={qrModalUri != null} transparent animationType="fade" onRequestClose={() => setQrModalUri(null)}>
+        <View style={styles.qrOverlay}>
+          <View style={styles.qrModalCard}>
+            <Text style={styles.qrModalTitle}>{qrModalName}</Text>
+            {qrModalUri ? (
+              <Image source={{ uri: qrModalUri }} style={styles.qrModalImage} resizeMode="contain" />
+            ) : null}
+            <View style={styles.qrModalActions}>
+              <Pressable
+                style={[styles.qrModalBtn, styles.qrModalBtnShare]}
+                onPress={async () => {
+                  if (!qrModalUri) return;
+                  try {
+                    const available = await Sharing.isAvailableAsync();
+                    if (!available) { Alert.alert('Sharing not available on this device'); return; }
+                    await Sharing.shareAsync(qrModalUri, { mimeType: 'image/jpeg', dialogTitle: 'Share QR code' });
+                  } catch {
+                    Alert.alert('Could not share QR code');
+                  }
+                }}
+              >
+                <Text style={styles.qrModalBtnText}>Share</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.qrModalBtn, styles.qrModalBtnSave]}
+                onPress={async () => {
+                  if (!qrModalUri) return;
+                  try {
+                    const { status } = await MediaLibrary.requestPermissionsAsync();
+                    if (status !== 'granted') { Alert.alert('Permission required', 'Allow photo library access to save the QR image.'); return; }
+                    await MediaLibrary.saveToLibraryAsync(qrModalUri);
+                    Alert.alert('Saved', 'QR image saved to your gallery.');
+                  } catch {
+                    Alert.alert('Could not save QR image');
+                  }
+                }}
+              >
+                <Text style={styles.qrModalBtnText}>Save to gallery</Text>
+              </Pressable>
+            </View>
+            <Pressable style={styles.qrModalClose} onPress={() => setQrModalUri(null)}>
+              <Text style={styles.qrModalCloseText}>Close</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -772,4 +832,39 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   fabIcon: { color: '#fff', fontSize: 28, fontWeight: '600', lineHeight: 30 },
+  qrIconBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: `${PALETTE.net}1A`,
+    borderWidth: 1,
+    borderColor: `${PALETTE.net}40`,
+  },
+  qrIconText: { fontSize: 15, color: PALETTE.net },
+  qrOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  qrModalCard: {
+    backgroundColor: PALETTE.surface,
+    borderRadius: 20,
+    padding: 20,
+    width: '100%',
+    alignItems: 'center',
+    gap: 16,
+  },
+  qrModalTitle: { fontSize: 16, fontWeight: '700', color: PALETTE.textPrimary, textAlign: 'center' },
+  qrModalImage: { width: 260, height: 260, borderRadius: 8 },
+  qrModalActions: { flexDirection: 'row', gap: 10, width: '100%' },
+  qrModalBtn: { flex: 1, paddingVertical: 13, borderRadius: 12, alignItems: 'center' },
+  qrModalBtnShare: { backgroundColor: PALETTE.net },
+  qrModalBtnSave: { backgroundColor: PALETTE.income },
+  qrModalBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  qrModalClose: { paddingVertical: 6 },
+  qrModalCloseText: { color: PALETTE.textSecondary, fontWeight: '600', fontSize: 14 },
 });
