@@ -34,7 +34,7 @@ export default function TransactionsListScreen() {
   const [typeFilter, setTypeFilter] = useState<'expense' | 'income' | undefined>(route.params?.type);
   const [runningBalanceMode, setRunningBalanceMode] = useState(route.params?.runningBalance ?? false);
   const [uncategorizedSelected, setUncategorizedSelected] = useState(false);
-  const [excludedFilter, setExcludedFilter] = useState<ExcludedFilter>('all');
+  const [excludedFilter, setExcludedFilter] = useState<ExcludedFilter>('hide');
   const [groupByDay, setGroupByDay] = useState(false);
   const [filterVisible, setFilterVisible] = useState(false);
 
@@ -47,7 +47,7 @@ export default function TransactionsListScreen() {
     setSelectedAccountIds([]);
     setUncategorizedSelected(false);
     setSearchText('');
-    setExcludedFilter('all');
+    setExcludedFilter('hide');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route.params?.type, route.params?.start, route.params?.end, route.params?.runningBalance]);
 
@@ -62,9 +62,8 @@ export default function TransactionsListScreen() {
       next.end = endDate;
     }
     if (typeFilter) next.type = typeFilter;
-    if (excludedFilter === 'hide') next.excludeFromExpense = false;
-    else if (excludedFilter === 'only') next.excludeFromExpense = true;
-    else if (typeFilter || runningBalanceMode) next.excludeFromExpense = false;
+    if (excludedFilter === 'only') next.excludeFromExpense = true;
+    else if (excludedFilter !== 'all') next.excludeFromExpense = false;
     return next;
   }, [searchText, uncategorizedSelected, selectedCategoryIds, selectedAccountIds, startDate, endDate, typeFilter, runningBalanceMode, excludedFilter]);
 
@@ -106,7 +105,7 @@ export default function TransactionsListScreen() {
     (startDate && endDate ? 1 : 0) +
     (typeFilter ? 1 : 0) +
     (runningBalanceMode ? 1 : 0) +
-    (excludedFilter !== 'all' ? 1 : 0);
+    (excludedFilter === 'only' ? 1 : 0);
 
   function toggleCategory(id: number) {
     setSelectedCategoryIds((prev) => (prev.includes(id) ? prev.filter((existing) => existing !== id) : [...prev, id]));
@@ -124,7 +123,7 @@ export default function TransactionsListScreen() {
     setEndDate('');
     setTypeFilter(undefined);
     setRunningBalanceMode(false);
-    setExcludedFilter('all');
+    setExcludedFilter('hide');
   }
 
   return (

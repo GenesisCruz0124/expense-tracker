@@ -40,7 +40,7 @@ export async function getCategorySpend(
   categoryId: number,
   range: { start: string; end: string },
 ): Promise<number> {
-  return sumTransactions(db, { type: 'expense', categoryIds: [categoryId], start: range.start, end: range.end });
+  return sumTransactions(db, { type: 'expense', categoryIds: [categoryId], start: range.start, end: range.end, excludeFromExpense: false });
 }
 
 export interface BudgetInput {
