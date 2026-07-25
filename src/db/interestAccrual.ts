@@ -119,7 +119,7 @@ async function accrueDailyInterest(
   if (startIso > todayIso) return;
 
   const grossPerDay = Math.floor(balance * rate / 3_650_000);
-  const netPerDay = Math.floor(grossPerDay * 80 / 100);
+  const netPerDay = Math.round(grossPerDay * 80 / 100);
   if (netPerDay <= 0) {
     await setLastAccrued(db, accountId, todayIso);
     return;
@@ -162,7 +162,7 @@ async function accrueMonthlyInterest(
   }
 
   const grossPerMonth = Math.floor(balance * rate / 120_000);
-  const netPerMonth = Math.floor(grossPerMonth * 80 / 100);
+  const netPerMonth = Math.round(grossPerMonth * 80 / 100);
 
   const balPhp = fmtPhp(balance);
   const rateStr = (rate / 100).toFixed(2);
@@ -210,7 +210,7 @@ async function accrueYearlyInterest(
   }
 
   const grossPerYear = Math.floor(balance * rate / 10_000);
-  const netPerYear = Math.floor(grossPerYear * 80 / 100);
+  const netPerYear = Math.round(grossPerYear * 80 / 100);
 
   const balPhp = fmtPhp(balance);
   const rateStr = (rate / 100).toFixed(2);
