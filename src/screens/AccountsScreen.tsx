@@ -213,6 +213,15 @@ export default function AccountsScreen() {
     [accountCategories, visible],
   );
 
+  const CATEGORY_KIND_ORDER: ('standard' | 'credit_card' | 'investment')[] = ['standard', 'credit_card', 'investment'];
+  const categoryGroups = useMemo(
+    () =>
+      CATEGORY_KIND_ORDER.map((kind) => filterableCategories.filter((category) => category.kind === kind)).filter(
+        (group) => group.length > 0,
+      ),
+    [filterableCategories],
+  );
+
   const filtered = visible
     .filter((account) => selectedCategoryIds.length === 0 || (account.categoryId != null && selectedCategoryIds.includes(account.categoryId)))
     .filter((account) => {
@@ -365,42 +374,44 @@ export default function AccountsScreen() {
               ) : null}
             </View>
 
-            {filterableCategories.length > 0 ? (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.filterRow}
-              >
-                <Pressable
-                  onPress={() => setSelectedCategoryIds([])}
-                  style={[styles.filterChip, selectedCategoryIds.length === 0 && styles.filterChipAllSelected]}
-                >
-                  <Text style={[styles.filterChipText, selectedCategoryIds.length === 0 && styles.filterChipTextSelected]}>
-                    All
-                  </Text>
-                </Pressable>
-                {filterableCategories.map((category) => {
-                  const selected = selectedCategoryIds.includes(category.id);
-                  return (
+            {categoryGroups.length > 0 ? (
+              <View style={styles.filterGroupsContainer}>
+                {categoryGroups.map((group, index) => (
+                  <View key={index} style={styles.filterGroupRow}>
                     <Pressable
-                      key={category.id}
-                      onPress={() => toggleCategoryFilter(category.id)}
-                      style={[
-                        styles.filterChip,
-                        { borderColor: category.color },
-                        selected && { backgroundColor: category.color },
-                      ]}
+                      onPress={() => setSelectedCategoryIds([])}
+                      style={[styles.filterChip, selectedCategoryIds.length === 0 && styles.filterChipAllSelected]}
                     >
-                      <View style={styles.filterChipContent}>
-                        <AccountIcon icon={category.icon} size={13} />
-                        <Text style={[styles.filterChipText, { color: selected ? '#fff' : category.color }]}>
-                          {category.name}
-                        </Text>
-                      </View>
+                      <Text
+                        style={[styles.filterChipText, selectedCategoryIds.length === 0 && styles.filterChipTextSelected]}
+                      >
+                        All
+                      </Text>
                     </Pressable>
-                  );
-                })}
-              </ScrollView>
+                    {group.map((category) => {
+                      const selected = selectedCategoryIds.includes(category.id);
+                      return (
+                        <Pressable
+                          key={category.id}
+                          onPress={() => toggleCategoryFilter(category.id)}
+                          style={[
+                            styles.filterChip,
+                            { borderColor: category.color },
+                            selected && { backgroundColor: category.color },
+                          ]}
+                        >
+                          <View style={styles.filterChipContent}>
+                            <AccountIcon icon={category.icon} size={13} />
+                            <Text style={[styles.filterChipText, { color: selected ? '#fff' : category.color }]}>
+                              {category.name}
+                            </Text>
+                          </View>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                ))}
+              </View>
             ) : null}
 
             <ScrollView
@@ -713,6 +724,8 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 14, color: PALETTE.textPrimary, padding: 0 },
   searchClear: { fontSize: 13, color: PALETTE.textSecondary, fontWeight: '600' },
   filterRow: { gap: 8, paddingBottom: 12 },
+  filterGroupsContainer: { gap: 8, paddingBottom: 12 },
+  filterGroupRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   filterChip: {
     flexDirection: 'row',
     alignItems: 'center',
