@@ -376,18 +376,16 @@ export default function AccountsScreen() {
 
             {categoryGroups.length > 0 ? (
               <View style={styles.filterGroupsContainer}>
+                <Pressable
+                  onPress={() => setSelectedCategoryIds([])}
+                  style={[styles.filterChip, styles.filterAllChip, selectedCategoryIds.length === 0 && styles.filterChipAllSelected]}
+                >
+                  <Text style={[styles.filterChipText, selectedCategoryIds.length === 0 && styles.filterChipTextSelected]}>
+                    All
+                  </Text>
+                </Pressable>
                 {categoryGroups.map((group, index) => (
                   <View key={index} style={styles.filterGroupRow}>
-                    <Pressable
-                      onPress={() => setSelectedCategoryIds([])}
-                      style={[styles.filterChip, selectedCategoryIds.length === 0 && styles.filterChipAllSelected]}
-                    >
-                      <Text
-                        style={[styles.filterChipText, selectedCategoryIds.length === 0 && styles.filterChipTextSelected]}
-                      >
-                        All
-                      </Text>
-                    </Pressable>
                     {group.map((category) => {
                       const selected = selectedCategoryIds.includes(category.id);
                       return (
@@ -725,6 +723,7 @@ const styles = StyleSheet.create({
   searchClear: { fontSize: 13, color: PALETTE.textSecondary, fontWeight: '600' },
   filterRow: { gap: 8, paddingBottom: 12 },
   filterGroupsContainer: { gap: 8, paddingBottom: 12 },
+  filterAllChip: { alignSelf: 'flex-start' },
   filterGroupRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   filterChip: {
     flexDirection: 'row',
