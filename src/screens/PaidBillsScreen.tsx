@@ -7,28 +7,32 @@ import { EmptyState } from '../components/EmptyState';
 import { PALETTE } from '../constants/colors';
 import type { AccountWithBalance } from '../db/queries/accounts';
 import type { BillWithDetails } from '../db/queries/bills';
+import type { TransactionWithCategory } from '../db/queries/transactions';
 import { useAccounts } from '../hooks/useAccounts';
 import { useBills } from '../hooks/useBills';
+import { useTransactions } from '../hooks/useTransactions';
 import { formatCurrency } from '../utils/currency';
 import { formatDisplayDate, monthKeyFor, monthRangeFor } from '../utils/dateRanges';
 import { frequencyLabelFor } from '../utils/bills';
 
 type PaidListItem =
   | { kind: 'bill'; data: BillWithDetails }
-  | { kind: 'due'; data: AccountWithBalance };
+  | { kind: 'due'; data: AccountWithBalance }
+  | { kind: 'recurring'; data: TransactionWithCategory };
 
 export default function PaidBillsScreen() {
   const navigation = useNavigation();
   const { bills, unpayBill } = useBills();
   const { accounts, markMonthlyDueUnpaid } = useAccounts();
+  const { start, end } = monthRangeFor(new Date());
+  const { transactions: monthTransactions } = useTransactions({ start, end });
   const [searchText, setSearchText] = useState('');
 
   const paidThisMonth = useMemo(() => {
-    const { start, end } = monthRangeFor(new Date());
     return bills
       .filter((bill) => bill.lastPaidAt != null && bill.lastPaidAt >= start && bill.lastPaidAt <= end)
       .sort((a, b) => b.lastPaidAt!.localeCompare(a.lastPaidAt!));
-  }, [bills]);
+  }, [bills, start, end]);
 
   const paidDuesThisMonth = useMemo(() => {
     const currentMonthKey = monthKeyFor(new Date());
@@ -36,6 +40,11 @@ export default function PaidBillsScreen() {
       (account) => account.monthlyAmountDue != null && account.monthlyDueLastPaidMonth === currentMonthKey,
     );
   }, [accounts]);
+
+  const paidRecurringThisMonth = useMemo(
+    () => monthTransactions.filter((transaction) => transaction.recurringId != null),
+    [monthTransactions],
+  );
 
   const combinedList = useMemo((): PaidListItem[] => {
     const q = searchText.trim().toLowerCase();
@@ -45,14 +54,21 @@ export default function PaidBillsScreen() {
     const dueItems: PaidListItem[] = paidDuesThisMonth
       .filter((a) => !q || a.name.toLowerCase().includes(q))
       .map((data) => ({ kind: 'due', data }));
-    return [...billItems, ...dueItems];
-  }, [paidThisMonth, paidDuesThisMonth, searchText]);
+    const recurringItems: PaidListItem[] = paidRecurringThisMonth
+      .filter((t) => !q || (t.note ?? '').toLowerCase().includes(q) || (t.establishment ?? '').toLowerCase().includes(q))
+      .map((data) => ({ kind: 'recurring', data }));
+    return [...billItems, ...dueItems, ...recurringItems];
+  }, [paidThisMonth, paidDuesThisMonth, paidRecurringThisMonth, searchText]);
 
   const totalPaid = useMemo(() => {
     const billsTotal = paidThisMonth.reduce((sum, bill) => sum + bill.amount, 0);
     const duesTotal = paidDuesThisMonth.reduce((sum, account) => sum + (account.monthlyAmountDue ?? 0), 0);
-    return billsTotal + duesTotal;
-  }, [paidThisMonth, paidDuesThisMonth]);
+    const recurringTotal = paidRecurringThisMonth.reduce(
+      (sum, transaction) => sum + (transaction.type === 'income' ? -transaction.amount : transaction.amount),
+      0,
+    );
+    return billsTotal + duesTotal + recurringTotal;
+  }, [paidThisMonth, paidDuesThisMonth, paidRecurringThisMonth]);
 
   function handleMarkUnpaid(bill: BillWithDetails) {
     Alert.alert(
@@ -91,7 +107,7 @@ export default function PaidBillsScreen() {
       </View>
       <FlatList
         data={combinedList}
-        keyExtractor={(item) => item.kind === 'bill' ? `bill-${item.data.id}` : `due-${item.data.id}`}
+        keyExtractor={(item) => `${item.kind}-${item.data.id}`}
         contentContainerStyle={combinedList.length === 0 ? styles.emptyContainer : styles.listContent}
         ListHeaderComponent={
           combinedList.length > 0 ? (
@@ -129,6 +145,36 @@ export default function PaidBillsScreen() {
                   <Pressable style={styles.undoButton} onPress={() => handleMarkDueUnpaid(account)}>
                     <Text style={styles.undoButtonText}>Undo</Text>
                   </Pressable>
+                </View>
+              </Pressable>
+            );
+          }
+
+          if (item.kind === 'recurring') {
+            const transaction = item.data;
+            const isIncome = transaction.type === 'income';
+            return (
+              <Pressable
+                style={styles.card}
+                onPress={() => navigation.navigate('AddEditTransaction', { transactionId: transaction.id })}
+              >
+                <View style={styles.cardMain}>
+                  <Text style={styles.cardTitle}>{transaction.note || transaction.establishment || 'Recurring'}</Text>
+                  {transaction.categoryName ? (
+                    <CategoryBadge
+                      name={transaction.categoryName}
+                      color={transaction.categoryColor ?? PALETTE.textSecondary}
+                      icon={transaction.categoryIcon}
+                    />
+                  ) : (
+                    <UncategorizedBadge />
+                  )}
+                  <Text style={styles.cardSubtitle}>Paid {formatDisplayDate(transaction.occurredAt)} · Recurring</Text>
+                </View>
+                <View style={styles.cardTrailing}>
+                  <Text style={[styles.cardAmount, { color: isIncome ? PALETTE.income : PALETTE.textPrimary }]}>
+                    {isIncome ? '+' : ''}{formatCurrency(transaction.amount)}
+                  </Text>
                 </View>
               </Pressable>
             );
