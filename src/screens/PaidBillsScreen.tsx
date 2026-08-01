@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { addMonths } from 'date-fns';
 
 import { CategoryBadge, UncategorizedBadge } from '../components/CategoryBadge';
 import { EmptyState } from '../components/EmptyState';
@@ -13,7 +14,7 @@ import { useBills } from '../hooks/useBills';
 import { useRecurringTransactions } from '../hooks/useRecurringTransactions';
 import { useTransactions } from '../hooks/useTransactions';
 import { formatCurrency } from '../utils/currency';
-import { formatDisplayDate, monthKeyFor, monthRangeFor } from '../utils/dateRanges';
+import { formatDisplayDate, monthRangeFor } from '../utils/dateRanges';
 import { frequencyLabelFor } from '../utils/bills';
 
 type PaidListItem =
@@ -26,7 +27,10 @@ export default function PaidBillsScreen() {
   const { bills, unpayBill } = useBills();
   const { accounts, markMonthlyDueUnpaid } = useAccounts();
   const { undoPaid: undoRecurringPaid } = useRecurringTransactions();
-  const { start, end } = monthRangeFor(new Date());
+  const [monthOffset, setMonthOffset] = useState(0);
+  const viewedDate = useMemo(() => addMonths(new Date(), monthOffset), [monthOffset]);
+  const { start, end, label, monthKey } = monthRangeFor(viewedDate);
+  const isCurrentMonth = monthOffset === 0;
   const { transactions: monthTransactions } = useTransactions({ start, end });
   const [searchText, setSearchText] = useState('');
 
@@ -37,11 +41,10 @@ export default function PaidBillsScreen() {
   }, [bills, start, end]);
 
   const paidDuesThisMonth = useMemo(() => {
-    const currentMonthKey = monthKeyFor(new Date());
     return accounts.filter(
-      (account) => account.monthlyAmountDue != null && account.monthlyDueLastPaidMonth === currentMonthKey,
+      (account) => account.monthlyAmountDue != null && account.monthlyDueLastPaidMonth === monthKey,
     );
-  }, [accounts]);
+  }, [accounts, monthKey]);
 
   const paidRecurringThisMonth = useMemo(
     () => monthTransactions.filter((transaction) => transaction.recurringId != null),
@@ -107,6 +110,19 @@ export default function PaidBillsScreen() {
 
   return (
     <View style={styles.screen}>
+      <View style={styles.monthNavRow}>
+        <Pressable style={styles.monthNavButton} onPress={() => setMonthOffset((value) => value - 1)}>
+          <Text style={styles.monthNavButtonText}>‹</Text>
+        </Pressable>
+        <Text style={styles.monthNavLabel}>{label}</Text>
+        <Pressable
+          style={[styles.monthNavButton, isCurrentMonth && styles.monthNavButtonDisabled]}
+          onPress={() => setMonthOffset((value) => Math.min(0, value + 1))}
+          disabled={isCurrentMonth}
+        >
+          <Text style={[styles.monthNavButtonText, isCurrentMonth && styles.monthNavButtonTextDisabled]}>›</Text>
+        </Pressable>
+      </View>
       <View style={styles.searchRow}>
         <Text style={styles.searchIcon}>🔍</Text>
         <TextInput
@@ -125,7 +141,7 @@ export default function PaidBillsScreen() {
         ListHeaderComponent={
           combinedList.length > 0 ? (
             <View style={styles.summaryCard}>
-              <Text style={styles.summaryLabel}>Total paid this month</Text>
+              <Text style={styles.summaryLabel}>Total paid {isCurrentMonth ? 'this month' : `in ${label}`}</Text>
               <Text style={styles.summaryAmount}>{formatCurrency(totalPaid)}</Text>
               <Text style={styles.summaryCount}>{combinedList.length} {combinedList.length === 1 ? 'item' : 'items'}</Text>
             </View>
@@ -134,7 +150,7 @@ export default function PaidBillsScreen() {
         ListEmptyComponent={
           <EmptyState
             icon="✅"
-            title="Nothing paid yet this month"
+            title={isCurrentMonth ? 'Nothing paid yet this month' : `Nothing paid in ${label}`}
             message="Bills you mark as paid from the Upcoming tab will show up here."
           />
         }
@@ -188,15 +204,17 @@ export default function PaidBillsScreen() {
                   <Text style={[styles.cardAmount, { color: isIncome ? PALETTE.income : PALETTE.textPrimary }]}>
                     {isIncome ? '+' : ''}{formatCurrency(transaction.amount)}
                   </Text>
-                  <Pressable
-                    style={styles.undoButton}
-                    onPress={(event) => {
-                      event.stopPropagation();
-                      handleUndoRecurring(transaction);
-                    }}
-                  >
-                    <Text style={styles.undoButtonText}>Undo</Text>
-                  </Pressable>
+                  {isCurrentMonth ? (
+                    <Pressable
+                      style={styles.undoButton}
+                      onPress={(event) => {
+                        event.stopPropagation();
+                        handleUndoRecurring(transaction);
+                      }}
+                    >
+                      <Text style={styles.undoButtonText}>Undo</Text>
+                    </Pressable>
+                  ) : null}
                 </View>
               </Pressable>
             );
@@ -240,6 +258,27 @@ export default function PaidBillsScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: PALETTE.background },
+  monthNavRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 12,
+  },
+  monthNavButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: PALETTE.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.border,
+  },
+  monthNavButtonDisabled: { opacity: 0.4 },
+  monthNavButtonText: { fontSize: 18, fontWeight: '700', color: PALETTE.textPrimary },
+  monthNavButtonTextDisabled: { color: PALETTE.textSecondary },
+  monthNavLabel: { fontSize: 15, fontWeight: '700', color: PALETTE.textPrimary },
   listContent: { padding: 16, gap: 10 },
   emptyContainer: { flexGrow: 1, justifyContent: 'center' },
   card: {
