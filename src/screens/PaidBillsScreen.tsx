@@ -10,6 +10,7 @@ import type { BillWithDetails } from '../db/queries/bills';
 import type { TransactionWithCategory } from '../db/queries/transactions';
 import { useAccounts } from '../hooks/useAccounts';
 import { useBills } from '../hooks/useBills';
+import { useRecurringTransactions } from '../hooks/useRecurringTransactions';
 import { useTransactions } from '../hooks/useTransactions';
 import { formatCurrency } from '../utils/currency';
 import { formatDisplayDate, monthKeyFor, monthRangeFor } from '../utils/dateRanges';
@@ -24,6 +25,7 @@ export default function PaidBillsScreen() {
   const navigation = useNavigation();
   const { bills, unpayBill } = useBills();
   const { accounts, markMonthlyDueUnpaid } = useAccounts();
+  const { undoPaid: undoRecurringPaid } = useRecurringTransactions();
   const { start, end } = monthRangeFor(new Date());
   const { transactions: monthTransactions } = useTransactions({ start, end });
   const [searchText, setSearchText] = useState('');
@@ -77,6 +79,17 @@ export default function PaidBillsScreen() {
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Mark unpaid', style: 'destructive', onPress: () => unpayBill(bill.id) },
+      ],
+    );
+  }
+
+  function handleUndoRecurring(transaction: TransactionWithCategory) {
+    Alert.alert(
+      'Undo this payment?',
+      `This removes the logged transaction and restores "${transaction.note || transaction.establishment || 'this recurring entry'}" to the Recurring tab as due.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Undo', style: 'destructive', onPress: () => undoRecurringPaid(transaction.recurringId!) },
       ],
     );
   }
@@ -175,6 +188,15 @@ export default function PaidBillsScreen() {
                   <Text style={[styles.cardAmount, { color: isIncome ? PALETTE.income : PALETTE.textPrimary }]}>
                     {isIncome ? '+' : ''}{formatCurrency(transaction.amount)}
                   </Text>
+                  <Pressable
+                    style={styles.undoButton}
+                    onPress={(event) => {
+                      event.stopPropagation();
+                      handleUndoRecurring(transaction);
+                    }}
+                  >
+                    <Text style={styles.undoButtonText}>Undo</Text>
+                  </Pressable>
                 </View>
               </Pressable>
             );

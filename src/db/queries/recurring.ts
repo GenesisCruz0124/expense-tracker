@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, lte, sql } from 'drizzle-orm';
 
 import type { Database } from '../client';
 import {
@@ -172,6 +172,37 @@ export async function markRecurringPaid(db: Database, rule: RecurringWithStatus)
         updatedAt: sql`(datetime('now'))`,
       })
       .where(eq(recurringTransactions.id, rule.id));
+  });
+}
+
+/**
+ * Reverses the most recent `markRecurringPaid` / auto-generated occurrence for a rule:
+ * deletes that transaction and rolls `next_run_date` back to its date, reactivating the
+ * rule if it had been deactivated for running past its `end_date`.
+ */
+export async function undoRecurringPaid(db: Database, ruleId: number): Promise<void> {
+  await db.transaction(async (tx) => {
+    const [lastTransaction] = await tx
+      .select({ id: transactions.id, occurredAt: transactions.occurredAt })
+      .from(transactions)
+      .where(and(eq(transactions.recurringId, ruleId), isNull(transactions.deletedAt)))
+      .orderBy(desc(transactions.occurredAt), desc(transactions.id))
+      .limit(1);
+    if (!lastTransaction) return;
+
+    await tx
+      .update(transactions)
+      .set({ deletedAt: sql`(datetime('now'))`, updatedAt: sql`(datetime('now'))` })
+      .where(eq(transactions.id, lastTransaction.id));
+
+    await tx
+      .update(recurringTransactions)
+      .set({
+        nextRunDate: lastTransaction.occurredAt,
+        isActive: true,
+        updatedAt: sql`(datetime('now'))`,
+      })
+      .where(eq(recurringTransactions.id, ruleId));
   });
 }
 
