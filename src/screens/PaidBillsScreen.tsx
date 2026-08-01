@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { addMonths } from 'date-fns';
 
 import { CategoryBadge, UncategorizedBadge } from '../components/CategoryBadge';
+import { DateField } from '../components/DateField';
 import { EmptyState } from '../components/EmptyState';
 import { PALETTE } from '../constants/colors';
 import type { AccountWithBalance } from '../db/queries/accounts';
@@ -24,7 +25,7 @@ type PaidListItem =
 
 export default function PaidBillsScreen() {
   const navigation = useNavigation();
-  const { bills, unpayBill } = useBills();
+  const { bills, unpayBill, updatePaidDate } = useBills();
   const { accounts, markMonthlyDueUnpaid } = useAccounts();
   const { undoPaid: undoRecurringPaid } = useRecurringTransactions();
   const [monthOffset, setMonthOffset] = useState(0);
@@ -74,6 +75,21 @@ export default function PaidBillsScreen() {
     );
     return billsTotal + duesTotal + recurringTotal;
   }, [paidThisMonth, paidDuesThisMonth, paidRecurringThisMonth]);
+
+  const [editDateBill, setEditDateBill] = useState<BillWithDetails | null>(null);
+  const [editDateText, setEditDateText] = useState('');
+
+  function handleOpenEditDate(bill: BillWithDetails) {
+    setEditDateBill(bill);
+    setEditDateText(bill.lastPaidAt ?? '');
+  }
+
+  function handleSaveEditDate() {
+    if (editDateBill && editDateText) {
+      updatePaidDate(editDateBill.id, editDateText);
+    }
+    setEditDateBill(null);
+  }
 
   function handleMarkUnpaid(bill: BillWithDetails) {
     Alert.alert(
@@ -237,7 +253,15 @@ export default function PaidBillsScreen() {
                     <Text style={styles.accountName}>{bill.accountName}</Text>
                   </View>
                 ) : null}
-                <Text style={styles.cardSubtitle}>Paid {formatDisplayDate(bill.lastPaidAt!)}</Text>
+                <Pressable
+                  onPress={(event) => {
+                    event.stopPropagation();
+                    handleOpenEditDate(bill);
+                  }}
+                  hitSlop={4}
+                >
+                  <Text style={styles.cardSubtitleLink}>Paid {formatDisplayDate(bill.lastPaidAt!)} · Edit</Text>
+                </Pressable>
                 {frequencyLabel ? <Text style={styles.cardFrequency}>{frequencyLabel}</Text> : null}
               </View>
               <View style={styles.cardTrailing}>
@@ -252,6 +276,24 @@ export default function PaidBillsScreen() {
           );
         }}
       />
+
+      <Modal visible={editDateBill != null} transparent animationType="fade" onRequestClose={() => setEditDateBill(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Edit paid date</Text>
+            <Text style={styles.modalSubtitle}>{editDateBill?.name}</Text>
+            <DateField value={editDateText} onChangeText={setEditDateText} />
+            <View style={styles.modalActions}>
+              <Pressable style={styles.modalCancelButton} onPress={() => setEditDateBill(null)}>
+                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+              </Pressable>
+              <Pressable style={styles.modalSaveButton} onPress={handleSaveEditDate}>
+                <Text style={styles.modalSaveButtonText}>Save</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -321,6 +363,7 @@ const styles = StyleSheet.create({
   cardMain: { flex: 1, gap: 6 },
   cardTitle: { fontSize: 14, fontWeight: '700', color: PALETTE.textPrimary },
   cardSubtitle: { fontSize: 12, color: PALETTE.textSecondary },
+  cardSubtitleLink: { fontSize: 12, color: PALETTE.net, fontWeight: '600' },
   accountRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   accountDot: { width: 8, height: 8, borderRadius: 4 },
   accountName: { fontSize: 12, color: PALETTE.textSecondary, fontWeight: '600' },
@@ -334,4 +377,25 @@ const styles = StyleSheet.create({
     backgroundColor: `${PALETTE.textSecondary}1A`,
   },
   undoButtonText: { fontSize: 12, fontWeight: '700', color: PALETTE.textSecondary },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  modalCard: {
+    width: '100%',
+    backgroundColor: PALETTE.surface,
+    borderRadius: 16,
+    padding: 20,
+    gap: 14,
+  },
+  modalTitle: { fontSize: 16, fontWeight: '700', color: PALETTE.textPrimary },
+  modalSubtitle: { fontSize: 13, color: PALETTE.textSecondary, marginTop: -10 },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10 },
+  modalCancelButton: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 10 },
+  modalCancelButtonText: { fontSize: 14, fontWeight: '600', color: PALETTE.textSecondary },
+  modalSaveButton: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 10, backgroundColor: PALETTE.net },
+  modalSaveButtonText: { fontSize: 14, fontWeight: '700', color: '#fff' },
 });

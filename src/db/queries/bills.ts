@@ -284,6 +284,40 @@ export async function markBillUnpaid(db: Database, id: number): Promise<void> {
   });
 }
 
+/**
+ * Updates the date of an already-paid bill's logged transaction (and its transfer counterpart,
+ * if the bill pays into another account), plus the bill's own `lastPaidAt`.
+ */
+export async function updateBillPaidDate(db: Database, id: number, occurredAt: string): Promise<void> {
+  const bill = await getBill(db, id);
+  if (!bill || !bill.isPaid || bill.paidTransactionId == null) return;
+
+  await db.transaction(async (tx) => {
+    const [paidTransaction] = await tx
+      .select({ transferId: transactions.transferId })
+      .from(transactions)
+      .where(eq(transactions.id, bill.paidTransactionId!))
+      .limit(1);
+
+    if (paidTransaction?.transferId != null) {
+      await tx
+        .update(transactions)
+        .set({ occurredAt, updatedAt: sql`(datetime('now'))` })
+        .where(eq(transactions.transferId, paidTransaction.transferId));
+    } else {
+      await tx
+        .update(transactions)
+        .set({ occurredAt, updatedAt: sql`(datetime('now'))` })
+        .where(eq(transactions.id, bill.paidTransactionId!));
+    }
+
+    await tx
+      .update(bills)
+      .set({ lastPaidAt: occurredAt, updatedAt: sql`(datetime('now'))` })
+      .where(eq(bills.id, id));
+  });
+}
+
 /** Records that a due-date reminder has been sent so `checkBillReminders` doesn't repeat it. */
 export async function markBillReminded(db: Database, id: number, remindedAt: string): Promise<void> {
   await db

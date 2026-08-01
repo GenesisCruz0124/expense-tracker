@@ -9,6 +9,7 @@ import {
   markBillPaid as markBillPaidQuery,
   markBillUnpaid as markBillUnpaidQuery,
   updateBill as updateBillQuery,
+  updateBillPaidDate as updateBillPaidDateQuery,
   type BillInput,
   type BillWithDetails,
 } from '../db/queries/bills';
@@ -79,5 +80,14 @@ export function useBills() {
     [db, notifyDataChanged, refresh],
   );
 
-  return { bills, loading, refresh, addBill, editBill, removeBill, payBill, unpayBill };
+  const updatePaidDate = useCallback(
+    async (id: number, occurredAt: string) => {
+      await updateBillPaidDateQuery(db, id, occurredAt);
+      notifyDataChanged();
+      await refresh();
+    },
+    [db, notifyDataChanged, refresh],
+  );
+
+  return { bills, loading, refresh, addBill, editBill, removeBill, payBill, unpayBill, updatePaidDate };
 }
