@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Modal, Pressable, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { addMonths } from 'date-fns';
 
@@ -10,6 +10,7 @@ import { PALETTE } from '../constants/colors';
 import type { AccountWithBalance } from '../db/queries/accounts';
 import type { BillWithDetails } from '../db/queries/bills';
 import type { TransactionWithCategory } from '../db/queries/transactions';
+import { useAccountCategories } from '../hooks/useAccountCategories';
 import { useAccounts } from '../hooks/useAccounts';
 import { useBills } from '../hooks/useBills';
 import { useRecurringTransactions } from '../hooks/useRecurringTransactions';
@@ -23,10 +24,19 @@ type PaidListItem =
   | { kind: 'due'; data: AccountWithBalance }
   | { kind: 'recurring'; data: TransactionWithCategory };
 
+interface SourceSection {
+  title: string;
+  total: number;
+  data: PaidListItem[];
+}
+
+const UNGROUPED_LAST = ['Payroll deduction', 'Other'];
+
 export default function PaidBillsScreen() {
   const navigation = useNavigation();
   const { bills, unpayBill, updatePaidDate } = useBills();
   const { accounts, markMonthlyDueUnpaid } = useAccounts();
+  const { accountCategories } = useAccountCategories();
   const { undoPaid: undoRecurringPaid } = useRecurringTransactions();
   const [monthOffset, setMonthOffset] = useState(0);
   const viewedDate = useMemo(() => addMonths(new Date(), monthOffset), [monthOffset]);
@@ -65,6 +75,48 @@ export default function PaidBillsScreen() {
       .map((data) => ({ kind: 'recurring', data }));
     return [...billItems, ...dueItems, ...recurringItems];
   }, [paidThisMonth, paidDuesThisMonth, paidRecurringThisMonth, searchText]);
+
+  const accountById = useMemo(() => new Map(accounts.map((account) => [account.id, account])), [accounts]);
+  const categoryById = useMemo(() => new Map(accountCategories.map((category) => [category.id, category])), [accountCategories]);
+
+  function sourceLabelFor(item: PaidListItem): string {
+    if (item.kind === 'due') {
+      return categoryById.get(item.data.categoryId ?? -1)?.name ?? 'Other';
+    }
+    const accountId = item.data.accountId;
+    if (accountId == null) return 'Payroll deduction';
+    const account = accountById.get(accountId);
+    if (!account) return 'Other';
+    return categoryById.get(account.categoryId ?? -1)?.name ?? 'Other';
+  }
+
+  function itemSignedAmount(item: PaidListItem): number {
+    if (item.kind === 'recurring') {
+      return item.data.type === 'income' ? -item.data.amount : item.data.amount;
+    }
+    return item.kind === 'bill' ? item.data.amount : item.data.monthlyAmountDue ?? 0;
+  }
+
+  const sourceSections = useMemo((): SourceSection[] => {
+    const byLabel = new Map<string, SourceSection>();
+    for (const item of combinedList) {
+      const label = sourceLabelFor(item);
+      let section = byLabel.get(label);
+      if (!section) {
+        section = { title: label, total: 0, data: [] };
+        byLabel.set(label, section);
+      }
+      section.total += itemSignedAmount(item);
+      section.data.push(item);
+    }
+    return Array.from(byLabel.values()).sort((a, b) => {
+      const aLast = UNGROUPED_LAST.includes(a.title);
+      const bLast = UNGROUPED_LAST.includes(b.title);
+      if (aLast !== bLast) return aLast ? 1 : -1;
+      return b.total - a.total;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [combinedList, accountById, categoryById]);
 
   const totalPaid = useMemo(() => {
     const billsTotal = paidThisMonth.reduce((sum, bill) => sum + bill.amount, 0);
@@ -150,10 +202,20 @@ export default function PaidBillsScreen() {
           clearButtonMode="while-editing"
         />
       </View>
-      <FlatList
-        data={combinedList}
+      <SectionList
+        sections={sourceSections}
         keyExtractor={(item) => `${item.kind}-${item.data.id}`}
+        stickySectionHeadersEnabled
         contentContainerStyle={combinedList.length === 0 ? styles.emptyContainer : styles.listContent}
+        renderSectionHeader={({ section }) => (
+          <View style={styles.sourceHeader}>
+            <Text style={styles.sourceTitle}>{section.title}</Text>
+            <View style={styles.sourceSummary}>
+              <Text style={styles.sourceCount}>{section.data.length} {section.data.length === 1 ? 'item' : 'items'}</Text>
+              <Text style={styles.sourceTotal}>{formatCurrency(section.total)}</Text>
+            </View>
+          </View>
+        )}
         ListHeaderComponent={
           combinedList.length > 0 ? (
             <View style={styles.summaryCard}>
@@ -323,6 +385,21 @@ const styles = StyleSheet.create({
   monthNavLabel: { fontSize: 15, fontWeight: '700', color: PALETTE.textPrimary },
   listContent: { padding: 16, gap: 10 },
   emptyContainer: { flexGrow: 1, justifyContent: 'center' },
+  sourceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginHorizontal: -16,
+    backgroundColor: PALETTE.background,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: PALETTE.border,
+  },
+  sourceTitle: { fontSize: 13, fontWeight: '700', color: PALETTE.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4 },
+  sourceSummary: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  sourceCount: { fontSize: 12, color: PALETTE.textSecondary },
+  sourceTotal: { fontSize: 14, fontWeight: '700', color: PALETTE.textPrimary },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
