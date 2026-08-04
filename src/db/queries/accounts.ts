@@ -62,6 +62,7 @@ export async function listAccounts(db: Database, options: ListAccountsOptions = 
       totalMonths: accounts.totalMonths,
       creditLimit: accounts.creditLimit,
       linkedCreditCardId: accounts.linkedCreditCardId,
+      paymentSource: accounts.paymentSource,
       createdAt: accounts.createdAt,
       updatedAt: accounts.updatedAt,
       deletedAt: accounts.deletedAt,
@@ -120,6 +121,7 @@ export async function getAccountWithBalance(db: Database, id: number): Promise<A
       totalMonths: accounts.totalMonths,
       creditLimit: accounts.creditLimit,
       linkedCreditCardId: accounts.linkedCreditCardId,
+      paymentSource: accounts.paymentSource,
       createdAt: accounts.createdAt,
       updatedAt: accounts.updatedAt,
       deletedAt: accounts.deletedAt,
@@ -166,6 +168,8 @@ export interface AccountInput {
   annualInterestRate?: number | null;
   /** How often interest is credited: 'daily' | 'monthly' | 'yearly'. */
   interestFrequency?: 'daily' | 'monthly' | 'yearly' | null;
+  /** Free-text label for how this account's monthly due/contribution is funded, e.g. "Salary deduction" or "Cash". */
+  paymentSource?: string | null;
 }
 
 export async function createAccount(db: Database, input: AccountInput): Promise<Account> {
@@ -188,6 +192,7 @@ export async function createAccount(db: Database, input: AccountInput): Promise<
     subscriptionDueDay: input.subscriptionDueDay ?? null,
     annualInterestRate: input.annualInterestRate ?? null,
     interestFrequency: input.interestFrequency ?? null,
+    paymentSource: input.paymentSource?.trim() || null,
     uuid: generateUuid(),
   };
   const [row] = await db.insert(accounts).values(values).returning();
@@ -216,6 +221,7 @@ export async function updateAccount(db: Database, id: number, input: AccountInpu
       subscriptionDueDay: input.subscriptionDueDay ?? null,
       annualInterestRate: input.annualInterestRate ?? null,
       interestFrequency: input.interestFrequency ?? null,
+      paymentSource: input.paymentSource?.trim() || null,
       updatedAt: sql`(datetime('now'))`,
     })
     .where(eq(accounts.id, id));

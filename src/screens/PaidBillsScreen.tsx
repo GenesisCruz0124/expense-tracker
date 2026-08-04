@@ -81,13 +81,13 @@ export default function PaidBillsScreen() {
 
   function sourceLabelFor(item: PaidListItem): string {
     if (item.kind === 'due') {
-      return categoryById.get(item.data.categoryId ?? -1)?.name ?? 'Other';
+      return item.data.paymentSource?.trim() || categoryById.get(item.data.categoryId ?? -1)?.name || 'Other';
     }
     const accountId = item.data.accountId;
     if (accountId == null) return 'Payroll deduction';
     const account = accountById.get(accountId);
     if (!account) return 'Other';
-    return categoryById.get(account.categoryId ?? -1)?.name ?? 'Other';
+    return account.paymentSource?.trim() || categoryById.get(account.categoryId ?? -1)?.name || 'Other';
   }
 
   function itemSignedAmount(item: PaidListItem): number {

@@ -71,6 +71,40 @@ export default function RecurringTransactionsScreen() {
     [accounts, accountCategories, currentMonthKey, searchQ],
   );
 
+  const totalInvestmentContribution = useMemo(
+    () => investmentAccounts.reduce((sum, account) => sum + (account.monthlyContribution ?? 0), 0),
+    [investmentAccounts],
+  );
+
+  function groupBySource(list: AccountWithBalance[], amountOf: (account: AccountWithBalance) => number) {
+    const byLabel = new Map<string, { label: string; total: number; data: AccountWithBalance[] }>();
+    for (const account of list) {
+      const label = account.paymentSource?.trim() || 'Salary deduction';
+      let group = byLabel.get(label);
+      if (!group) {
+        group = { label, total: 0, data: [] };
+        byLabel.set(label, group);
+      }
+      group.total += amountOf(account);
+      group.data.push(account);
+    }
+    return Array.from(byLabel.values()).sort((a, b) => {
+      if (a.label === 'Salary deduction') return -1;
+      if (b.label === 'Salary deduction') return 1;
+      return a.label.localeCompare(b.label);
+    });
+  }
+
+  const creditCardGroups = useMemo(
+    () => groupBySource(creditCardAccounts, (a) => a.monthlyAmountDue ?? 0),
+    [creditCardAccounts],
+  );
+  const loanGroups = useMemo(() => groupBySource(loanAccounts, (a) => a.monthlyAmountDue ?? 0), [loanAccounts]);
+  const investmentGroups = useMemo(
+    () => groupBySource(investmentAccounts, (a) => a.monthlyContribution ?? 0),
+    [investmentAccounts],
+  );
+
   const { recurringMonthlyIncome, recurringMonthlyExpense } = useMemo(() => {
     let income = 0;
     let expense = 0;
@@ -161,6 +195,58 @@ export default function RecurringTransactionsScreen() {
     );
   }
 
+  function renderInvestmentAccountCard(account: AccountWithBalance) {
+    return (
+      <Pressable
+        key={account.id}
+        style={styles.card}
+        onPress={() => navigation.navigate('AddEditAccount', { accountId: account.id })}
+      >
+        <View style={[styles.avatar, { backgroundColor: `${account.color}1A` }]}>
+          <AccountIcon icon={account.icon} size={18} textStyle={styles.avatarIcon} />
+        </View>
+        <View style={styles.cardMain}>
+          <Text style={styles.cardTitle}>{account.name}</Text>
+          <Text style={styles.cardSubtitle}>Add monthly amount</Text>
+          {account.totalMonths > 0 ? (
+            <Text style={styles.totalMonthsBadge}>{account.totalMonths} {account.totalMonths === 1 ? 'month' : 'months'} added</Text>
+          ) : null}
+        </View>
+        <View style={styles.amountColumn}>
+          <Text style={[styles.cardAmount, { color: PALETTE.income }]}>
+            +{formatCurrency(account.monthlyContribution!)}
+          </Text>
+          <Pressable
+            style={styles.actionButton}
+            onPress={(event) => {
+              event.stopPropagation();
+              handleAddContribution(account);
+            }}
+          >
+            <Text style={styles.actionButtonText}>Add to balance</Text>
+          </Pressable>
+        </View>
+      </Pressable>
+    );
+  }
+
+  function renderSourceGroups(
+    groups: { label: string; total: number; data: AccountWithBalance[] }[],
+    renderCard: (account: AccountWithBalance) => React.ReactNode,
+  ) {
+    return groups.map((group) => (
+      <View key={group.label} style={styles.sourceGroup}>
+        {groups.length > 1 ? (
+          <View style={styles.sourceGroupHeaderRow}>
+            <Text style={styles.sourceGroupTitle}>{group.label}</Text>
+            <Text style={styles.sourceGroupTotal}>{formatCurrency(group.total)}</Text>
+          </View>
+        ) : null}
+        {group.data.map(renderCard)}
+      </View>
+    ));
+  }
+
   return (
     <View style={styles.screen}>
       <View style={styles.searchRow}>
@@ -196,7 +282,7 @@ export default function RecurringTransactionsScreen() {
                   <Text style={styles.sectionTitle}>Credit card dues</Text>
                   <Text style={styles.sectionTotal}>Total {formatCurrency(totalCreditCardDue)}</Text>
                 </View>
-                {creditCardAccounts.map(renderDueAccountCard)}
+                {renderSourceGroups(creditCardGroups, renderDueAccountCard)}
               </>
             ) : null}
 
@@ -206,45 +292,19 @@ export default function RecurringTransactionsScreen() {
                   <Text style={styles.sectionTitle}>Loan dues</Text>
                   <Text style={styles.sectionTotal}>Total {formatCurrency(totalLoanDue)}</Text>
                 </View>
-                {loanAccounts.map(renderDueAccountCard)}
+                {renderSourceGroups(loanGroups, renderDueAccountCard)}
               </>
             ) : null}
 
             {investmentAccounts.length > 0 ? (
               <>
-                <Text style={styles.sectionTitle}>Investment contributions</Text>
-                {investmentAccounts.map((account) => (
-                  <Pressable
-                    key={account.id}
-                    style={styles.card}
-                    onPress={() => navigation.navigate('AddEditAccount', { accountId: account.id })}
-                  >
-                    <View style={[styles.avatar, { backgroundColor: `${account.color}1A` }]}>
-                      <AccountIcon icon={account.icon} size={18} textStyle={styles.avatarIcon} />
-                    </View>
-                    <View style={styles.cardMain}>
-                      <Text style={styles.cardTitle}>{account.name}</Text>
-                      <Text style={styles.cardSubtitle}>Add monthly amount</Text>
-                      {account.totalMonths > 0 ? (
-                        <Text style={styles.totalMonthsBadge}>{account.totalMonths} {account.totalMonths === 1 ? 'month' : 'months'} added</Text>
-                      ) : null}
-                    </View>
-                    <View style={styles.amountColumn}>
-                      <Text style={[styles.cardAmount, { color: PALETTE.income }]}>
-                        +{formatCurrency(account.monthlyContribution!)}
-                      </Text>
-                      <Pressable
-                        style={styles.actionButton}
-                        onPress={(event) => {
-                          event.stopPropagation();
-                          handleAddContribution(account);
-                        }}
-                      >
-                        <Text style={styles.actionButtonText}>Add to balance</Text>
-                      </Pressable>
-                    </View>
-                  </Pressable>
-                ))}
+                <View style={styles.sectionHeaderRow}>
+                  <Text style={styles.sectionTitle}>Investment contributions</Text>
+                  <Text style={[styles.sectionTotal, styles.sectionTotalIncome]}>
+                    Total {formatCurrency(totalInvestmentContribution)}
+                  </Text>
+                </View>
+                {renderSourceGroups(investmentGroups, renderInvestmentAccountCard)}
               </>
             ) : null}
 
@@ -362,6 +422,10 @@ const styles = StyleSheet.create({
   sectionTotal: { fontSize: 12, fontWeight: '700', color: PALETTE.expense },
   sectionTotalIncome: { color: PALETTE.income },
   recurringTotals: { flexDirection: 'row', gap: 10 },
+  sourceGroup: { gap: 10 },
+  sourceGroupHeaderRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', paddingTop: 2 },
+  sourceGroupTitle: { fontSize: 11, fontWeight: '700', color: PALETTE.textSecondary },
+  sourceGroupTotal: { fontSize: 11, fontWeight: '600', color: PALETTE.textSecondary },
   avatar: {
     width: 38,
     height: 38,

@@ -57,6 +57,7 @@ export default function AddEditAccountScreen() {
   const [subscriptionDueDay, setSubscriptionDueDay] = useState<number | null>(null);
   const [interestRateText, setInterestRateText] = useState('');
   const [interestFrequency, setInterestFrequency] = useState<'daily' | 'monthly' | 'yearly'>('daily');
+  const [paymentSource, setPaymentSource] = useState('');
   const [transactionEffect, setTransactionEffect] = useState(0);
   const [loading, setLoading] = useState(isEditing);
   const [saving, setSaving] = useState(false);
@@ -92,6 +93,7 @@ export default function AddEditAccountScreen() {
       setSubscriptionDueDay(existing.subscriptionDueDay ?? null);
       setInterestRateText(existing.annualInterestRate != null ? String(existing.annualInterestRate / 100) : '');
       setInterestFrequency((existing.interestFrequency as 'daily' | 'monthly' | 'yearly') ?? 'daily');
+      setPaymentSource(existing.paymentSource ?? '');
       setTransactionEffect(existing.balance - existing.startingBalance);
       setLoading(false);
     })();
@@ -174,6 +176,7 @@ export default function AddEditAccountScreen() {
         balanceLastUpdatedAt,
         annualInterestRate,
         interestFrequency: annualInterestRate != null ? interestFrequency : null,
+        paymentSource: isCreditCardKind || isInvestmentKind ? paymentSource : null,
       };
       if (isEditing) {
         await updateAccount(accountId, { ...input, totalMonths });
@@ -311,6 +314,20 @@ export default function AddEditAccountScreen() {
 
       {isCreditCardKind ? (
         <View style={styles.field}>
+          <Text style={styles.label}>Payment source (optional)</Text>
+          <TextInput
+            style={styles.input}
+            value={paymentSource}
+            onChangeText={setPaymentSource}
+            placeholder="e.g. Salary deduction, Cash, Credit card"
+            placeholderTextColor={PALETTE.textSecondary}
+          />
+          <Text style={styles.helperText}>Used to group this due on the Recurring tab.</Text>
+        </View>
+      ) : null}
+
+      {isCreditCardKind ? (
+        <View style={styles.field}>
           <Text style={styles.label}>Credit limit (optional)</Text>
           <AmountInput value={creditLimitText} onChangeText={setCreditLimitText} />
         </View>
@@ -429,6 +446,20 @@ export default function AddEditAccountScreen() {
         <View style={styles.field}>
           <Text style={styles.label}>Monthly amount (optional)</Text>
           <AmountInput value={monthlyContributionText} onChangeText={setMonthlyContributionText} />
+        </View>
+      ) : null}
+
+      {isInvestmentKind ? (
+        <View style={styles.field}>
+          <Text style={styles.label}>Payment source (optional)</Text>
+          <TextInput
+            style={styles.input}
+            value={paymentSource}
+            onChangeText={setPaymentSource}
+            placeholder="e.g. Salary deduction, Cash"
+            placeholderTextColor={PALETTE.textSecondary}
+          />
+          <Text style={styles.helperText}>Used to group this contribution on the Recurring tab.</Text>
         </View>
       ) : null}
 

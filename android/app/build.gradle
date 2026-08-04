@@ -92,8 +92,8 @@ android {
         applicationId 'com.genesiscruz0124.expensetracker'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 142
-        versionName "1.1.49"
+        versionCode 143
+        versionName "1.1.50"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }

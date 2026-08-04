@@ -88,6 +88,8 @@ export const accounts = sqliteTable(
     creditLimit: integer('credit_limit'),
     /** For loan accounts: the credit card account this loan is charged against. */
     linkedCreditCardId: integer('linked_credit_card_id'),
+    /** Free-text label for how a monthly due/contribution is funded, e.g. "Salary deduction" or "Cash". */
+    paymentSource: text('payment_source'),
     createdAt: text('created_at')
       .notNull()
       .default(sql`(datetime('now'))`),
