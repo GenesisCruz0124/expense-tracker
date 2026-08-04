@@ -311,10 +311,14 @@ export default function RecurringTransactionsScreen() {
             <View style={styles.sectionHeaderRow}>
               <Text style={styles.sectionTitle}>Recurring transactions</Text>
               <View style={styles.recurringTotals}>
-                <Text style={[styles.sectionTotal, styles.sectionTotalIncome]}>
-                  +{formatCurrency(recurringMonthlyIncome)}
-                </Text>
-                <Text style={styles.sectionTotal}>−{formatCurrency(recurringMonthlyExpense)}</Text>
+                {recurringMonthlyIncome > 0 ? (
+                  <Text style={[styles.sectionTotal, styles.sectionTotalIncome]}>
+                    +{formatCurrency(recurringMonthlyIncome)}
+                  </Text>
+                ) : null}
+                {recurringMonthlyExpense > 0 ? (
+                  <Text style={styles.sectionTotal}>−{formatCurrency(recurringMonthlyExpense)}</Text>
+                ) : null}
               </View>
             </View>
           </View>
