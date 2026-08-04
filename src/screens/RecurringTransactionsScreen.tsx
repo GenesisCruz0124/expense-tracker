@@ -30,7 +30,7 @@ export default function RecurringTransactionsScreen() {
         if (account.monthlyAmountDue == null) return false;
         if (account.monthlyDueLastPaidMonth === currentMonthKey) return false;
         const category = accountCategories.find((item) => item.id === account.categoryId);
-        if (category?.kind !== 'credit_card' || category.name === 'Loan') return false;
+        if (category?.kind !== 'credit_card' || account.linkedCreditCardId == null) return false;
         return !searchQ || account.name.toLowerCase().includes(searchQ);
       }),
     [accounts, accountCategories, currentMonthKey, searchQ],
@@ -42,7 +42,7 @@ export default function RecurringTransactionsScreen() {
         if (account.monthlyAmountDue == null) return false;
         if (account.monthlyDueLastPaidMonth === currentMonthKey) return false;
         const category = accountCategories.find((item) => item.id === account.categoryId);
-        if (category?.kind !== 'credit_card' || category.name !== 'Loan') return false;
+        if (category?.kind !== 'credit_card' || account.linkedCreditCardId != null) return false;
         return !searchQ || account.name.toLowerCase().includes(searchQ);
       }),
     [accounts, accountCategories, currentMonthKey, searchQ],
