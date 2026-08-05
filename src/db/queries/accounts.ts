@@ -63,6 +63,7 @@ export async function listAccounts(db: Database, options: ListAccountsOptions = 
       creditLimit: accounts.creditLimit,
       linkedCreditCardId: accounts.linkedCreditCardId,
       paymentSource: accounts.paymentSource,
+      sharedCreditLimitAccountId: accounts.sharedCreditLimitAccountId,
       createdAt: accounts.createdAt,
       updatedAt: accounts.updatedAt,
       deletedAt: accounts.deletedAt,
@@ -122,6 +123,7 @@ export async function getAccountWithBalance(db: Database, id: number): Promise<A
       creditLimit: accounts.creditLimit,
       linkedCreditCardId: accounts.linkedCreditCardId,
       paymentSource: accounts.paymentSource,
+      sharedCreditLimitAccountId: accounts.sharedCreditLimitAccountId,
       createdAt: accounts.createdAt,
       updatedAt: accounts.updatedAt,
       deletedAt: accounts.deletedAt,
@@ -170,6 +172,33 @@ export interface AccountInput {
   interestFrequency?: 'daily' | 'monthly' | 'yearly' | null;
   /** Free-text label for how this account's monthly due/contribution is funded, e.g. "Salary deduction" or "Cash". */
   paymentSource?: string | null;
+  /** For credit-card-kind accounts: another credit card account ID that shares the same credit limit. */
+  sharedCreditLimitAccountId?: number | null;
+}
+
+/**
+ * Keeps a shared-credit-limit pairing mutual: clears the old partner's back-link (if it pointed
+ * at `id` and isn't the new partner) and points the new partner back at `id`.
+ */
+async function syncSharedCreditLimitPartner(
+  db: Database,
+  id: number,
+  oldPartnerId: number | null,
+  newPartnerId: number | null,
+): Promise<void> {
+  if (oldPartnerId === newPartnerId) return;
+  if (oldPartnerId != null) {
+    await db
+      .update(accounts)
+      .set({ sharedCreditLimitAccountId: null, updatedAt: sql`(datetime('now'))` })
+      .where(eq(accounts.id, oldPartnerId));
+  }
+  if (newPartnerId != null) {
+    await db
+      .update(accounts)
+      .set({ sharedCreditLimitAccountId: id, updatedAt: sql`(datetime('now'))` })
+      .where(eq(accounts.id, newPartnerId));
+  }
 }
 
 export async function createAccount(db: Database, input: AccountInput): Promise<Account> {
@@ -193,13 +222,23 @@ export async function createAccount(db: Database, input: AccountInput): Promise<
     annualInterestRate: input.annualInterestRate ?? null,
     interestFrequency: input.interestFrequency ?? null,
     paymentSource: input.paymentSource?.trim() || null,
+    sharedCreditLimitAccountId: input.sharedCreditLimitAccountId ?? null,
     uuid: generateUuid(),
   };
   const [row] = await db.insert(accounts).values(values).returning();
+  if (input.sharedCreditLimitAccountId != null) {
+    await syncSharedCreditLimitPartner(db, row.id, null, input.sharedCreditLimitAccountId);
+  }
   return row;
 }
 
 export async function updateAccount(db: Database, id: number, input: AccountInput): Promise<void> {
+  const [existing] = await db
+    .select({ sharedCreditLimitAccountId: accounts.sharedCreditLimitAccountId })
+    .from(accounts)
+    .where(eq(accounts.id, id))
+    .limit(1);
+
   await db
     .update(accounts)
     .set({
@@ -222,9 +261,17 @@ export async function updateAccount(db: Database, id: number, input: AccountInpu
       annualInterestRate: input.annualInterestRate ?? null,
       interestFrequency: input.interestFrequency ?? null,
       paymentSource: input.paymentSource?.trim() || null,
+      sharedCreditLimitAccountId: input.sharedCreditLimitAccountId ?? null,
       updatedAt: sql`(datetime('now'))`,
     })
     .where(eq(accounts.id, id));
+
+  await syncSharedCreditLimitPartner(
+    db,
+    id,
+    existing?.sharedCreditLimitAccountId ?? null,
+    input.sharedCreditLimitAccountId ?? null,
+  );
 }
 
 export async function setAccountArchived(db: Database, id: number, isArchived: boolean): Promise<void> {

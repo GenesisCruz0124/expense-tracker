@@ -267,6 +267,13 @@
       "when": 1785861247505,
       "tag": "0037_account_payment_source",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "6",
+      "when": 1785861347505,
+      "tag": "0038_account_shared_credit_limit",
+      "breakpoints": true
     }
   ]
 }

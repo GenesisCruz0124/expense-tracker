@@ -260,6 +260,8 @@ export default function AccountsScreen() {
     return totals;
   }, [visible]);
 
+  const accountById = useMemo(() => new Map(visible.map((acc) => [acc.id, acc])), [visible]);
+
   const sections = useMemo<AccountSection[]>(() => {
     if (!grouped) {
       const data = sortAccounts(filtered, sortOption);
@@ -505,9 +507,13 @@ export default function AccountsScreen() {
                   {isLoan && item.creditLimit != null ? (
                     <Text style={styles.cardMetaLimit}>
                       {hideAmounts ? '••••••' : (() => {
-                        const used = item.balance + (linkedLoanTotals[item.id] ?? 0);
+                        const ownUsed = item.balance + (linkedLoanTotals[item.id] ?? 0);
+                        const partner = item.sharedCreditLimitAccountId != null ? accountById.get(item.sharedCreditLimitAccountId) : undefined;
+                        const used = partner ? ownUsed + partner.balance + (linkedLoanTotals[partner.id] ?? 0) : ownUsed;
                         const avail = Math.max(0, item.creditLimit - used);
-                        return `${formatCurrency(item.creditLimit)} limit · ${formatCurrency(avail)} avail.`;
+                        return partner
+                          ? `${formatCurrency(item.creditLimit)} limit (shared w/ ${partner.name}) · ${formatCurrency(avail)} avail.`
+                          : `${formatCurrency(item.creditLimit)} limit · ${formatCurrency(avail)} avail.`;
                       })()}
                     </Text>
                   ) : null}

@@ -39,6 +39,7 @@ import m0034 from './0034_recurring_account_id.sql';
 import m0035 from './0035_account_interest_rate.sql';
 import m0036 from './0036_account_interest_frequency.sql';
 import m0037 from './0037_account_payment_source.sql';
+import m0038 from './0038_account_shared_credit_limit.sql';
 
   export default {
     journal,
@@ -80,7 +81,8 @@ m0033,
 m0034,
 m0035,
 m0036,
-m0037
+m0037,
+m0038
     }
   }
   

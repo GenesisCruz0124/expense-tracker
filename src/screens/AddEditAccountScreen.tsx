@@ -49,6 +49,8 @@ export default function AddEditAccountScreen() {
   const [creditLimitText, setCreditLimitText] = useState('');
   const [linkedCreditCardId, setLinkedCreditCardId] = useState<number | null>(null);
   const [showCreditCardPicker, setShowCreditCardPicker] = useState(false);
+  const [sharedCreditLimitAccountId, setSharedCreditLimitAccountId] = useState<number | null>(null);
+  const [showSharedLimitPicker, setShowSharedLimitPicker] = useState(false);
   const [remainingMonths, setRemainingMonths] = useState(0);
   const [monthlyDueLastPaidMonth, setMonthlyDueLastPaidMonth] = useState<string | null>(null);
   const [monthlyContributionText, setMonthlyContributionText] = useState('');
@@ -85,6 +87,7 @@ export default function AddEditAccountScreen() {
       setMonthlyAmountDueText(existing.monthlyAmountDue != null ? String(fromMinorUnits(existing.monthlyAmountDue)) : '');
       setCreditLimitText(existing.creditLimit != null ? String(fromMinorUnits(existing.creditLimit)) : '');
       setLinkedCreditCardId(existing.linkedCreditCardId ?? null);
+      setSharedCreditLimitAccountId(existing.sharedCreditLimitAccountId ?? null);
       setRemainingMonths(existing.remainingMonths ?? 0);
       setMonthlyDueLastPaidMonth(existing.monthlyDueLastPaidMonth ?? null);
       setMonthlyContributionText(existing.monthlyContribution != null ? String(fromMinorUnits(existing.monthlyContribution)) : '');
@@ -177,6 +180,7 @@ export default function AddEditAccountScreen() {
         annualInterestRate,
         interestFrequency: annualInterestRate != null ? interestFrequency : null,
         paymentSource: isCreditCardKind || isInvestmentKind ? paymentSource : null,
+        sharedCreditLimitAccountId: isCreditCardKind ? sharedCreditLimitAccountId : null,
       };
       if (isEditing) {
         await updateAccount(accountId, { ...input, totalMonths });
@@ -332,6 +336,46 @@ export default function AddEditAccountScreen() {
           <AmountInput value={creditLimitText} onChangeText={setCreditLimitText} />
         </View>
       ) : null}
+
+      {isCreditCardKind ? (() => {
+        const shareableAccounts = accounts.filter((a) => {
+          const cat = accountCategories.find((c) => c.id === a.categoryId);
+          return cat?.kind === 'credit_card' && a.creditLimit != null && a.id !== accountId;
+        });
+        const sharedWith = accounts.find((a) => a.id === sharedCreditLimitAccountId);
+        return (
+          <View style={styles.field}>
+            <Text style={styles.label}>Shares credit limit with (optional)</Text>
+            <Pressable style={styles.pickerRow} onPress={() => setShowSharedLimitPicker(true)}>
+              <Text style={[styles.pickerRowText, !sharedWith && styles.pickerRowPlaceholder]}>
+                {sharedWith ? sharedWith.name : 'None — tap to select'}
+              </Text>
+              {sharedWith ? (
+                <Pressable
+                  onPress={(e) => { e.stopPropagation(); setSharedCreditLimitAccountId(null); }}
+                  hitSlop={8}
+                >
+                  <Text style={styles.pickerRowClear}>✕</Text>
+                </Pressable>
+              ) : (
+                <Text style={styles.pickerRowChevron}>›</Text>
+              )}
+            </Pressable>
+            <Text style={styles.helperText}>
+              For cards that share one combined limit — available credit is calculated across both.
+            </Text>
+            <ActionSheet
+              visible={showSharedLimitPicker}
+              onClose={() => setShowSharedLimitPicker(false)}
+              title="Select card sharing this limit"
+              options={shareableAccounts.map((a) => ({
+                label: a.name,
+                onPress: () => { setSharedCreditLimitAccountId(a.id); setShowSharedLimitPicker(false); },
+              }))}
+            />
+          </View>
+        );
+      })() : null}
 
       {isCreditCardKind ? (() => {
         const creditCardAccounts = accounts.filter(

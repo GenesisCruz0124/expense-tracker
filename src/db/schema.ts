@@ -90,6 +90,8 @@ export const accounts = sqliteTable(
     linkedCreditCardId: integer('linked_credit_card_id'),
     /** Free-text label for how a monthly due/contribution is funded, e.g. "Salary deduction" or "Cash". */
     paymentSource: text('payment_source'),
+    /** For credit-card-kind accounts: another credit card account that shares the same credit limit. */
+    sharedCreditLimitAccountId: integer('shared_credit_limit_account_id'),
     createdAt: text('created_at')
       .notNull()
       .default(sql`(datetime('now'))`),
