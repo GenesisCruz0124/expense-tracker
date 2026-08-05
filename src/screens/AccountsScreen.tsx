@@ -501,6 +501,9 @@ export default function AccountsScreen() {
                   {isInvestment && item.totalMonths > 0 ? (
                     <Text style={styles.cardMeta}>{item.totalMonths} {item.totalMonths === 1 ? 'month' : 'months'} contributed</Text>
                   ) : null}
+                  {isLoan && item.totalMonths > 0 ? (
+                    <Text style={styles.cardMeta}>{item.totalMonths} {item.totalMonths === 1 ? 'month' : 'months'} paid</Text>
+                  ) : null}
                   {isLoan && item.remainingMonths != null && item.remainingMonths > 0 ? (
                     <Text style={styles.cardMeta}>{item.remainingMonths} {item.remainingMonths === 1 ? 'month' : 'months'} remaining</Text>
                   ) : null}
