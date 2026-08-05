@@ -479,10 +479,19 @@ export default function AddEditAccountScreen() {
         )
       ) : null}
 
-      {isCreditCardKind && isEditing && totalMonths > 0 ? (
-        <View style={styles.totalMonthsRow}>
-          <Text style={styles.totalMonthsLabel}>Total months paid</Text>
-          <Text style={styles.totalMonthsValue}>{totalMonths} {totalMonths === 1 ? 'month' : 'months'}</Text>
+      {isCreditCardKind && isEditing ? (
+        <View style={styles.field}>
+          <Text style={styles.label}>Total months paid</Text>
+          <View style={styles.stepperRow}>
+            <Pressable style={styles.stepperButton} onPress={() => setTotalMonths((v) => Math.max(0, v - 1))}>
+              <Text style={styles.stepperButtonText}>−</Text>
+            </Pressable>
+            <Text style={styles.stepperValue}>{totalMonths}</Text>
+            <Pressable style={styles.stepperButton} onPress={() => setTotalMonths((v) => v + 1)}>
+              <Text style={styles.stepperButtonText}>+</Text>
+            </Pressable>
+            <Text style={styles.stepperUnit}>{totalMonths === 1 ? 'month' : 'months'}</Text>
+          </View>
         </View>
       ) : null}
 
@@ -703,19 +712,6 @@ const styles = StyleSheet.create({
     borderColor: PALETTE.border,
   },
   copyButtonText: { fontSize: 13, fontWeight: '600', color: PALETTE.net },
-  totalMonthsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    backgroundColor: PALETTE.surface,
-    borderRadius: 10,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: PALETTE.border,
-  },
-  totalMonthsLabel: { fontSize: 13, color: PALETTE.textSecondary, fontWeight: '600' },
-  totalMonthsValue: { fontSize: 13, fontWeight: '700', color: PALETTE.textPrimary },
   pickerRow: {
     flexDirection: 'row',
     alignItems: 'center',
