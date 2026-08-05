@@ -509,11 +509,16 @@ export default function AccountsScreen() {
                       {hideAmounts ? '••••••' : (() => {
                         const ownUsed = item.balance + (linkedLoanTotals[item.id] ?? 0);
                         const partner = item.sharedCreditLimitAccountId != null ? accountById.get(item.sharedCreditLimitAccountId) : undefined;
-                        const used = partner ? ownUsed + partner.balance + (linkedLoanTotals[partner.id] ?? 0) : ownUsed;
-                        const avail = Math.max(0, item.creditLimit - used);
-                        return partner
-                          ? `${formatCurrency(item.creditLimit)} limit (shared w/ ${partner.name}) · ${formatCurrency(avail)} avail.`
-                          : `${formatCurrency(item.creditLimit)} limit · ${formatCurrency(avail)} avail.`;
+                        if (!partner || partner.creditLimit == null) {
+                          const avail = Math.max(0, item.creditLimit - ownUsed);
+                          return `${formatCurrency(item.creditLimit)} limit · ${formatCurrency(avail)} avail.`;
+                        }
+                        // Shared limit: use one common limit (the larger entry) so both cards
+                        // in the pair report the same figure instead of two different ones.
+                        const sharedLimit = Math.max(item.creditLimit, partner.creditLimit);
+                        const used = ownUsed + partner.balance + (linkedLoanTotals[partner.id] ?? 0);
+                        const avail = Math.max(0, sharedLimit - used);
+                        return `${formatCurrency(sharedLimit)} limit (shared w/ ${partner.name}) · ${formatCurrency(avail)} avail.`;
                       })()}
                     </Text>
                   ) : null}
