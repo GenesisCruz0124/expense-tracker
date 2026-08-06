@@ -68,7 +68,45 @@ export interface CategoryInput {
   isBiller?: boolean;
 }
 
+/** Case-insensitive lookup — `categories.name` has a unique index, so callers must check this before inserting. */
+export async function getCategoryByName(db: Database, name: string): Promise<Category | undefined> {
+  const [row] = await db
+    .select()
+    .from(categories)
+    .where(and(sql`lower(${categories.name}) = lower(${name.trim()})`, isNull(categories.deletedAt)))
+    .limit(1);
+  return row;
+}
+
+/**
+ * Creates a category, or if one with the same name already exists (name is unique), upgrades it
+ * in place instead of failing — un-archiving it, widening its type to 'both' if it didn't already
+ * cover the requested type, and flagging it as a biller if requested. This lets "add as a biller"
+ * (or picking a category from the other transaction type) reuse an existing category by name
+ * rather than hitting a silent unique-constraint failure.
+ */
 export async function createCategory(db: Database, input: CategoryInput): Promise<Category> {
+  const existing = await getCategoryByName(db, input.name);
+  if (existing) {
+    const needsUpdate =
+      existing.isArchived ||
+      (input.isBiller && !existing.isBiller) ||
+      (existing.type !== input.type && existing.type !== 'both');
+    if (!needsUpdate) return existing;
+
+    const [row] = await db
+      .update(categories)
+      .set({
+        isArchived: false,
+        isBiller: existing.isBiller || (input.isBiller ?? false),
+        type: existing.type === input.type ? existing.type : 'both',
+        updatedAt: sql`(datetime('now'))`,
+      })
+      .where(eq(categories.id, existing.id))
+      .returning();
+    return row;
+  }
+
   const values: NewCategory = {
     name: input.name.trim(),
     type: input.type,

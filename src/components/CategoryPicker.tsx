@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CATEGORY_COLOR_PALETTE, PALETTE } from '../constants/colors';
@@ -64,6 +64,8 @@ export function CategoryPicker({ forType, selectedCategoryId, onSelect, billersO
       });
       onSelect(created.id);
       close();
+    } catch (err) {
+      Alert.alert('Could not add category', err instanceof Error ? err.message : 'Please try again.');
     } finally {
       setCreating(false);
     }
