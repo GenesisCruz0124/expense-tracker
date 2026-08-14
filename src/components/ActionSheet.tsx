@@ -1,5 +1,5 @@
 import React from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { PALETTE } from '../constants/colors';
 
@@ -34,11 +34,15 @@ export function ActionSheet({ visible, onClose, title, message, options }: Props
         <View style={styles.sheet}>
           <Text style={styles.title}>{title}</Text>
           {message ? <Text style={styles.message}>{message}</Text> : null}
-          {options.map((option) => (
-            <Pressable key={option.label} style={styles.option} onPress={() => handleSelect(option.onPress)}>
-              <Text style={[styles.optionText, option.destructive && styles.optionTextDestructive]}>{option.label}</Text>
-            </Pressable>
-          ))}
+          {/* Scrollable so long option lists (e.g. every account) stay reachable instead of
+              overflowing past the top of the screen. */}
+          <ScrollView style={styles.optionList} contentContainerStyle={styles.optionListContent}>
+            {options.map((option) => (
+              <Pressable key={option.label} style={styles.option} onPress={() => handleSelect(option.onPress)}>
+                <Text style={[styles.optionText, option.destructive && styles.optionTextDestructive]}>{option.label}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
           <Pressable style={styles.option} onPress={onClose}>
             <Text style={styles.cancelText}>Cancel</Text>
           </Pressable>
@@ -57,7 +61,10 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 28,
     paddingHorizontal: 20,
+    maxHeight: '85%',
   },
+  optionList: { flexGrow: 0 },
+  optionListContent: { paddingBottom: 4 },
   title: { fontSize: 16, fontWeight: '700', color: PALETTE.textPrimary, textAlign: 'center' },
   message: { fontSize: 13, color: PALETTE.textSecondary, textAlign: 'center', marginTop: 4 },
   option: {
