@@ -76,6 +76,11 @@ export default function RecurringTransactionsScreen() {
     [investmentAccounts],
   );
 
+  const totalInvestmentBalance = useMemo(
+    () => investmentAccounts.reduce((sum, account) => sum + account.balance, 0),
+    [investmentAccounts],
+  );
+
   function groupBySource(list: AccountWithBalance[], amountOf: (account: AccountWithBalance) => number) {
     const byLabel = new Map<string, { label: string; total: number; data: AccountWithBalance[] }>();
     for (const account of list) {
@@ -207,7 +212,7 @@ export default function RecurringTransactionsScreen() {
         </View>
         <View style={styles.cardMain}>
           <Text style={styles.cardTitle}>{account.name}</Text>
-          <Text style={styles.cardSubtitle}>Add monthly amount</Text>
+          <Text style={styles.cardSubtitle}>Balance {formatCurrency(account.balance)}</Text>
           {account.totalMonths > 0 ? (
             <Text style={styles.totalMonthsBadge}>{account.totalMonths} {account.totalMonths === 1 ? 'month' : 'months'} added</Text>
           ) : null}
@@ -300,9 +305,12 @@ export default function RecurringTransactionsScreen() {
               <>
                 <View style={styles.sectionHeaderRow}>
                   <Text style={styles.sectionTitle}>Investment contributions</Text>
-                  <Text style={[styles.sectionTotal, styles.sectionTotalIncome]}>
-                    Total {formatCurrency(totalInvestmentContribution)}
-                  </Text>
+                  <View style={styles.recurringTotals}>
+                    <Text style={styles.sectionTotalMuted}>Bal {formatCurrency(totalInvestmentBalance)}</Text>
+                    <Text style={[styles.sectionTotal, styles.sectionTotalIncome]}>
+                      +{formatCurrency(totalInvestmentContribution)}
+                    </Text>
+                  </View>
                 </View>
                 {renderSourceGroups(investmentGroups, renderInvestmentAccountCard)}
               </>
@@ -425,6 +433,7 @@ const styles = StyleSheet.create({
   },
   sectionTotal: { fontSize: 12, fontWeight: '700', color: PALETTE.expense },
   sectionTotalIncome: { color: PALETTE.income },
+  sectionTotalMuted: { fontSize: 12, fontWeight: '700', color: PALETTE.textSecondary },
   recurringTotals: { flexDirection: 'row', gap: 10 },
   sourceGroup: { gap: 10 },
   sourceGroupHeaderRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', paddingTop: 2 },
