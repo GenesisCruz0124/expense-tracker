@@ -63,6 +63,8 @@ export async function listAccounts(db: Database, options: ListAccountsOptions = 
       creditLimit: accounts.creditLimit,
       linkedCreditCardId: accounts.linkedCreditCardId,
       paymentSource: accounts.paymentSource,
+      paymentSourceAccountId: accounts.paymentSourceAccountId,
+      monthlyDuePaidTransactionId: accounts.monthlyDuePaidTransactionId,
       sharedCreditLimitAccountId: accounts.sharedCreditLimitAccountId,
       createdAt: accounts.createdAt,
       updatedAt: accounts.updatedAt,
@@ -123,6 +125,8 @@ export async function getAccountWithBalance(db: Database, id: number): Promise<A
       creditLimit: accounts.creditLimit,
       linkedCreditCardId: accounts.linkedCreditCardId,
       paymentSource: accounts.paymentSource,
+      paymentSourceAccountId: accounts.paymentSourceAccountId,
+      monthlyDuePaidTransactionId: accounts.monthlyDuePaidTransactionId,
       sharedCreditLimitAccountId: accounts.sharedCreditLimitAccountId,
       createdAt: accounts.createdAt,
       updatedAt: accounts.updatedAt,
@@ -172,6 +176,8 @@ export interface AccountInput {
   interestFrequency?: 'daily' | 'monthly' | 'yearly' | null;
   /** Free-text label for how this account's monthly due/contribution is funded, e.g. "Salary deduction" or "Cash". */
   paymentSource?: string | null;
+  /** Account the monthly due/contribution is paid from. Null means an untracked source (e.g. salary deduction). */
+  paymentSourceAccountId?: number | null;
   /** For credit-card-kind accounts: another credit card account ID that shares the same credit limit. */
   sharedCreditLimitAccountId?: number | null;
 }
@@ -222,6 +228,7 @@ export async function createAccount(db: Database, input: AccountInput): Promise<
     annualInterestRate: input.annualInterestRate ?? null,
     interestFrequency: input.interestFrequency ?? null,
     paymentSource: input.paymentSource?.trim() || null,
+    paymentSourceAccountId: input.paymentSourceAccountId ?? null,
     sharedCreditLimitAccountId: input.sharedCreditLimitAccountId ?? null,
     uuid: generateUuid(),
   };
@@ -261,6 +268,7 @@ export async function updateAccount(db: Database, id: number, input: AccountInpu
       annualInterestRate: input.annualInterestRate ?? null,
       interestFrequency: input.interestFrequency ?? null,
       paymentSource: input.paymentSource?.trim() || null,
+      paymentSourceAccountId: input.paymentSourceAccountId ?? null,
       sharedCreditLimitAccountId: input.sharedCreditLimitAccountId ?? null,
       updatedAt: sql`(datetime('now'))`,
     })
@@ -280,37 +288,82 @@ export async function setAccountArchived(db: Database, id: number, isArchived: b
 
 /**
  * Marks an account's monthly amount due as paid for `monthKey` ('YYYY-MM'), hiding it from the
- * Recurring screen until the next month, decrements `remainingMonths` if set and above zero, and
- * subtracts `monthlyAmountDue` from the account's balance.
+ * Recurring screen until the next month, and decrements `remainingMonths` if set and above zero.
+ *
+ * The payment is logged as a two-leg transfer so it shows up in the ledger: an expense leg on the
+ * configured `paymentSourceAccountId` (or with no account, for untracked sources like a salary
+ * deduction) and an income leg on this account, which is what actually reduces the balance owed.
  */
-export async function markMonthlyDuePaid(db: Database, id: number, monthKey: string): Promise<void> {
+export async function markMonthlyDuePaid(
+  db: Database,
+  id: number,
+  monthKey: string,
+  occurredAt: string,
+): Promise<void> {
   const [account] = await db
     .select({
+      name: accounts.name,
       remainingMonths: accounts.remainingMonths,
       monthlyAmountDue: accounts.monthlyAmountDue,
-      startingBalance: accounts.startingBalance,
       totalMonths: accounts.totalMonths,
+      paymentSourceAccountId: accounts.paymentSourceAccountId,
     })
     .from(accounts)
     .where(eq(accounts.id, id))
     .limit(1);
   if (!account) return;
-  await db
-    .update(accounts)
-    .set({
-      monthlyDueLastPaidMonth: monthKey,
-      remainingMonths:
-        account.remainingMonths != null && account.remainingMonths > 0 ? account.remainingMonths - 1 : account.remainingMonths,
-      startingBalance: account.startingBalance - (account.monthlyAmountDue ?? 0),
-      totalMonths: account.totalMonths + 1,
-      updatedAt: sql`(datetime('now'))`,
-    })
-    .where(eq(accounts.id, id));
+
+  const amount = account.monthlyAmountDue ?? 0;
+
+  await db.transaction(async (tx) => {
+    let paidTransactionId: number | null = null;
+
+    if (amount > 0) {
+      const [expenseLeg] = await tx
+        .insert(transactions)
+        .values({
+          type: 'expense',
+          amount,
+          occurredAt,
+          note: account.name,
+          accountId: account.paymentSourceAccountId ?? null,
+          uuid: generateUuid(),
+        })
+        .returning();
+
+      await tx.insert(transactions).values({
+        type: 'income',
+        amount,
+        occurredAt,
+        note: account.name,
+        accountId: id,
+        transferId: expenseLeg.id,
+        excludeFromExpense: true,
+        uuid: generateUuid(),
+      });
+      await tx.update(transactions).set({ transferId: expenseLeg.id }).where(eq(transactions.id, expenseLeg.id));
+      paidTransactionId = expenseLeg.id;
+    }
+
+    await tx
+      .update(accounts)
+      .set({
+        monthlyDueLastPaidMonth: monthKey,
+        remainingMonths:
+          account.remainingMonths != null && account.remainingMonths > 0 ? account.remainingMonths - 1 : account.remainingMonths,
+        totalMonths: account.totalMonths + 1,
+        monthlyDuePaidTransactionId: paidTransactionId,
+        updatedAt: sql`(datetime('now'))`,
+      })
+      .where(eq(accounts.id, id));
+  });
 }
 
 /**
  * Reverses `markMonthlyDuePaid`, restoring the account's monthly due to the Recurring screen and
- * adding `monthlyAmountDue` back to the account's balance.
+ * deleting the transfer legs it logged. Dues paid before transaction logging existed have no
+ * `monthlyDuePaidTransactionId` — those adjusted `startingBalance` directly, so undo restores it
+ * the same way.
  */
 export async function markMonthlyDueUnpaid(db: Database, id: number): Promise<void> {
   const [account] = await db
@@ -319,20 +372,39 @@ export async function markMonthlyDueUnpaid(db: Database, id: number): Promise<vo
       monthlyDueLastPaidMonth: accounts.monthlyDueLastPaidMonth,
       monthlyAmountDue: accounts.monthlyAmountDue,
       startingBalance: accounts.startingBalance,
+      monthlyDuePaidTransactionId: accounts.monthlyDuePaidTransactionId,
+      totalMonths: accounts.totalMonths,
     })
     .from(accounts)
     .where(eq(accounts.id, id))
     .limit(1);
   if (!account?.monthlyDueLastPaidMonth) return;
-  await db
-    .update(accounts)
-    .set({
-      monthlyDueLastPaidMonth: null,
-      remainingMonths: account.remainingMonths != null ? account.remainingMonths + 1 : null,
-      startingBalance: account.startingBalance + (account.monthlyAmountDue ?? 0),
-      updatedAt: sql`(datetime('now'))`,
-    })
-    .where(eq(accounts.id, id));
+
+  const paidTransactionId = account.monthlyDuePaidTransactionId;
+
+  await db.transaction(async (tx) => {
+    if (paidTransactionId != null) {
+      await tx
+        .update(transactions)
+        .set({ deletedAt: sql`(datetime('now'))`, updatedAt: sql`(datetime('now'))` })
+        .where(eq(transactions.transferId, paidTransactionId));
+    }
+
+    await tx
+      .update(accounts)
+      .set({
+        monthlyDueLastPaidMonth: null,
+        remainingMonths: account.remainingMonths != null ? account.remainingMonths + 1 : null,
+        // Legacy rows adjusted the balance directly instead of logging a transfer.
+        ...(paidTransactionId == null
+          ? { startingBalance: account.startingBalance + (account.monthlyAmountDue ?? 0) }
+          : {}),
+        totalMonths: Math.max(0, account.totalMonths - 1),
+        monthlyDuePaidTransactionId: null,
+        updatedAt: sql`(datetime('now'))`,
+      })
+      .where(eq(accounts.id, id));
+  });
 }
 
 /**

@@ -10,7 +10,7 @@ import { useAccountCategories } from '../hooks/useAccountCategories';
 import { useAccounts } from '../hooks/useAccounts';
 import { useRecurringTransactions } from '../hooks/useRecurringTransactions';
 import { formatCurrency } from '../utils/currency';
-import { formatDisplayDate, monthKeyFor, parseIsoDate } from '../utils/dateRanges';
+import { formatDisplayDate, formatIsoDate, monthKeyFor, parseIsoDate } from '../utils/dateRanges';
 
 const FREQUENCY_UNIT: Record<'weekly' | 'monthly', string> = { weekly: 'week', monthly: 'month' };
 const MONTHLY_FACTOR: Record<'weekly' | 'monthly', number> = { weekly: 52 / 12, monthly: 1 };
@@ -125,7 +125,7 @@ export default function RecurringTransactionsScreen() {
   function handleMarkPaid(account: AccountWithBalance) {
     Alert.alert('Mark as paid?', `This hides "${account.name}" from Recurring until next month.`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Mark paid', onPress: () => markMonthlyDuePaid(account.id, currentMonthKey) },
+      { text: 'Mark paid', onPress: () => markMonthlyDuePaid(account.id, currentMonthKey, formatIsoDate(new Date())) },
     ]);
   }
 

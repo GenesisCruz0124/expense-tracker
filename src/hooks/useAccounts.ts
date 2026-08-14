@@ -73,8 +73,8 @@ export function useAccounts(options: ListAccountsOptions = {}) {
   );
 
   const markMonthlyDuePaid = useCallback(
-    async (id: number, monthKey: string) => {
-      await markMonthlyDuePaidQuery(db, id, monthKey);
+    async (id: number, monthKey: string, occurredAt: string) => {
+      await markMonthlyDuePaidQuery(db, id, monthKey, occurredAt);
       notifyDataChanged();
       await refresh();
     },

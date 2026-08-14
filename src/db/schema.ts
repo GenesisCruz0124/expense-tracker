@@ -90,6 +90,13 @@ export const accounts = sqliteTable(
     linkedCreditCardId: integer('linked_credit_card_id'),
     /** Free-text label for how a monthly due/contribution is funded, e.g. "Salary deduction" or "Cash". */
     paymentSource: text('payment_source'),
+    /** Account the monthly due/contribution is paid from. Null means an untracked source (e.g. salary deduction). */
+    paymentSourceAccountId: integer('payment_source_account_id'),
+    /**
+     * Expense leg of the transfer logged by the most recent `markMonthlyDuePaid`. Null on dues paid
+     * before transaction logging existed — those still adjust `startingBalance` directly.
+     */
+    monthlyDuePaidTransactionId: integer('monthly_due_paid_transaction_id'),
     /** For credit-card-kind accounts: another credit card account that shares the same credit limit. */
     sharedCreditLimitAccountId: integer('shared_credit_limit_account_id'),
     createdAt: text('created_at')

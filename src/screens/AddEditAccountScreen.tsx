@@ -51,6 +51,7 @@ export default function AddEditAccountScreen() {
   const [showCreditCardPicker, setShowCreditCardPicker] = useState(false);
   const [sharedCreditLimitAccountId, setSharedCreditLimitAccountId] = useState<number | null>(null);
   const [showSharedLimitPicker, setShowSharedLimitPicker] = useState(false);
+  const [showPaymentSourcePicker, setShowPaymentSourcePicker] = useState(false);
   const [remainingMonths, setRemainingMonths] = useState(0);
   const [monthlyDueLastPaidMonth, setMonthlyDueLastPaidMonth] = useState<string | null>(null);
   const [monthlyContributionText, setMonthlyContributionText] = useState('');
@@ -60,6 +61,7 @@ export default function AddEditAccountScreen() {
   const [interestRateText, setInterestRateText] = useState('');
   const [interestFrequency, setInterestFrequency] = useState<'daily' | 'monthly' | 'yearly'>('daily');
   const [paymentSource, setPaymentSource] = useState('');
+  const [paymentSourceAccountId, setPaymentSourceAccountId] = useState<number | null>(null);
   const [transactionEffect, setTransactionEffect] = useState(0);
   const [loading, setLoading] = useState(isEditing);
   const [saving, setSaving] = useState(false);
@@ -97,6 +99,7 @@ export default function AddEditAccountScreen() {
       setInterestRateText(existing.annualInterestRate != null ? String(existing.annualInterestRate / 100) : '');
       setInterestFrequency((existing.interestFrequency as 'daily' | 'monthly' | 'yearly') ?? 'daily');
       setPaymentSource(existing.paymentSource ?? '');
+      setPaymentSourceAccountId(existing.paymentSourceAccountId ?? null);
       setTransactionEffect(existing.balance - existing.startingBalance);
       setLoading(false);
     })();
@@ -180,6 +183,7 @@ export default function AddEditAccountScreen() {
         annualInterestRate,
         interestFrequency: annualInterestRate != null ? interestFrequency : null,
         paymentSource: isCreditCardKind || isInvestmentKind ? paymentSource : null,
+        paymentSourceAccountId: isCreditCardKind || isInvestmentKind ? paymentSourceAccountId : null,
         sharedCreditLimitAccountId: isCreditCardKind ? sharedCreditLimitAccountId : null,
       };
       if (isEditing) {
@@ -197,7 +201,7 @@ export default function AddEditAccountScreen() {
 
   async function handleMarkDuePaid() {
     if (!isEditing) return;
-    await markMonthlyDuePaid(accountId, currentMonthKey);
+    await markMonthlyDuePaid(accountId, currentMonthKey, formatIsoDate(new Date()));
     setMonthlyDueLastPaidMonth(currentMonthKey);
     setRemainingMonths((value) => (value > 0 ? value - 1 : value));
     setTotalMonths((value) => value + 1);
@@ -214,6 +218,7 @@ export default function AddEditAccountScreen() {
     await markMonthlyDueUnpaid(accountId);
     setMonthlyDueLastPaidMonth(null);
     setRemainingMonths((value) => value + 1);
+    setTotalMonths((value) => Math.max(0, value - 1));
     const amountDue = toMinorUnits(monthlyAmountDueText);
     const currentBalance = toMinorUnits(balanceText);
     if (amountDue != null && currentBalance != null) {
@@ -228,6 +233,63 @@ export default function AddEditAccountScreen() {
     setBalanceText(String(fromMinorUnits(currentBalance + contribution)));
     setBalanceLastUpdatedAt(formatIsoDate(new Date()));
     setTotalMonths((value) => value + 1);
+  }
+
+  /**
+   * Payment source is either one of the user's own accounts or an untracked source like a salary
+   * deduction, so the picker offers both. `paymentSource` keeps the display label (used to group
+   * dues on the Recurring tab) and `paymentSourceAccountId` links the account when there is one.
+   */
+  function renderPaymentSourceField(helper: string) {
+    const selectableAccounts = accounts.filter((a) => a.id !== accountId && !a.isArchived);
+    return (
+      <View style={styles.field}>
+        <Text style={styles.label}>Payment source (optional)</Text>
+        <Pressable style={styles.pickerRow} onPress={() => setShowPaymentSourcePicker(true)}>
+          <Text style={[styles.pickerRowText, !paymentSource && styles.pickerRowPlaceholder]}>
+            {paymentSource || 'None — tap to select'}
+          </Text>
+          {paymentSource ? (
+            <Pressable
+              onPress={(e) => {
+                e.stopPropagation();
+                setPaymentSource('');
+                setPaymentSourceAccountId(null);
+              }}
+              hitSlop={8}
+            >
+              <Text style={styles.pickerRowClear}>✕</Text>
+            </Pressable>
+          ) : (
+            <Text style={styles.pickerRowChevron}>›</Text>
+          )}
+        </Pressable>
+        <Text style={styles.helperText}>{helper}</Text>
+        <ActionSheet
+          visible={showPaymentSourcePicker}
+          onClose={() => setShowPaymentSourcePicker(false)}
+          title="Select payment source"
+          options={[
+            {
+              label: 'Salary deduction',
+              onPress: () => {
+                setPaymentSource('Salary deduction');
+                setPaymentSourceAccountId(null);
+                setShowPaymentSourcePicker(false);
+              },
+            },
+            ...selectableAccounts.map((a) => ({
+              label: a.name,
+              onPress: () => {
+                setPaymentSource(a.name);
+                setPaymentSourceAccountId(a.id);
+                setShowPaymentSourcePicker(false);
+              },
+            })),
+          ]}
+        />
+      </View>
+    );
   }
 
   async function handleCopyAccountNumber() {
@@ -316,19 +378,9 @@ export default function AddEditAccountScreen() {
         </View>
       ) : null}
 
-      {isCreditCardKind ? (
-        <View style={styles.field}>
-          <Text style={styles.label}>Payment source (optional)</Text>
-          <TextInput
-            style={styles.input}
-            value={paymentSource}
-            onChangeText={setPaymentSource}
-            placeholder="e.g. Salary deduction, Cash, Credit card"
-            placeholderTextColor={PALETTE.textSecondary}
-          />
-          <Text style={styles.helperText}>Used to group this due on the Recurring tab.</Text>
-        </View>
-      ) : null}
+      {isCreditCardKind
+        ? renderPaymentSourceField('Groups this due on the Recurring tab, and is the account charged when you mark it paid.')
+        : null}
 
       {isCreditCardKind ? (
         <View style={styles.field}>
@@ -502,19 +554,7 @@ export default function AddEditAccountScreen() {
         </View>
       ) : null}
 
-      {isInvestmentKind ? (
-        <View style={styles.field}>
-          <Text style={styles.label}>Payment source (optional)</Text>
-          <TextInput
-            style={styles.input}
-            value={paymentSource}
-            onChangeText={setPaymentSource}
-            placeholder="e.g. Salary deduction, Cash"
-            placeholderTextColor={PALETTE.textSecondary}
-          />
-          <Text style={styles.helperText}>Used to group this contribution on the Recurring tab.</Text>
-        </View>
-      ) : null}
+      {isInvestmentKind ? renderPaymentSourceField('Used to group this contribution on the Recurring tab.') : null}
 
       {isInvestmentKind ? (
         <View style={styles.field}>
