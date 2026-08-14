@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { differenceInCalendarDays, isSameDay, isSameMonth, isSameWeek } from 'date-fns';
@@ -30,6 +30,17 @@ import {
 
 /** A bill is "due soon" once it lands within this many days — flagged amber instead of neutral. */
 const DUE_SOON_THRESHOLD_DAYS = 3;
+
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+/** 'YYYY-MM-DD' → 'August 2026'. Parsed off the string so it stays timezone-independent. */
+function monthLabelFor(isoDate: string): string {
+  const [year, month] = isoDate.split('-');
+  return `${MONTH_NAMES[Number(month) - 1]} ${year}`;
+}
 
 interface BillStatus {
   tone: 'paid' | 'overdue' | 'dueSoon' | 'upcoming';
@@ -95,6 +106,25 @@ export default function DashboardScreen() {
   const net = totals.income - totals.expense;
   const upcomingBills = bills.filter((bill) => !bill.isPaid);
   const upcomingBillsTotal = upcomingBills.reduce((sum, bill) => sum + bill.amount, 0);
+
+  // `listBills` already orders unpaid bills by due date, so a single pass yields months in order.
+  const upcomingBillMonths = useMemo(() => {
+    const sections: { key: string; title: string; total: number; data: BillWithDetails[] }[] = [];
+    const byMonth = new Map<string, (typeof sections)[number]>();
+    for (const bill of upcomingBills) {
+      const key = bill.dueDate.slice(0, 7);
+      let section = byMonth.get(key);
+      if (!section) {
+        section = { key, title: monthLabelFor(bill.dueDate), total: 0, data: [] };
+        byMonth.set(key, section);
+        sections.push(section);
+      }
+      section.total += bill.amount;
+      section.data.push(bill);
+    }
+    return sections;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bills]);
 
   return (
     <ScrollView
@@ -193,24 +223,39 @@ export default function DashboardScreen() {
         {upcomingBills.length === 0 ? (
           <EmptyState icon="↻" title="No upcoming bills" message="Set up rent, subscriptions, or other recurring expenses to track them here." />
         ) : (
-          <View style={styles.list}>
-            {upcomingBills.map((bill) => {
-              const status = billStatusFor(bill, today);
-              return (
-                <View key={bill.id} style={styles.listRow}>
-                  <View style={styles.listRowMain}>
-                    <Text style={styles.listRowTitle}>{bill.name}</Text>
-                    <View style={styles.billMetaRow}>
-                      <Text style={styles.listRowSubtitle}>Due {formatDisplayDate(bill.dueDate)}</Text>
-                      <View style={[styles.billStatusBadge, { backgroundColor: `${BILL_STATUS_COLOR[status.tone]}1A` }]}>
-                        <Text style={[styles.billStatusText, { color: BILL_STATUS_COLOR[status.tone] }]}>{status.label}</Text>
-                      </View>
-                    </View>
+          <View style={styles.monthGroups}>
+            {upcomingBillMonths.map((section) => (
+              <View key={section.key} style={styles.monthGroup}>
+                <View style={styles.monthHeader}>
+                  <Text style={styles.monthTitle}>{section.title}</Text>
+                  <View style={styles.monthSummary}>
+                    <Text style={styles.monthCount}>
+                      {section.data.length} {section.data.length === 1 ? 'bill' : 'bills'}
+                    </Text>
+                    <Text style={styles.monthTotal}>−{formatCurrency(section.total)}</Text>
                   </View>
-                  <Text style={[styles.listRowAmount, { color: PALETTE.expense }]}>−{formatCurrency(bill.amount)}</Text>
                 </View>
-              );
-            })}
+                <View style={styles.list}>
+                  {section.data.map((bill) => {
+                    const status = billStatusFor(bill, today);
+                    return (
+                      <View key={bill.id} style={styles.listRow}>
+                        <View style={styles.listRowMain}>
+                          <Text style={styles.listRowTitle}>{bill.name}</Text>
+                          <View style={styles.billMetaRow}>
+                            <Text style={styles.listRowSubtitle}>Due {formatDisplayDate(bill.dueDate)}</Text>
+                            <View style={[styles.billStatusBadge, { backgroundColor: `${BILL_STATUS_COLOR[status.tone]}1A` }]}>
+                              <Text style={[styles.billStatusText, { color: BILL_STATUS_COLOR[status.tone] }]}>{status.label}</Text>
+                            </View>
+                          </View>
+                        </View>
+                        <Text style={[styles.listRowAmount, { color: PALETTE.expense }]}>−{formatCurrency(bill.amount)}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            ))}
           </View>
         )}
       </View>
@@ -230,6 +275,19 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 15, fontWeight: '700', color: PALETTE.textPrimary },
   sectionLink: { fontSize: 13, fontWeight: '600', color: PALETTE.net },
   list: { gap: 4, backgroundColor: PALETTE.surface, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, borderColor: PALETTE.border },
+  monthGroups: { gap: 16 },
+  monthGroup: { gap: 8 },
+  monthHeader: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
+  monthTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: PALETTE.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  monthSummary: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
+  monthCount: { fontSize: 12, color: PALETTE.textSecondary },
+  monthTotal: { fontSize: 13, fontWeight: '700', color: PALETTE.expense },
   listRow: {
     flexDirection: 'row',
     alignItems: 'center',
