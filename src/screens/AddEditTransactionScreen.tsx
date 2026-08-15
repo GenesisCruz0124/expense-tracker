@@ -168,11 +168,13 @@ export default function AddEditTransactionScreen() {
     }
 
     if (type === 'transfer') {
-      if (!accountId || !toAccountId) {
-        setError('Choose both a from and to account.');
+      // One side may be left blank for money moving to or from somewhere untracked (e.g. a loan
+      // paid by salary deduction), but a transfer with neither side set records nothing.
+      if (!accountId && !toAccountId) {
+        setError('Choose a from or to account.');
         return;
       }
-      if (accountId === toAccountId) {
+      if (accountId && toAccountId && accountId === toAccountId) {
         setError('Choose two different accounts to transfer between.');
         return;
       }
@@ -180,8 +182,8 @@ export default function AddEditTransactionScreen() {
       setSaving(true);
       try {
         const input = {
-          fromAccountId: accountId,
-          toAccountId,
+          fromAccountId: accountId ?? null,
+          toAccountId: toAccountId ?? null,
           amount,
           fee: fee ?? 0,
           occurredAt,
@@ -304,6 +306,9 @@ export default function AddEditTransactionScreen() {
           <View style={styles.field}>
             <Text style={styles.label}>To account</Text>
             <AccountPicker selectedAccountId={toAccountId} onSelect={setToAccountId} />
+            <Text style={styles.helperText}>
+              Leave one side blank when the money comes from or goes somewhere you don't track, like a salary deduction.
+            </Text>
           </View>
           <View style={styles.toggleRow}>
             <View style={styles.toggleTextGroup}>

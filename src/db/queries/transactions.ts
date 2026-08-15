@@ -137,8 +137,10 @@ function toNewTransactionValues(input: TransactionInput): NewTransaction {
 }
 
 export interface TransferInput {
-  fromAccountId: number;
-  toAccountId: number;
+  /** Null when the money comes from an untracked source, e.g. a salary deduction. */
+  fromAccountId: number | null;
+  /** Null when the money leaves to an untracked destination. */
+  toAccountId: number | null;
   /** Integer amount in minor units (cents) */
   amount: number;
   /** Optional fee deducted from the source account (minor units). */
