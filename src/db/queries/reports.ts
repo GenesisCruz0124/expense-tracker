@@ -1,4 +1,4 @@
-import { and, between, eq, isNull, sql } from 'drizzle-orm';
+import { and, between, eq, isNotNull, isNull, ne, sql } from 'drizzle-orm';
 
 import type { Database } from '../client';
 import { categories, transactions } from '../schema';
@@ -45,6 +45,53 @@ export async function categoryBreakdown(
     categoryName: row.categoryName ?? 'Uncategorized',
     categoryColor: row.categoryColor ?? '#94A3B8',
     total: row.total,
+  }));
+}
+
+export interface EstablishmentBreakdownEntry {
+  establishment: string;
+  /** Sum in minor units (cents) */
+  total: number;
+  /** How many transactions make up `total`. */
+  count: number;
+}
+
+/**
+ * Spend grouped by the free-text `establishment` field. Transactions with no establishment are
+ * skipped rather than bucketed together, since a blank merchant carries no reporting value.
+ */
+export async function establishmentBreakdown(
+  db: Database,
+  type: 'expense' | 'income',
+  range: { start: string; end: string },
+): Promise<EstablishmentBreakdownEntry[]> {
+  const totalExpr = sql<number>`coalesce(sum(${transactions.amount}), 0)`;
+  const countExpr = sql<number>`count(*)`;
+
+  const rows = await db
+    .select({
+      establishment: transactions.establishment,
+      total: totalExpr,
+      count: countExpr,
+    })
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.type, type),
+        eq(transactions.excludeFromExpense, false),
+        between(transactions.occurredAt, range.start, range.end),
+        isNull(transactions.deletedAt),
+        isNotNull(transactions.establishment),
+        ne(transactions.establishment, ''),
+      ),
+    )
+    .groupBy(transactions.establishment)
+    .orderBy(sql`${totalExpr} desc`);
+
+  return rows.map((row) => ({
+    establishment: row.establishment ?? '',
+    total: row.total,
+    count: row.count,
   }));
 }
 

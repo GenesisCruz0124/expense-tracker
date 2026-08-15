@@ -4,11 +4,13 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useDatabase } from '../context/DatabaseProvider';
 import {
   categoryBreakdown,
+  establishmentBreakdown,
   incomeVsExpenseTrend,
   incomeVsExpenseTrendDaily,
   incomeVsExpenseTrendWeekly,
   monthlyTotals,
   type CategoryBreakdownEntry,
+  type EstablishmentBreakdownEntry,
   type MonthlyTotals,
   type MonthlyTrendEntry,
 } from '../db/queries/reports';
@@ -21,6 +23,7 @@ export function useReportsData(range: DateRange, monthsBack: number = 8, trendPe
   const { db, refreshSignal } = useDatabase();
   const [breakdownKind, setBreakdownKind] = useState<ReportKind>('expense');
   const [categoryData, setCategoryData] = useState<CategoryBreakdownEntry[]>([]);
+  const [establishmentData, setEstablishmentData] = useState<EstablishmentBreakdownEntry[]>([]);
   const [trend, setTrend] = useState<MonthlyTrendEntry[]>([]);
   const [totals, setTotals] = useState<MonthlyTotals>({ income: 0, expense: 0 });
   const [loading, setLoading] = useState(true);
@@ -34,8 +37,9 @@ export function useReportsData(range: DateRange, monthsBack: number = 8, trendPe
       const monthRanges = lastMonthRanges(new Date(), periodCount);
       const weekRanges = lastWeekRanges(new Date(), periodCount);
       const dayRanges = lastDayRanges(new Date(), periodCount);
-      const [breakdown, trendData, totalsData] = await Promise.all([
+      const [breakdown, establishments, trendData, totalsData] = await Promise.all([
         categoryBreakdown(db, breakdownKind, range),
+        establishmentBreakdown(db, breakdownKind, range),
         trendPeriod === 'daily'
           ? incomeVsExpenseTrendDaily(db, dayRanges)
           : trendPeriod === 'weekly'
@@ -44,6 +48,7 @@ export function useReportsData(range: DateRange, monthsBack: number = 8, trendPe
         monthlyTotals(db, range),
       ]);
       setCategoryData(breakdown);
+      setEstablishmentData(establishments);
       setTrend(trendData);
       setTotals(totalsData);
 
@@ -72,5 +77,5 @@ export function useReportsData(range: DateRange, monthsBack: number = 8, trendPe
     }, [refresh, refreshSignal]),
   );
 
-  return { categoryData, trend, totals, loading, breakdownKind, setBreakdownKind, refresh };
+  return { categoryData, establishmentData, trend, totals, loading, breakdownKind, setBreakdownKind, refresh };
 }

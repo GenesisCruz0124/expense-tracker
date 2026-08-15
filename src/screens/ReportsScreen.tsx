@@ -54,6 +54,9 @@ function SegmentButton({ label, active, onPress }: { label: string; active: bool
   );
 }
 
+/** Establishment lists can be long, so collapse to a preview until the user expands. */
+const ESTABLISHMENT_PREVIEW_COUNT = 8;
+
 export default function ReportsScreen() {
   const navigation = useNavigation();
   const [period, setPeriod] = useState<PeriodType>('month');
@@ -90,7 +93,13 @@ export default function ReportsScreen() {
     });
   }
 
-  const { categoryData, trend, totals, breakdownKind, setBreakdownKind } = useReportsData(range, 8, trendPeriod, periodCount);
+  const [showAllEstablishments, setShowAllEstablishments] = useState(false);
+  const { categoryData, establishmentData, trend, totals, breakdownKind, setBreakdownKind } = useReportsData(
+    range,
+    8,
+    trendPeriod,
+    periodCount,
+  );
   const net = totals.income - totals.expense;
 
   return (
@@ -181,6 +190,42 @@ export default function ReportsScreen() {
           ))}
         </View>
         {breakdownView === 'pie' ? <CategoryPieChart entries={categoryData} /> : <CategoryBarChart entries={categoryData} />}
+      </View>
+
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>
+            {breakdownKind === 'expense' ? 'Spending by establishment' : 'Income by establishment'}
+          </Text>
+        </View>
+        {establishmentData.length === 0 ? (
+          <Text style={styles.emptyNote}>
+            No {breakdownKind === 'expense' ? 'expenses' : 'income'} with an establishment recorded this period.
+          </Text>
+        ) : (
+          <>
+            {(showAllEstablishments ? establishmentData : establishmentData.slice(0, ESTABLISHMENT_PREVIEW_COUNT)).map(
+              (entry) => (
+                <View key={entry.establishment} style={styles.avgRow}>
+                  <Text style={styles.avgName} numberOfLines={1}>{entry.establishment}</Text>
+                  <Text style={styles.estCount}>
+                    {entry.count}{entry.count === 1 ? ' txn' : ' txns'}
+                  </Text>
+                  <Text style={styles.avgAmount}>{formatCurrency(entry.total)}</Text>
+                </View>
+              ),
+            )}
+            {establishmentData.length > ESTABLISHMENT_PREVIEW_COUNT ? (
+              <Pressable onPress={() => setShowAllEstablishments((value) => !value)} hitSlop={8}>
+                <Text style={styles.showMoreLink}>
+                  {showAllEstablishments
+                    ? 'Show less'
+                    : `Show all ${establishmentData.length}`}
+                </Text>
+              </Pressable>
+            ) : null}
+          </>
+        )}
       </View>
 
       <View style={styles.section}>
@@ -328,6 +373,9 @@ const styles = StyleSheet.create({
   kindChipTextSelected: { color: PALETTE.net },
   avgRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: PALETTE.border },
   avgDot: { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
+  estCount: { fontSize: 11, color: PALETTE.textSecondary, flexShrink: 0 },
+  emptyNote: { fontSize: 13, color: PALETTE.textSecondary, paddingVertical: 8 },
+  showMoreLink: { fontSize: 13, fontWeight: '600', color: PALETTE.net, paddingTop: 10 },
   avgName: { flex: 1, fontSize: 13, fontWeight: '600', color: PALETTE.textPrimary },
   avgAmount: { fontSize: 13, fontWeight: '700', color: PALETTE.expense },
   avgSuffix: { fontSize: 11, fontWeight: '500', color: PALETTE.textSecondary },
