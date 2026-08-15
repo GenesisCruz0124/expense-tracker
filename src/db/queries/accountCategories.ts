@@ -1,7 +1,7 @@
 import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 
 import type { Database } from '../client';
-import { accountCategories, type AccountCategory, type NewAccountCategory } from '../schema';
+import { accountCategories, accounts, type AccountCategory, type NewAccountCategory } from '../schema';
 import { generateUuid } from '../../utils/uuid';
 
 export interface ListAccountCategoriesOptions {
@@ -63,6 +63,20 @@ export async function updateAccountCategory(db: Database, id: number, input: Acc
       updatedAt: sql`(datetime('now'))`,
     })
     .where(eq(accountCategories.id, id));
+}
+
+/**
+ * Moves every account on `sourceId` to `targetId`, then soft-deletes the source category.
+ * `accounts.category_id` is the only reference to this table, so nothing else needs repointing.
+ */
+export async function mergeAccountCategory(db: Database, sourceId: number, targetId: number): Promise<void> {
+  if (sourceId === targetId) return;
+
+  await db.transaction(async (tx) => {
+    const now = sql`(datetime('now'))`;
+    await tx.update(accounts).set({ categoryId: targetId, updatedAt: now }).where(eq(accounts.categoryId, sourceId));
+    await tx.update(accountCategories).set({ deletedAt: now, updatedAt: now }).where(eq(accountCategories.id, sourceId));
+  });
 }
 
 export async function setAccountCategoryArchived(db: Database, id: number, isArchived: boolean): Promise<void> {

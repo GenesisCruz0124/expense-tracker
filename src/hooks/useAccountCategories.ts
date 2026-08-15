@@ -5,6 +5,7 @@ import { useDatabase } from '../context/DatabaseProvider';
 import {
   createAccountCategory as createAccountCategoryQuery,
   listAccountCategories,
+  mergeAccountCategory as mergeAccountCategoryQuery,
   setAccountCategoryArchived as setAccountCategoryArchivedQuery,
   updateAccountCategory as updateAccountCategoryQuery,
   type AccountCategoryInput,
@@ -64,5 +65,22 @@ export function useAccountCategories(options: ListAccountCategoriesOptions = {})
     [db, notifyDataChanged, refresh],
   );
 
-  return { accountCategories, loading, refresh, createAccountCategory, updateAccountCategory, setArchived };
+  const mergeAccountCategory = useCallback(
+    async (sourceId: number, targetId: number) => {
+      await mergeAccountCategoryQuery(db, sourceId, targetId);
+      notifyDataChanged();
+      await refresh();
+    },
+    [db, notifyDataChanged, refresh],
+  );
+
+  return {
+    accountCategories,
+    loading,
+    refresh,
+    createAccountCategory,
+    updateAccountCategory,
+    setArchived,
+    mergeAccountCategory,
+  };
 }
