@@ -19,7 +19,7 @@ import {
 import { useAuth } from '../context/AuthProvider';
 import { useDatabase } from '../context/DatabaseProvider';
 import { useLicense } from '../context/LicenseProvider';
-import { setPreference } from '../db/themePreferences';
+import { getStoredShowSplash, setPreference, SPLASH_SCREEN_KEY } from '../db/themePreferences';
 import { TRIAL_DAYS } from '../utils/license';
 import { deleteAllTransactions } from '../db/queries/transactions';
 import { getSetting, setSetting } from '../db/queries/settings';
@@ -54,6 +54,7 @@ export default function SettingsScreen() {
   const [updateModalVisible, setUpdateModalVisible] = useState(false);
   const [themeMode, setThemeMode] = useState<ThemeMode>(getStoredThemeMode);
   const [accentKey, setAccentKey] = useState<AccentKey>(getStoredAccentKey);
+  const [showSplash, setShowSplash] = useState<boolean>(getStoredShowSplash);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
 
@@ -87,6 +88,11 @@ export default function SettingsScreen() {
     setPreference(THEME_ACCENT_KEY, key);
     setAccentKey(key);
     promptRestart();
+  }
+
+  function handleToggleSplash(value: boolean) {
+    setPreference(SPLASH_SCREEN_KEY, value ? 'true' : 'false');
+    setShowSplash(value);
   }
 
   async function handleRequestPermission() {
@@ -250,6 +256,13 @@ export default function SettingsScreen() {
           })}
         </View>
         <Text style={styles.helperText}>Theme changes take effect the next time you open the app.</Text>
+        <View style={styles.row}>
+          <View style={styles.rowLabelGroup}>
+            <Text style={styles.rowLabel}>Splash screen</Text>
+            <Text style={styles.rowSubLabel}>Show the logo screen while the app starts up</Text>
+          </View>
+          <Switch value={showSplash} onValueChange={handleToggleSplash} trackColor={{ true: PALETTE.net }} />
+        </View>
       </View>
 
       <View style={styles.section}>

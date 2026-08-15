@@ -10,6 +10,7 @@ import { generateDueRecurringTransactions } from '../db/queries/recurring';
 import { generateDailyInterest } from '../db/interestAccrual';
 import { initSettingsTable } from '../db/queries/settings';
 import { backfillRowUuids } from '../db/uuidBackfill';
+import { getStoredShowSplash } from '../db/themePreferences';
 import { checkBudgetAlerts } from '../db/budgetAlerts';
 import { checkBillReminders } from '../db/billReminders';
 import { configureNotificationChannel, requestNotificationPermissions } from '../utils/notifications';
@@ -100,13 +101,17 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
   const { success, error } = useMigrations(db, migrations);
   const [bootstrapped, setBootstrapped] = useState(false);
   const [bootstrapError, setBootstrapError] = useState<Error | null>(null);
-  const [splashReady, setSplashReady] = useState(false);
+  // With the splash disabled in Settings there is no minimum display time to wait out, so the app
+  // shows as soon as migrations and bootstrap finish.
+  const [splashReady, setSplashReady] = useState(() => !getStoredShowSplash());
   const [refreshSignal, setRefreshSignal] = useState(0);
   const ranBootstrap = useRef(false);
 
   useEffect(() => {
+    if (splashReady) return;
     const timer = setTimeout(() => setSplashReady(true), 5000);
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

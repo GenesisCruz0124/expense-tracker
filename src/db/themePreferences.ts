@@ -20,3 +20,10 @@ export function setPreference(key: string, value: string): void {
     [key, value],
   );
 }
+
+export const SPLASH_SCREEN_KEY = 'showSplashScreen';
+
+/** Whether to hold the launch splash for its minimum display time. Defaults to on. */
+export function getStoredShowSplash(): boolean {
+  return getPreference(SPLASH_SCREEN_KEY) !== 'false';
+}
