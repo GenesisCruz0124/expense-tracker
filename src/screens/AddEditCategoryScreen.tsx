@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 
+import { ActionSheet } from '../components/ActionSheet';
 import { CATEGORY_ICON_OPTIONS, DEFAULT_CATEGORY_ICON } from '../constants/categoryIcons';
 import { CATEGORY_COLOR_PALETTE, PALETTE } from '../constants/colors';
 import { useDatabase } from '../context/DatabaseProvider';
@@ -24,7 +25,7 @@ export default function AddEditCategoryScreen() {
   const noun = lockType ? 'biller' : 'category';
 
   const { db } = useDatabase();
-  const { createCategory, updateCategory } = useCategories({ includeArchived: true });
+  const { categories, createCategory, updateCategory, mergeCategory } = useCategories({ includeArchived: true });
 
   const [name, setName] = useState('');
   const [type, setType] = useState<CategoryType>(lockType ?? 'expense');
@@ -34,6 +35,40 @@ export default function AddEditCategoryScreen() {
   const [loading, setLoading] = useState(isEditing);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showMergePicker, setShowMergePicker] = useState(false);
+  const [merging, setMerging] = useState(false);
+
+  // Anything active except this category itself is a valid destination; from the Billers screen the
+  // list is narrowed to billers so it matches what that screen shows.
+  const mergeTargets = categories.filter(
+    (candidate) => candidate.id !== categoryId && !candidate.isArchived && (lockType ? candidate.isBiller : true),
+  );
+
+  function confirmMerge(targetId: number, targetName: string) {
+    setShowMergePicker(false);
+    Alert.alert(
+      `Merge into "${targetName}"?`,
+      `Every transaction, bill, budget, and recurring rule using "${name}" will be moved to "${targetName}", and "${name}" will be deleted. This can't be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Merge',
+          style: 'destructive',
+          onPress: async () => {
+            setMerging(true);
+            try {
+              await mergeCategory(categoryId!, targetId);
+              navigation.goBack();
+            } catch (err) {
+              setError(err instanceof Error ? err.message : 'Could not merge.');
+            } finally {
+              setMerging(false);
+            }
+          },
+        },
+      ],
+    );
+  }
 
   useEffect(() => {
     if (!isEditing) return;
@@ -154,6 +189,28 @@ export default function AddEditCategoryScreen() {
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
+      {isEditing ? (
+        <View style={styles.field}>
+          <Text style={styles.label}>Merge into another {noun}</Text>
+          <Pressable style={styles.mergeButton} onPress={() => setShowMergePicker(true)} disabled={merging}>
+            <Text style={styles.mergeButtonText}>{merging ? 'Merging…' : `Merge this ${noun} into…`}</Text>
+          </Pressable>
+          <Text style={styles.helperText}>
+            Moves every transaction, bill, and budget onto the {noun} you pick, then deletes this one.
+          </Text>
+          <ActionSheet
+            visible={showMergePicker}
+            onClose={() => setShowMergePicker(false)}
+            title={`Merge "${name}" into`}
+            message="This can't be undone."
+            options={mergeTargets.map((target) => ({
+              label: target.name,
+              onPress: () => confirmMerge(target.id, target.name),
+            }))}
+          />
+        </View>
+      ) : null}
+
       <Pressable style={[styles.saveButton, saving && styles.saveButtonDisabled]} onPress={handleSave} disabled={saving}>
         <Text style={styles.saveButtonText}>{saving ? 'Saving…' : isEditing ? 'Save changes' : `Add ${noun}`}</Text>
       </Pressable>
@@ -209,6 +266,16 @@ const styles = StyleSheet.create({
   iconOptionSelected: { borderColor: PALETTE.net, backgroundColor: `${PALETTE.net}1A` },
   iconOptionText: { fontSize: 20 },
   error: { fontSize: 13, color: PALETTE.danger, textAlign: 'center' },
+  helperText: { fontSize: 12, color: PALETTE.textSecondary, lineHeight: 16 },
+  mergeButton: {
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+    backgroundColor: PALETTE.surface,
+    borderWidth: 1.5,
+    borderColor: PALETTE.border,
+  },
+  mergeButtonText: { fontSize: 14, fontWeight: '700', color: PALETTE.danger },
   saveButton: { backgroundColor: PALETTE.net, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   saveButtonDisabled: { opacity: 0.6 },
   saveButtonText: { color: '#fff', fontSize: 15, fontWeight: '700' },

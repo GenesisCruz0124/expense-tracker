@@ -1,7 +1,7 @@
 import { and, asc, eq, isNull, or, sql } from 'drizzle-orm';
 
 import type { Database } from '../client';
-import { categories, transactions, type Category, type NewCategory } from '../schema';
+import { bills, budgets, categories, recurringTransactions, transactions, type Category, type NewCategory } from '../schema';
 import { generateUuid } from '../../utils/uuid';
 
 export type CategoryType = 'expense' | 'income' | 'both';
@@ -131,6 +131,53 @@ export async function updateCategory(db: Database, id: number, input: CategoryIn
       updatedAt: sql`(datetime('now'))`,
     })
     .where(eq(categories.id, id));
+}
+
+/**
+ * Repoints everything referencing `sourceId` at `targetId`, then soft-deletes the source category.
+ *
+ * Budgets are the one place a straight repoint can collide: `(category_id, month)` is unique, so
+ * when both categories budget the same month the two limits are summed into the target's row and
+ * the source's row is deleted rather than moved.
+ */
+export async function mergeCategory(db: Database, sourceId: number, targetId: number): Promise<void> {
+  if (sourceId === targetId) return;
+
+  await db.transaction(async (tx) => {
+    const now = sql`(datetime('now'))`;
+
+    await tx.update(transactions).set({ categoryId: targetId, updatedAt: now }).where(eq(transactions.categoryId, sourceId));
+    await tx.update(bills).set({ categoryId: targetId, updatedAt: now }).where(eq(bills.categoryId, sourceId));
+    await tx.update(bills).set({ billerId: targetId, updatedAt: now }).where(eq(bills.billerId, sourceId));
+    await tx
+      .update(recurringTransactions)
+      .set({ categoryId: targetId, updatedAt: now })
+      .where(eq(recurringTransactions.categoryId, sourceId));
+    await tx
+      .update(recurringTransactions)
+      .set({ billerId: targetId, updatedAt: now })
+      .where(eq(recurringTransactions.billerId, sourceId));
+
+    const sourceBudgets = await tx.select().from(budgets).where(eq(budgets.categoryId, sourceId));
+    for (const budget of sourceBudgets) {
+      const [clash] = await tx
+        .select({ id: budgets.id, amountLimit: budgets.amountLimit })
+        .from(budgets)
+        .where(and(eq(budgets.categoryId, targetId), eq(budgets.month, budget.month)))
+        .limit(1);
+      if (clash) {
+        await tx
+          .update(budgets)
+          .set({ amountLimit: clash.amountLimit + budget.amountLimit, updatedAt: now })
+          .where(eq(budgets.id, clash.id));
+        await tx.delete(budgets).where(eq(budgets.id, budget.id));
+      } else {
+        await tx.update(budgets).set({ categoryId: targetId, updatedAt: now }).where(eq(budgets.id, budget.id));
+      }
+    }
+
+    await tx.update(categories).set({ deletedAt: now, updatedAt: now }).where(eq(categories.id, sourceId));
+  });
 }
 
 export async function setCategoryArchived(db: Database, id: number, isArchived: boolean): Promise<void> {
