@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 
 import { CategoryBadge } from '../components/CategoryBadge';
@@ -11,15 +11,38 @@ import { useCategories } from '../hooks/useCategories';
 export default function BillersScreen() {
   const navigation = useNavigation();
   const [showArchived, setShowArchived] = useState(false);
+  const [searchText, setSearchText] = useState('');
   const { categories, setArchived } = useCategories({ forType: 'expense', includeArchived: true, billersOnly: true });
 
-  const visible = categories.filter((category) => (showArchived ? category.isArchived : !category.isArchived));
+  const query = searchText.trim().toLowerCase();
+  const visible = categories
+    .filter((category) => (showArchived ? category.isArchived : !category.isArchived))
+    .filter((category) => !query || category.name.toLowerCase().includes(query));
 
   return (
     <View style={styles.screen}>
       <View style={styles.toggleRow}>
         <Text style={styles.toggleLabel}>Show archived</Text>
         <Switch value={showArchived} onValueChange={setShowArchived} trackColor={{ true: PALETTE.net }} />
+      </View>
+
+      <View style={styles.searchRow}>
+        <Text style={styles.searchIcon}>🔍</Text>
+        <TextInput
+          style={styles.searchInput}
+          value={searchText}
+          onChangeText={setSearchText}
+          placeholder="Search billers"
+          placeholderTextColor={PALETTE.textSecondary}
+          autoCapitalize="none"
+          autoCorrect={false}
+          clearButtonMode="while-editing"
+        />
+        {searchText.length > 0 ? (
+          <Pressable onPress={() => setSearchText('')} hitSlop={8}>
+            <Text style={styles.searchClear}>✕</Text>
+          </Pressable>
+        ) : null}
       </View>
 
       <FlatList
@@ -29,8 +52,14 @@ export default function BillersScreen() {
         ListEmptyComponent={
           <EmptyState
             icon="🧾"
-            title={showArchived ? 'No archived billers' : 'No billers yet'}
-            message={showArchived ? undefined : 'Add a biller to quickly categorize your bills, like Netflix or Meralco.'}
+            title={query ? 'No matching billers' : showArchived ? 'No archived billers' : 'No billers yet'}
+            message={
+              query
+                ? `Nothing matches "${searchText.trim()}". Try a different search.`
+                : showArchived
+                  ? undefined
+                  : 'Add a biller to quickly categorize your bills, like Netflix or Meralco.'
+            }
           />
         }
         renderItem={({ item }) => (
@@ -67,6 +96,21 @@ const styles = StyleSheet.create({
     borderBottomColor: PALETTE.border,
   },
   toggleLabel: { fontSize: 14, fontWeight: '600', color: PALETTE.textPrimary },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: PALETTE.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.border,
+    borderRadius: 10,
+    marginHorizontal: 16,
+    marginTop: 12,
+    paddingHorizontal: 12,
+    gap: 8,
+  },
+  searchIcon: { fontSize: 14 },
+  searchInput: { flex: 1, fontSize: 14, color: PALETTE.textPrimary, paddingVertical: 10 },
+  searchClear: { fontSize: 13, color: PALETTE.textSecondary, fontWeight: '600' },
   listContent: { padding: 16, gap: 10 },
   emptyContainer: { flexGrow: 1, justifyContent: 'center' },
   row: {

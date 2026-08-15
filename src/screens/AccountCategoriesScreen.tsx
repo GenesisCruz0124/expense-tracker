@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 
 import { AccountBadge } from '../components/AccountBadge';
@@ -10,15 +10,38 @@ import { useAccountCategories } from '../hooks/useAccountCategories';
 export default function AccountCategoriesScreen() {
   const navigation = useNavigation();
   const [showArchived, setShowArchived] = useState(false);
+  const [searchText, setSearchText] = useState('');
   const { accountCategories, setArchived } = useAccountCategories({ includeArchived: true });
 
-  const visible = accountCategories.filter((category) => (showArchived ? category.isArchived : !category.isArchived));
+  const query = searchText.trim().toLowerCase();
+  const visible = accountCategories
+    .filter((category) => (showArchived ? category.isArchived : !category.isArchived))
+    .filter((category) => !query || category.name.toLowerCase().includes(query));
 
   return (
     <View style={styles.screen}>
       <View style={styles.toggleRow}>
         <Text style={styles.toggleLabel}>Show archived</Text>
         <Switch value={showArchived} onValueChange={setShowArchived} trackColor={{ true: PALETTE.net }} />
+      </View>
+
+      <View style={styles.searchRow}>
+        <Text style={styles.searchIcon}>🔍</Text>
+        <TextInput
+          style={styles.searchInput}
+          value={searchText}
+          onChangeText={setSearchText}
+          placeholder="Search account types"
+          placeholderTextColor={PALETTE.textSecondary}
+          autoCapitalize="none"
+          autoCorrect={false}
+          clearButtonMode="while-editing"
+        />
+        {searchText.length > 0 ? (
+          <Pressable onPress={() => setSearchText('')} hitSlop={8}>
+            <Text style={styles.searchClear}>✕</Text>
+          </Pressable>
+        ) : null}
       </View>
 
       <FlatList
@@ -28,8 +51,16 @@ export default function AccountCategoriesScreen() {
         ListEmptyComponent={
           <EmptyState
             icon="🏦"
-            title={showArchived ? 'No archived account categories' : 'No account categories yet'}
-            message={showArchived ? undefined : 'Add a category to start organizing your accounts.'}
+            title={
+              query ? 'No matching account types' : showArchived ? 'No archived account categories' : 'No account categories yet'
+            }
+            message={
+              query
+                ? `Nothing matches "${searchText.trim()}". Try a different search.`
+                : showArchived
+                  ? undefined
+                  : 'Add a category to start organizing your accounts.'
+            }
           />
         }
         renderItem={({ item }) => (
@@ -66,6 +97,21 @@ const styles = StyleSheet.create({
     borderBottomColor: PALETTE.border,
   },
   toggleLabel: { fontSize: 14, fontWeight: '600', color: PALETTE.textPrimary },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: PALETTE.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.border,
+    borderRadius: 10,
+    marginHorizontal: 16,
+    marginTop: 12,
+    paddingHorizontal: 12,
+    gap: 8,
+  },
+  searchIcon: { fontSize: 14 },
+  searchInput: { flex: 1, fontSize: 14, color: PALETTE.textPrimary, paddingVertical: 10 },
+  searchClear: { fontSize: 13, color: PALETTE.textSecondary, fontWeight: '600' },
   listContent: { padding: 16, gap: 10 },
   emptyContainer: { flexGrow: 1, justifyContent: 'center' },
   row: {
