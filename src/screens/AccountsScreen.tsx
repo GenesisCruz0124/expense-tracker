@@ -231,14 +231,42 @@ export default function AccountsScreen() {
     [accountCategories, visible],
   );
 
-  const CATEGORY_KIND_ORDER: ('standard' | 'credit_card' | 'investment')[] = ['standard', 'credit_card', 'investment'];
-  const categoryGroups = useMemo(
-    () =>
-      CATEGORY_KIND_ORDER.map((kind) => filterableCategories.filter((category) => category.kind === kind)).filter(
-        (group) => group.length > 0,
-      ),
-    [filterableCategories],
-  );
+  /**
+   * Collapses the account categories into the four buckets the summary cards show. Credit-card and
+   * investment kinds map straight across; the remaining "standard" categories split by name so
+   * banks/e-wallets stay separate from cash-like ones. Labels are built from whichever categories
+   * actually land in a bucket, so adding a category shows up here without further changes.
+   */
+  const categoryBuckets = useMemo(() => {
+    const standard = filterableCategories.filter((category) => category.kind === 'standard');
+    const isBankLike = (name: string) => /bank|wallet/i.test(name);
+    const definitions = [
+      { key: 'bank', categories: standard.filter((category) => isBankLike(category.name)) },
+      { key: 'cash', categories: standard.filter((category) => !isBankLike(category.name)) },
+      { key: 'credit', categories: filterableCategories.filter((category) => category.kind === 'credit_card') },
+      { key: 'investment', categories: filterableCategories.filter((category) => category.kind === 'investment') },
+    ];
+
+    return definitions
+      .filter((definition) => definition.categories.length > 0)
+      .map((definition) => {
+        const ids = definition.categories.map((category) => category.id);
+        const total = visible
+          .filter((account) => account.categoryId != null && ids.includes(account.categoryId))
+          .reduce((sum, account) => {
+            const category = definition.categories.find((item) => item.id === account.categoryId);
+            return sum + (category?.kind === 'credit_card' ? -account.balance : account.balance);
+          }, 0);
+        return {
+          key: definition.key,
+          label: definition.categories.map((category) => category.name).join(' / '),
+          icon: definition.categories[0].icon,
+          color: definition.categories[0].color,
+          ids,
+          total,
+        };
+      });
+  }, [filterableCategories, visible]);
 
   const filtered = visible
     .filter((account) => selectedCategoryIds.length === 0 || (account.categoryId != null && selectedCategoryIds.includes(account.categoryId)))
@@ -250,9 +278,6 @@ export default function AccountsScreen() {
     .filter((account) => !hideSmallBalances || Math.abs(account.balance) > SMALL_BALANCE_THRESHOLD)
     .filter((account) => !searchQuery.trim() || account.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
-  function toggleCategoryFilter(id: number) {
-    setSelectedCategoryIds((prev) => (prev.includes(id) ? prev.filter((existing) => existing !== id) : [...prev, id]));
-  }
 
   const netWorth = useMemo(() => {
     return visible.reduce((sum, account) => {
@@ -395,41 +420,40 @@ export default function AccountsScreen() {
               ) : null}
             </View>
 
-            {categoryGroups.length > 0 ? (
-              <View style={styles.filterGroupsContainer}>
-                <Pressable
-                  onPress={() => setSelectedCategoryIds([])}
-                  style={[styles.filterChip, styles.filterAllChip, selectedCategoryIds.length === 0 && styles.filterChipAllSelected]}
-                >
-                  <Text style={[styles.filterChipText, selectedCategoryIds.length === 0 && styles.filterChipTextSelected]}>
-                    All
-                  </Text>
-                </Pressable>
-                {categoryGroups.map((group, index) => (
-                  <View key={index} style={styles.filterGroupRow}>
-                    {group.map((category) => {
-                      const selected = selectedCategoryIds.includes(category.id);
-                      return (
-                        <Pressable
-                          key={category.id}
-                          onPress={() => toggleCategoryFilter(category.id)}
-                          style={[
-                            styles.filterChip,
-                            { borderColor: category.color },
-                            selected && { backgroundColor: category.color },
-                          ]}
-                        >
-                          <View style={styles.filterChipContent}>
-                            <AccountIcon icon={category.icon} size={13} />
-                            <Text style={[styles.filterChipText, { color: selected ? '#fff' : category.color }]}>
-                              {category.name}
-                            </Text>
-                          </View>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                ))}
+            {categoryBuckets.length > 0 ? (
+              <View style={styles.bucketSection}>
+                <View style={styles.bucketGrid}>
+                  {categoryBuckets.map((bucket) => {
+                    const selected = bucket.ids.every((id) => selectedCategoryIds.includes(id)) &&
+                      selectedCategoryIds.length === bucket.ids.length;
+                    return (
+                      <Pressable
+                        key={bucket.key}
+                        onPress={() => setSelectedCategoryIds(selected ? [] : bucket.ids)}
+                        style={[
+                          styles.bucketCard,
+                          { borderColor: bucket.color },
+                          selected && { backgroundColor: `${bucket.color}22` },
+                        ]}
+                      >
+                        <View style={styles.bucketCardHeader}>
+                          <AccountIcon icon={bucket.icon} size={14} />
+                          <Text style={[styles.bucketCardLabel, { color: bucket.color }]} numberOfLines={2}>
+                            {bucket.label}
+                          </Text>
+                        </View>
+                        <Text style={[styles.bucketCardTotal, bucket.total < 0 && styles.negative]}>
+                          {hideAmounts ? AMOUNT_MASK : formatCurrency(bucket.total)}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                {selectedCategoryIds.length > 0 ? (
+                  <Pressable onPress={() => setSelectedCategoryIds([])} hitSlop={8}>
+                    <Text style={styles.bucketClearLink}>Show all accounts</Text>
+                  </Pressable>
+                ) : null}
               </View>
             ) : null}
 
@@ -764,9 +788,22 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 14, color: PALETTE.textPrimary, padding: 0 },
   searchClear: { fontSize: 13, color: PALETTE.textSecondary, fontWeight: '600' },
   filterRow: { gap: 8, paddingBottom: 12 },
-  filterGroupsContainer: { gap: 8, paddingBottom: 12 },
-  filterAllChip: { alignSelf: 'flex-start' },
-  filterGroupRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  bucketSection: { paddingBottom: 12, gap: 8 },
+  bucketGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  bucketCard: {
+    flexGrow: 1,
+    flexBasis: '47%',
+    borderWidth: 1.5,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: PALETTE.surface,
+    gap: 6,
+  },
+  bucketCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  bucketCardLabel: { flex: 1, fontSize: 12, fontWeight: '700' },
+  bucketCardTotal: { fontSize: 15, fontWeight: '700', color: PALETTE.textPrimary },
+  bucketClearLink: { fontSize: 13, fontWeight: '600', color: PALETTE.net },
   filterChip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -778,7 +815,6 @@ const styles = StyleSheet.create({
     backgroundColor: PALETTE.surface,
   },
   filterChipAllSelected: { borderColor: PALETTE.net, backgroundColor: PALETTE.net },
-  filterChipContent: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   filterChipText: { fontSize: 13, fontWeight: '600', color: PALETTE.textSecondary },
   filterChipTextSelected: { color: '#fff' },
   controlsRow: { flexDirection: 'row', justifyContent: 'flex-start', gap: 8, paddingBottom: 10 },
