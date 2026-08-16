@@ -3,7 +3,6 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'r
 import { useNavigation } from '@react-navigation/native';
 import { differenceInCalendarDays, isSameDay, isSameMonth, isSameWeek } from 'date-fns';
 
-import { CategoryBarChart } from '../components/charts/CategoryBarChart';
 import { DateField } from '../components/DateField';
 import { EmptyState } from '../components/EmptyState';
 import { MonthSelector } from '../components/MonthSelector';
@@ -100,7 +99,7 @@ export default function DashboardScreen() {
     });
   }
 
-  const { totals, categoryData, loading, refresh } = useReportsData(range, 6);
+  const { totals, loading, refresh } = useReportsData(range, 6);
   const { bills } = useBills();
 
   const net = totals.income - totals.expense;
@@ -194,16 +193,6 @@ export default function DashboardScreen() {
             })
           }
         />
-      </View>
-
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Spending by category</Text>
-          <Pressable onPress={() => navigation.navigate('Tabs', { screen: 'Reports' })}>
-            <Text style={styles.sectionLink}>Reports →</Text>
-          </Pressable>
-        </View>
-        <CategoryBarChart entries={categoryData.slice(0, 6)} />
       </View>
 
       <View style={styles.section}>
