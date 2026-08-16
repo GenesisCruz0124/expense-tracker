@@ -153,6 +153,19 @@ export default function TransactionsListScreen() {
         >
           <Text style={[styles.filterButtonText, groupByDay && styles.filterButtonTextActive]}>Group by day</Text>
         </Pressable>
+        <Pressable
+          style={[styles.filterButton, runningBalanceMode && styles.filterButtonActive]}
+          onPress={() =>
+            setRunningBalanceMode((current) => {
+              // A running balance only reads correctly over income and expenses together, so
+              // drop a type filter when switching it on.
+              if (!current) setTypeFilter(undefined);
+              return !current;
+            })
+          }
+        >
+          <Text style={[styles.filterButtonText, runningBalanceMode && styles.filterButtonTextActive]}>Balance</Text>
+        </Pressable>
         <Pressable style={[styles.filterButton, activeFilterCount > 0 && styles.filterButtonActive]} onPress={() => setFilterVisible(true)}>
           <Text style={[styles.filterButtonText, activeFilterCount > 0 && styles.filterButtonTextActive]}>
             Filter{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
