@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { isSameDay, isSameMonth, isSameWeek } from 'date-fns';
 
@@ -26,6 +26,9 @@ import {
   type PeriodType,
 } from '../utils/dateRanges';
 import { formatCurrency } from '../utils/currency';
+import { buildTransactionsCsv, shareCsvFile, writeCsvFile } from '../utils/csvExport';
+import { useDatabase } from '../context/DatabaseProvider';
+import { listTransactions } from '../db/queries/transactions';
 
 type BreakdownView = 'pie' | 'bar';
 type TrendView = 'line' | 'bar';
@@ -94,6 +97,8 @@ export default function ReportsScreen() {
   }
 
   const [showAllEstablishments, setShowAllEstablishments] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const { db } = useDatabase();
   const { categoryData, establishmentData, trend, totals, breakdownKind, setBreakdownKind } = useReportsData(
     range,
     8,
@@ -101,6 +106,24 @@ export default function ReportsScreen() {
     periodCount,
   );
   const net = totals.income - totals.expense;
+
+  async function handleExportCsv() {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const rows = await listTransactions(db, { start: range.start, end: range.end });
+      if (rows.length === 0) {
+        Alert.alert('Nothing to export', `There are no transactions in ${range.label}.`);
+        return;
+      }
+      const fileUri = await writeCsvFile(buildTransactionsCsv(rows), range.label);
+      await shareCsvFile(fileUri);
+    } catch (err) {
+      Alert.alert('Export failed', err instanceof Error ? err.message : 'Could not export the report.');
+    } finally {
+      setExporting(false);
+    }
+  }
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -167,6 +190,14 @@ export default function ReportsScreen() {
           }
         />
       </View>
+
+      <Pressable style={styles.exportButton} onPress={handleExportCsv} disabled={exporting}>
+        {exporting ? (
+          <ActivityIndicator size="small" color={PALETTE.net} />
+        ) : (
+          <Text style={styles.exportButtonText}>Export {range.label} to CSV</Text>
+        )}
+      </Pressable>
 
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
@@ -373,6 +404,16 @@ const styles = StyleSheet.create({
   kindChipTextSelected: { color: PALETTE.net },
   avgRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: PALETTE.border },
   avgDot: { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
+  exportButton: {
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: PALETTE.surface,
+    borderWidth: 1.5,
+    borderColor: PALETTE.border,
+  },
+  exportButtonText: { fontSize: 14, fontWeight: '700', color: PALETTE.net },
   estCount: { fontSize: 11, color: PALETTE.textSecondary, flexShrink: 0 },
   emptyNote: { fontSize: 13, color: PALETTE.textSecondary, paddingVertical: 8 },
   showMoreLink: { fontSize: 13, fontWeight: '600', color: PALETTE.net, paddingTop: 10 },
