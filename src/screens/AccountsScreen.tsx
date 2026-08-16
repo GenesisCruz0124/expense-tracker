@@ -30,6 +30,10 @@ function accountOrdinal(n: number): string {
   return n + (s[(v - 20) % 10] ?? s[v] ?? s[0]);
 }
 const NET_WORTH_FILTER_KEY = 'accountsNetWorthFilter';
+const HIDE_SMALL_BALANCES_KEY = 'accountsHideSmallBalances';
+
+/** Balances at or under this (in minor units, i.e. ₱50.00) count as "small" and can be hidden. */
+const SMALL_BALANCE_THRESHOLD = 5000;
 
 type NetWorthFilter = 'all' | 'included' | 'excluded';
 
@@ -101,6 +105,8 @@ export default function AccountsScreen() {
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
   const [netWorthFilter, setNetWorthFilter] = useState<NetWorthFilter>('all');
   const [netWorthFilterLoaded, setNetWorthFilterLoaded] = useState(false);
+  const [hideSmallBalances, setHideSmallBalances] = useState(false);
+  const [hideSmallBalancesLoaded, setHideSmallBalancesLoaded] = useState(false);
   const [menuAccount, setMenuAccount] = useState<AccountWithBalance | null>(null);
   const [qrModalUri, setQrModalUri] = useState<string | null>(null);
   const [qrModalName, setQrModalName] = useState<string>('');
@@ -177,6 +183,18 @@ export default function AccountsScreen() {
   }, [netWorthFilter, netWorthFilterLoaded, db]);
 
   useEffect(() => {
+    (async () => {
+      setHideSmallBalances((await getSetting(db, HIDE_SMALL_BALANCES_KEY)) === 'true');
+      setHideSmallBalancesLoaded(true);
+    })();
+  }, [db]);
+
+  useEffect(() => {
+    if (!hideSmallBalancesLoaded) return;
+    setSetting(db, HIDE_SMALL_BALANCES_KEY, hideSmallBalances ? 'true' : 'false');
+  }, [hideSmallBalances, hideSmallBalancesLoaded, db]);
+
+  useEffect(() => {
     const d = new Date();
     d.setDate(d.getDate() - 1);
     const asOfDate = formatIsoDate(d);
@@ -229,6 +247,7 @@ export default function AccountsScreen() {
       if (netWorthFilter === 'excluded') return !account.includeInNetWorth;
       return true;
     })
+    .filter((account) => !hideSmallBalances || Math.abs(account.balance) > SMALL_BALANCE_THRESHOLD)
     .filter((account) => !searchQuery.trim() || account.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
   function toggleCategoryFilter(id: number) {
@@ -451,6 +470,15 @@ export default function AccountsScreen() {
             <View style={styles.toggleRow}>
               <Text style={styles.toggleLabel}>Show archived</Text>
               <Switch value={showArchived} onValueChange={setShowArchived} trackColor={{ true: PALETTE.net }} />
+            </View>
+
+            <View style={styles.toggleRow}>
+              <Text style={styles.toggleLabel}>Hide small balances</Text>
+              <Switch
+                value={hideSmallBalances}
+                onValueChange={setHideSmallBalances}
+                trackColor={{ true: PALETTE.net }}
+              />
             </View>
           </>
         }
