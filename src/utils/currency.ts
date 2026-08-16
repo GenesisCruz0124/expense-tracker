@@ -8,7 +8,10 @@ const formatter = new Intl.NumberFormat(LOCALE, {
 
 /** Converts a stored integer amount (minor units, e.g. centavos) to a display string like "₱45.50". */
 export function formatCurrency(minorUnits: number): string {
-  return formatter.format(minorUnits / 100);
+  const value = minorUnits / 100;
+  // Negating a zero balance (e.g. a paid-off credit card) produces -0 in JS, and
+  // Intl.NumberFormat honors that sign — printing "-₱0.00" instead of "₱0.00".
+  return formatter.format(value === 0 ? 0 : value);
 }
 
 /** Converts a stored integer amount (minor units) to a plain major-unit number, e.g. 4550 -> 45.5. */
