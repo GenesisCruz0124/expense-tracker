@@ -15,8 +15,15 @@ function lastDayOfMonth(year: number, month: number): string {
 
 /**
  * Generates interest income transactions for every account with `annualInterestRate` set.
- * Uses a lazy catch-up pattern: runs on each app launch and inserts any missed periods
- * since the last run. Applies 20% Philippine withholding tax on gross interest.
+ * Uses a lazy catch-up pattern: runs on each app launch and inserts one entry per period
+ * missed since the last run, so skipping the app for a stretch still records every day.
+ * Applies 20% Philippine withholding tax on gross interest.
+ *
+ * Each missed period compounds off the previous one's interest rather than reusing a single
+ * figure, matching what opening the app every period would have produced. The starting point is
+ * the account's current balance, so any non-interest transactions during the gap are treated as
+ * though they were already there — close enough at these amounts, and it avoids replaying the
+ * account's full history.
  *
  * Frequency formula (gross before 20% WHT):
  *   daily   = floor(balance × rate / 3_650_000)
@@ -118,22 +125,21 @@ async function accrueDailyInterest(
   }
   if (startIso > todayIso) return;
 
-  const grossPerDay = Math.floor(balance * rate / 3_650_000);
-  const netPerDay = Math.round(grossPerDay * 80 / 100);
-  if (netPerDay <= 0) {
-    await setLastAccrued(db, accountId, todayIso);
-    return;
-  }
-
-  const balPhp = fmtPhp(balance);
   const rateStr = (rate / 100).toFixed(2);
-  const grossPhp = fmtPhp(grossPerDay);
-  const netPhp = fmtPhp(netPerDay);
-  const note = `Daily interest: ₱${balPhp} × ${rateStr}% ÷ 365 = ₱${grossPhp} gross, −20% tax = ₱${netPhp}`;
 
+  // Catching up several days at once has to compound: each day earns interest on the balance that
+  // the previous day's interest already grew, which is what opening the app daily would have
+  // produced. Recomputing per day also keeps each note's figures matching its own row.
+  let runningBalance = balance;
   const cursor = new Date(startIso + 'T00:00:00');
   while (formatIsoDate(cursor) <= todayIso) {
-    await insertInterestTransaction(db, accountId, netPerDay, formatIsoDate(cursor), note, categoryId);
+    const gross = Math.floor(runningBalance * rate / 3_650_000);
+    const net = Math.round((gross * 80) / 100);
+    if (net > 0) {
+      const note = `Daily interest: ₱${fmtPhp(runningBalance)} × ${rateStr}% ÷ 365 = ₱${fmtPhp(gross)} gross, −20% tax = ₱${fmtPhp(net)}`;
+      await insertInterestTransaction(db, accountId, net, formatIsoDate(cursor), note, categoryId);
+      runningBalance += net;
+    }
     cursor.setDate(cursor.getDate() + 1);
   }
   await setLastAccrued(db, accountId, todayIso);
@@ -161,23 +167,22 @@ async function accrueMonthlyInterest(
     checkMonth = todayDate.getMonth();
   }
 
-  const grossPerMonth = Math.floor(balance * rate / 120_000);
-  const netPerMonth = Math.round(grossPerMonth * 80 / 100);
-
-  const balPhp = fmtPhp(balance);
   const rateStr = (rate / 100).toFixed(2);
-  const grossPhp = fmtPhp(grossPerMonth);
-  const netPhp = fmtPhp(netPerMonth);
-  const note = `Monthly interest: ₱${balPhp} × ${rateStr}% ÷ 12 = ₱${grossPhp} gross, −20% tax = ₱${netPhp}`;
 
+  // Compounds across a multi-month gap, so catching up matches month-by-month accrual.
+  let runningBalance = balance;
   let lastAccruedIso: string | null = null;
   while (
     checkYear < todayDate.getFullYear() ||
     (checkYear === todayDate.getFullYear() && checkMonth < todayDate.getMonth())
   ) {
     const dayStr = lastDayOfMonth(checkYear, checkMonth);
-    if (netPerMonth > 0) {
-      await insertInterestTransaction(db, accountId, netPerMonth, dayStr, note, categoryId);
+    const gross = Math.floor(runningBalance * rate / 120_000);
+    const net = Math.round((gross * 80) / 100);
+    if (net > 0) {
+      const note = `Monthly interest: ₱${fmtPhp(runningBalance)} × ${rateStr}% ÷ 12 = ₱${fmtPhp(gross)} gross, −20% tax = ₱${fmtPhp(net)}`;
+      await insertInterestTransaction(db, accountId, net, dayStr, note, categoryId);
+      runningBalance += net;
     }
     lastAccruedIso = dayStr;
     checkMonth++;
@@ -209,20 +214,19 @@ async function accrueYearlyInterest(
     checkYear = todayYear;
   }
 
-  const grossPerYear = Math.floor(balance * rate / 10_000);
-  const netPerYear = Math.round(grossPerYear * 80 / 100);
-
-  const balPhp = fmtPhp(balance);
   const rateStr = (rate / 100).toFixed(2);
-  const grossPhp = fmtPhp(grossPerYear);
-  const netPhp = fmtPhp(netPerYear);
-  const note = `Yearly interest: ₱${balPhp} × ${rateStr}% = ₱${grossPhp} gross, −20% tax = ₱${netPhp}`;
 
+  // Compounds across a multi-year gap, so catching up matches year-by-year accrual.
+  let runningBalance = balance;
   let lastAccruedIso: string | null = null;
   while (checkYear < todayYear) {
     const dayStr = `${checkYear}-12-31`;
-    if (netPerYear > 0) {
-      await insertInterestTransaction(db, accountId, netPerYear, dayStr, note, categoryId);
+    const gross = Math.floor(runningBalance * rate / 10_000);
+    const net = Math.round((gross * 80) / 100);
+    if (net > 0) {
+      const note = `Yearly interest: ₱${fmtPhp(runningBalance)} × ${rateStr}% = ₱${fmtPhp(gross)} gross, −20% tax = ₱${fmtPhp(net)}`;
+      await insertInterestTransaction(db, accountId, net, dayStr, note, categoryId);
+      runningBalance += net;
     }
     lastAccruedIso = dayStr;
     checkYear++;
