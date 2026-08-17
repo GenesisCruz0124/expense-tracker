@@ -85,15 +85,28 @@ export default function PaidBillsScreen() {
   const accountById = useMemo(() => new Map(accounts.map((account) => [account.id, account])), [accounts]);
   const categoryById = useMemo(() => new Map(accountCategories.map((category) => [category.id, category])), [accountCategories]);
 
+  /**
+   * `paymentSource` is free text captured when the source was chosen, so it goes stale if the
+   * account is later renamed. Resolve the live name through `paymentSourceAccountId` first and
+   * only fall back to the stored text for untracked sources like a salary deduction.
+   */
+  function paymentSourceLabel(account: AccountWithBalance): string | null {
+    if (account.paymentSourceAccountId != null) {
+      const source = accountById.get(account.paymentSourceAccountId);
+      if (source) return source.name;
+    }
+    return account.paymentSource?.trim() || null;
+  }
+
   function sourceLabelFor(item: PaidListItem): string {
     if (item.kind === 'due') {
-      return item.data.paymentSource?.trim() || categoryById.get(item.data.categoryId ?? -1)?.name || 'Other';
+      return paymentSourceLabel(item.data) || categoryById.get(item.data.categoryId ?? -1)?.name || 'Other';
     }
     const accountId = item.data.accountId;
     if (accountId == null) return 'Payroll deduction';
     const account = accountById.get(accountId);
     if (!account) return 'Other';
-    return account.paymentSource?.trim() || categoryById.get(account.categoryId ?? -1)?.name || 'Other';
+    return paymentSourceLabel(account) || categoryById.get(account.categoryId ?? -1)?.name || 'Other';
   }
 
   /** The account the money came out of, or null for untracked sources like a salary deduction. */

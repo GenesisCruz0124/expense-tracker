@@ -92,10 +92,23 @@ export default function RecurringTransactionsScreen() {
     [accounts, accountCategories],
   );
 
+  /**
+   * `paymentSource` is free text captured when the source was chosen, so it goes stale if the
+   * account is later renamed. Resolve the live name through `paymentSourceAccountId` first and
+   * only fall back to the stored text for untracked sources like a salary deduction.
+   */
+  function paymentSourceLabel(account: AccountWithBalance): string | null {
+    if (account.paymentSourceAccountId != null) {
+      const source = accounts.find((item) => item.id === account.paymentSourceAccountId);
+      if (source) return source.name;
+    }
+    return account.paymentSource?.trim() || null;
+  }
+
   function groupBySource(list: AccountWithBalance[], amountOf: (account: AccountWithBalance) => number) {
     const byLabel = new Map<string, { label: string; total: number; data: AccountWithBalance[] }>();
     for (const account of list) {
-      const label = account.paymentSource?.trim() || 'Salary deduction';
+      const label = paymentSourceLabel(account) || 'Salary deduction';
       let group = byLabel.get(label);
       if (!group) {
         group = { label, total: 0, data: [] };

@@ -247,7 +247,13 @@ export default function AddEditAccountScreen() {
         <Text style={styles.label}>Payment source (optional)</Text>
         <Pressable style={styles.pickerRow} onPress={() => setShowPaymentSourcePicker(true)}>
           <Text style={[styles.pickerRowText, !paymentSource && styles.pickerRowPlaceholder]}>
-            {paymentSource || 'None — tap to select'}
+            {/* Prefer the linked account's current name — the stored text is a snapshot from when
+                the source was picked and goes stale if that account is renamed. */}
+            {(paymentSourceAccountId != null
+              ? accounts.find((a) => a.id === paymentSourceAccountId)?.name
+              : null) ||
+              paymentSource ||
+              'None — tap to select'}
           </Text>
           {paymentSource ? (
             <Pressable
