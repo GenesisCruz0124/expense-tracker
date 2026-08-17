@@ -9,10 +9,12 @@ import { MonthSelector } from '../components/MonthSelector';
 import { PeriodTypeSelector } from '../components/PeriodTypeSelector';
 import { SummaryCard } from '../components/SummaryCard';
 import { PALETTE } from '../constants/colors';
-import type { BillWithDetails } from '../db/queries/bills';
+import { useAccountCategories } from '../hooks/useAccountCategories';
+import { useAccounts } from '../hooks/useAccounts';
 import { useBills } from '../hooks/useBills';
 import { useReportsData } from '../hooks/useReportsData';
 import { formatCurrency } from '../utils/currency';
+import { buildUpcomingItems, type UpcomingItem } from '../utils/upcoming';
 import {
   customRangeFor,
   dayRangeFor,
@@ -53,10 +55,9 @@ const BILL_STATUS_COLOR: Record<BillStatus['tone'], string> = {
   upcoming: PALETTE.textSecondary,
 };
 
-function billStatusFor(bill: BillWithDetails, today: Date): BillStatus {
-  if (bill.isPaid) return { tone: 'paid', label: 'Paid' };
-
-  const daysUntil = differenceInCalendarDays(parseIsoDate(bill.dueDate), today);
+/** Takes a date rather than a bill so account dues, which aren't bills, can use it too. */
+function dueStatusFor(dueDate: string, today: Date): BillStatus {
+  const daysUntil = differenceInCalendarDays(parseIsoDate(dueDate), today);
   if (daysUntil < 0) {
     const overdueDays = Math.abs(daysUntil);
     return { tone: 'overdue', label: overdueDays === 1 ? '1 day overdue' : `${overdueDays} days overdue` };
@@ -101,29 +102,34 @@ export default function DashboardScreen() {
 
   const { totals, loading, refresh } = useReportsData(range, 6);
   const { bills } = useBills();
+  const { accounts } = useAccounts();
+  const { accountCategories } = useAccountCategories();
 
   const net = totals.income - totals.expense;
-  const upcomingBills = bills.filter((bill) => !bill.isPaid);
-  const upcomingBillsTotal = upcomingBills.reduce((sum, bill) => sum + bill.amount, 0);
+  const upcomingBills = useMemo(
+    () => buildUpcomingItems(bills, accounts, accountCategories),
+    [bills, accounts, accountCategories],
+  );
+  const upcomingBillsTotal = upcomingBills.reduce((sum, item) => sum + item.amount, 0);
 
-  // `listBills` already orders unpaid bills by due date, so a single pass yields months in order.
+  // `buildUpcomingItems` returns items already ordered by due date, so a single pass yields
+  // months in order.
   const upcomingBillMonths = useMemo(() => {
-    const sections: { key: string; title: string; total: number; data: BillWithDetails[] }[] = [];
+    const sections: { key: string; title: string; total: number; data: UpcomingItem[] }[] = [];
     const byMonth = new Map<string, (typeof sections)[number]>();
-    for (const bill of upcomingBills) {
-      const key = bill.dueDate.slice(0, 7);
+    for (const item of upcomingBills) {
+      const key = item.dueDate.slice(0, 7);
       let section = byMonth.get(key);
       if (!section) {
-        section = { key, title: monthLabelFor(bill.dueDate), total: 0, data: [] };
+        section = { key, title: monthLabelFor(item.dueDate), total: 0, data: [] };
         byMonth.set(key, section);
         sections.push(section);
       }
-      section.total += bill.amount;
-      section.data.push(bill);
+      section.total += item.amount;
+      section.data.push(item);
     }
     return sections;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bills]);
+  }, [upcomingBills]);
 
   return (
     <ScrollView
@@ -225,20 +231,20 @@ export default function DashboardScreen() {
                   </View>
                 </View>
                 <View style={styles.list}>
-                  {section.data.map((bill) => {
-                    const status = billStatusFor(bill, today);
+                  {section.data.map((item) => {
+                    const status = dueStatusFor(item.dueDate, today);
                     return (
-                      <View key={bill.id} style={styles.listRow}>
+                      <View key={`${item.kind}-${item.id}`} style={styles.listRow}>
                         <View style={styles.listRowMain}>
-                          <Text style={styles.listRowTitle}>{bill.name}</Text>
+                          <Text style={styles.listRowTitle}>{item.name}</Text>
                           <View style={styles.billMetaRow}>
-                            <Text style={styles.listRowSubtitle}>Due {formatDisplayDate(bill.dueDate)}</Text>
+                            <Text style={styles.listRowSubtitle}>Due {formatDisplayDate(item.dueDate)}</Text>
                             <View style={[styles.billStatusBadge, { backgroundColor: `${BILL_STATUS_COLOR[status.tone]}1A` }]}>
                               <Text style={[styles.billStatusText, { color: BILL_STATUS_COLOR[status.tone] }]}>{status.label}</Text>
                             </View>
                           </View>
                         </View>
-                        <Text style={[styles.listRowAmount, { color: PALETTE.expense }]}>−{formatCurrency(bill.amount)}</Text>
+                        <Text style={[styles.listRowAmount, { color: PALETTE.expense }]}>−{formatCurrency(item.amount)}</Text>
                       </View>
                     );
                   })}

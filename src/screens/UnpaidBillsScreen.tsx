@@ -6,17 +6,21 @@ import { differenceInCalendarDays, parseISO } from 'date-fns';
 import { CategoryBadge, UncategorizedBadge } from '../components/CategoryBadge';
 import { EmptyState } from '../components/EmptyState';
 import { PALETTE } from '../constants/colors';
+import type { AccountWithBalance } from '../db/queries/accounts';
 import type { BillWithDetails } from '../db/queries/bills';
+import { useAccountCategories } from '../hooks/useAccountCategories';
+import { useAccounts } from '../hooks/useAccounts';
 import { useBills } from '../hooks/useBills';
 import { formatCurrency } from '../utils/currency';
-import { formatDisplayDate, formatIsoDate } from '../utils/dateRanges';
+import { formatDisplayDate, formatIsoDate, monthKeyFor } from '../utils/dateRanges';
+import { buildUpcomingItems, type UpcomingItem } from '../utils/upcoming';
 import { frequencyLabelFor } from '../utils/bills';
 
 interface MonthSection {
   title: string;
   monthKey: string;
   total: number;
-  data: BillWithDetails[];
+  data: UpcomingItem[];
 }
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -33,36 +37,57 @@ function monthKey(dueDate: string): string {
 export default function UnpaidBillsScreen() {
   const navigation = useNavigation();
   const { bills, payBill } = useBills();
+  const { accounts, markMonthlyDuePaid } = useAccounts();
+  const { accountCategories } = useAccountCategories();
   const [searchText, setSearchText] = useState('');
-  const allUnpaidBills = useMemo(() => bills.filter((bill) => !bill.isPaid), [bills]);
-  const unpaidBills = useMemo(() => {
-    const q = searchText.trim().toLowerCase();
-    return q ? allUnpaidBills.filter((b) => b.name.toLowerCase().includes(q)) : allUnpaidBills;
-  }, [allUnpaidBills, searchText]);
 
-  const totalUpcoming = useMemo(() => unpaidBills.reduce((sum, bill) => sum + bill.amount, 0), [unpaidBills]);
+  const allUpcoming = useMemo<UpcomingItem[]>(
+    () => buildUpcomingItems(bills, accounts, accountCategories),
+    [bills, accounts, accountCategories],
+  );
+
+  const upcomingItems = useMemo(() => {
+    const q = searchText.trim().toLowerCase();
+    return q ? allUpcoming.filter((item) => item.name.toLowerCase().includes(q)) : allUpcoming;
+  }, [allUpcoming, searchText]);
+
+  const totalUpcoming = useMemo(() => upcomingItems.reduce((sum, item) => sum + item.amount, 0), [upcomingItems]);
 
   const overdueCount = useMemo(
-    () => allUnpaidBills.filter((bill) => differenceInCalendarDays(parseISO(bill.dueDate), new Date()) < 0).length,
-    [allUnpaidBills],
+    () => allUpcoming.filter((item) => differenceInCalendarDays(parseISO(item.dueDate), new Date()) < 0).length,
+    [allUpcoming],
   );
 
   const monthSections = useMemo<MonthSection[]>(() => {
     const sections: MonthSection[] = [];
     const byMonth = new Map<string, MonthSection>();
-    for (const bill of unpaidBills) {
-      const key = monthKey(bill.dueDate);
+    for (const item of upcomingItems) {
+      const key = monthKey(item.dueDate);
       let section = byMonth.get(key);
       if (!section) {
-        section = { title: monthLabel(bill.dueDate), monthKey: key, total: 0, data: [] };
+        section = { title: monthLabel(item.dueDate), monthKey: key, total: 0, data: [] };
         byMonth.set(key, section);
         sections.push(section);
       }
-      section.total += bill.amount;
-      section.data.push(bill);
+      section.total += item.amount;
+      section.data.push(item);
     }
     return sections;
-  }, [unpaidBills]);
+  }, [upcomingItems]);
+
+  function handleMarkDuePaid(account: AccountWithBalance) {
+    Alert.alert(
+      'Mark as paid?',
+      `This logs a ${formatCurrency(account.monthlyAmountDue!)} payment for "${account.name}" and hides it until next month.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Mark paid',
+          onPress: () => markMonthlyDuePaid(account.id, monthKeyFor(new Date()), formatIsoDate(new Date())),
+        },
+      ],
+    );
+  }
 
   function handleMarkPaid(bill: BillWithDetails) {
     Alert.alert(
@@ -90,16 +115,16 @@ export default function UnpaidBillsScreen() {
       </View>
       <SectionList
         sections={monthSections}
-        keyExtractor={(item) => String(item.id)}
+        keyExtractor={(item) => `${item.kind}-${item.id}`}
         stickySectionHeadersEnabled
-        contentContainerStyle={unpaidBills.length === 0 ? styles.emptyContainer : styles.listContent}
+        contentContainerStyle={upcomingItems.length === 0 ? styles.emptyContainer : styles.listContent}
         ListHeaderComponent={
-          unpaidBills.length > 0 ? (
+          upcomingItems.length > 0 ? (
             <View style={styles.summaryCard}>
               <Text style={styles.summaryLabel}>Total upcoming</Text>
               <Text style={styles.summaryAmount}>{formatCurrency(totalUpcoming)}</Text>
               <Text style={styles.summaryCount}>
-                {unpaidBills.length} {unpaidBills.length === 1 ? 'bill' : 'bills'}
+                {upcomingItems.length} {upcomingItems.length === 1 ? 'item' : 'items'}
                 {overdueCount > 0 ? ` · ${overdueCount} overdue` : ''}
               </Text>
             </View>
@@ -125,13 +150,37 @@ export default function UnpaidBillsScreen() {
           const daysUntilDue = differenceInCalendarDays(parseISO(item.dueDate), new Date());
           const isOverdue = daysUntilDue < 0;
           const dueLabel = isOverdue ? `Overdue · due ${formatDisplayDate(item.dueDate)}` : `Due ${formatDisplayDate(item.dueDate)}`;
-          const frequencyLabel = frequencyLabelFor(item);
+
+          if (item.kind === 'due') {
+            const account = item.account;
+            return (
+              <Pressable
+                style={styles.card}
+                onPress={() => navigation.navigate('AddEditAccount', { accountId: account.id })}
+              >
+                <View style={styles.cardMain}>
+                  <Text style={styles.cardTitle}>{account.name}</Text>
+                  <Text style={[styles.cardSubtitle, isOverdue && styles.cardSubtitleOverdue]}>{dueLabel}</Text>
+                  <Text style={styles.cardFrequency}>Monthly due</Text>
+                </View>
+                <View style={styles.cardTrailing}>
+                  <Text style={styles.cardAmount}>{formatCurrency(item.amount)}</Text>
+                  <Pressable style={styles.payButton} onPress={() => handleMarkDuePaid(account)}>
+                    <Text style={styles.payButtonText}>Mark paid</Text>
+                  </Pressable>
+                </View>
+              </Pressable>
+            );
+          }
+
+          const bill = item.bill;
+          const frequencyLabel = frequencyLabelFor(bill);
           return (
-            <Pressable style={styles.card} onPress={() => navigation.navigate('AddEditBill', { billId: item.id })}>
+            <Pressable style={styles.card} onPress={() => navigation.navigate('AddEditBill', { billId: bill.id })}>
               <View style={styles.cardMain}>
-                <Text style={styles.cardTitle}>{item.name}</Text>
-                {item.categoryName ? (
-                  <CategoryBadge name={item.categoryName} color={item.categoryColor ?? PALETTE.textSecondary} icon={item.categoryIcon} />
+                <Text style={styles.cardTitle}>{bill.name}</Text>
+                {bill.categoryName ? (
+                  <CategoryBadge name={bill.categoryName} color={bill.categoryColor ?? PALETTE.textSecondary} icon={bill.categoryIcon} />
                 ) : (
                   <UncategorizedBadge />
                 )}
@@ -139,8 +188,8 @@ export default function UnpaidBillsScreen() {
                 {frequencyLabel ? <Text style={styles.cardFrequency}>{frequencyLabel}</Text> : null}
               </View>
               <View style={styles.cardTrailing}>
-                <Text style={styles.cardAmount}>{formatCurrency(item.amount)}</Text>
-                <Pressable style={styles.payButton} onPress={() => handleMarkPaid(item)}>
+                <Text style={styles.cardAmount}>{formatCurrency(bill.amount)}</Text>
+                <Pressable style={styles.payButton} onPress={() => handleMarkPaid(bill)}>
                   <Text style={styles.payButtonText}>Mark paid</Text>
                 </Pressable>
               </View>

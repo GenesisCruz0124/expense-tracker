@@ -11,6 +11,7 @@ import { useAccounts } from '../hooks/useAccounts';
 import { useRecurringTransactions } from '../hooks/useRecurringTransactions';
 import { formatCurrency } from '../utils/currency';
 import { formatDisplayDate, formatIsoDate, monthKeyFor, parseIsoDate } from '../utils/dateRanges';
+import { monthlyDueDateFor, ordinal } from '../utils/monthlyDue';
 
 const FREQUENCY_UNIT: Record<'weekly' | 'monthly', string> = { weekly: 'week', monthly: 'month' };
 const MONTHLY_FACTOR: Record<'weekly' | 'monthly', number> = { weekly: 52 / 12, monthly: 1 };
@@ -275,7 +276,10 @@ export default function RecurringTransactionsScreen() {
         </View>
         <View style={styles.cardMain}>
           <Text style={styles.cardTitle}>{account.name}</Text>
-          <Text style={styles.cardSubtitle}>Due every month</Text>
+          <Text style={styles.cardSubtitle}>
+            Due {formatDisplayDate(monthlyDueDateFor(account.subscriptionDueDay, new Date()))}
+            {account.subscriptionDueDay != null ? ` · ${ordinal(account.subscriptionDueDay)} monthly` : ' · month-end'}
+          </Text>
           {account.totalMonths > 0 ? (
             <Text style={styles.totalMonthsBadge}>{account.totalMonths} {account.totalMonths === 1 ? 'month' : 'months'} paid</Text>
           ) : null}
