@@ -12,8 +12,9 @@ interface Props {
 }
 
 function shortLabel(label: string): string {
-  // "June 2026" -> "Jun"
-  return label.split(' ')[0]?.slice(0, 3) ?? label;
+  // Monthly "June 2026" -> "Jun"; weekly "Jun 23" already short, use as-is
+  if (/\d{4}/.test(label)) return label.split(' ')[0]?.slice(0, 3) ?? label;
+  return label;
 }
 
 export function TrendLineChart({ entries }: Props) {
@@ -23,6 +24,7 @@ export function TrendLineChart({ entries }: Props) {
 
   const incomeData = entries.map((entry) => ({ value: fromMinorUnits(entry.income), label: shortLabel(entry.label) }));
   const expenseData = entries.map((entry) => ({ value: fromMinorUnits(entry.expense) }));
+  const spacing = entries.length >= 20 ? 22 : entries.length >= 10 ? 36 : 48;
 
   return (
     <View>
@@ -55,7 +57,7 @@ export function TrendLineChart({ entries }: Props) {
           xAxisLabelTextStyle={{ color: PALETTE.textSecondary, fontSize: 10 }}
           curved
           isAnimated
-          spacing={48}
+          spacing={spacing}
           initialSpacing={16}
         />
       </View>

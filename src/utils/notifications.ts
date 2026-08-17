@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 
 const BUDGET_CHANNEL_ID = 'budget-alerts';
+const BILL_CHANNEL_ID = 'bill-reminders';
 const PERMISSION_TIMEOUT_MS = 8000;
 
 /** Fallback used when a permission call hangs — "undetermined" lets the caller retry later. */
@@ -43,11 +44,15 @@ Notifications.setNotificationHandler({
   }),
 });
 
-/** Registers the Android notification channel budget alerts post to (required on Android 8+). */
+/** Registers the Android notification channels budget alerts and bill reminders post to (required on Android 8+). */
 export async function configureNotificationChannel(): Promise<void> {
   if (Platform.OS !== 'android') return;
   await Notifications.setNotificationChannelAsync(BUDGET_CHANNEL_ID, {
     name: 'Budget alerts',
+    importance: Notifications.AndroidImportance.DEFAULT,
+  });
+  await Notifications.setNotificationChannelAsync(BILL_CHANNEL_ID, {
+    name: 'Bill reminders',
     importance: Notifications.AndroidImportance.DEFAULT,
   });
 }
@@ -77,5 +82,19 @@ export async function presentBudgetAlert(title: string, body: string): Promise<v
   await Notifications.scheduleNotificationAsync({
     content: { title, body },
     trigger: Platform.OS === 'android' ? { channelId: BUDGET_CHANNEL_ID } : null,
+  });
+}
+
+/**
+ * Fires an immediate local notification for an upcoming or overdue bill (trigger: null) —
+ * evaluated opportunistically on launch via `checkBillReminders`, same as budget alerts.
+ */
+export async function presentBillReminder(title: string, body: string): Promise<void> {
+  const { status } = await Notifications.getPermissionsAsync();
+  if (status !== 'granted') return;
+
+  await Notifications.scheduleNotificationAsync({
+    content: { title, body },
+    trigger: Platform.OS === 'android' ? { channelId: BILL_CHANNEL_ID } : null,
   });
 }

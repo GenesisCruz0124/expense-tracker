@@ -4,7 +4,11 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useDatabase } from '../context/DatabaseProvider';
 import {
   createAccount as createAccountQuery,
+  incrementAccountBalance as incrementAccountBalanceQuery,
   listAccounts,
+  markMonthlyDuePaid as markMonthlyDuePaidQuery,
+  markMonthlyDueUnpaid as markMonthlyDueUnpaidQuery,
+  updateMonthlyDuePaidDate as updateMonthlyDuePaidDateQuery,
   setAccountArchived as setAccountArchivedQuery,
   updateAccount as updateAccountQuery,
   type AccountInput,
@@ -69,5 +73,53 @@ export function useAccounts(options: ListAccountsOptions = {}) {
     [db, notifyDataChanged, refresh],
   );
 
-  return { accounts, loading, error, refresh, createAccount, updateAccount, setArchived };
+  const markMonthlyDuePaid = useCallback(
+    async (id: number, monthKey: string, occurredAt: string) => {
+      await markMonthlyDuePaidQuery(db, id, monthKey, occurredAt);
+      notifyDataChanged();
+      await refresh();
+    },
+    [db, notifyDataChanged, refresh],
+  );
+
+  const markMonthlyDueUnpaid = useCallback(
+    async (id: number) => {
+      await markMonthlyDueUnpaidQuery(db, id);
+      notifyDataChanged();
+      await refresh();
+    },
+    [db, notifyDataChanged, refresh],
+  );
+
+  const updateMonthlyDuePaidDate = useCallback(
+    async (id: number, occurredAt: string) => {
+      await updateMonthlyDuePaidDateQuery(db, id, occurredAt);
+      notifyDataChanged();
+      await refresh();
+    },
+    [db, notifyDataChanged, refresh],
+  );
+
+  const incrementBalance = useCallback(
+    async (id: number) => {
+      await incrementAccountBalanceQuery(db, id);
+      notifyDataChanged();
+      await refresh();
+    },
+    [db, notifyDataChanged, refresh],
+  );
+
+  return {
+    accounts,
+    loading,
+    error,
+    refresh,
+    createAccount,
+    updateAccount,
+    setArchived,
+    markMonthlyDuePaid,
+    markMonthlyDueUnpaid,
+    updateMonthlyDuePaidDate,
+    incrementBalance,
+  };
 }

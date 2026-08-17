@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 
 import { EmptyState } from '../components/EmptyState';
@@ -14,6 +14,12 @@ export default function BudgetsScreen() {
   const [anchorDate, setAnchorDate] = useState(() => new Date());
   const range = monthRangeFor(anchorDate);
   const { budgets, copyFromMonth } = useBudgets(range);
+  const [searchText, setSearchText] = useState('');
+
+  const query = searchText.trim().toLowerCase();
+  const visibleBudgets = query
+    ? budgets.filter((budget) => budget.categoryName.toLowerCase().includes(query))
+    : budgets;
 
   async function handleCopyFromLastMonth() {
     const fromRange = monthRangeFor(shiftMonth(anchorDate, -1));
@@ -39,15 +45,38 @@ export default function BudgetsScreen() {
         </Pressable>
       </View>
 
+      <View style={styles.searchRow}>
+        <Text style={styles.searchIcon}>🔍</Text>
+        <TextInput
+          style={styles.searchInput}
+          value={searchText}
+          onChangeText={setSearchText}
+          placeholder="Search budgets"
+          placeholderTextColor={PALETTE.textSecondary}
+          autoCapitalize="none"
+          autoCorrect={false}
+          clearButtonMode="while-editing"
+        />
+        {searchText.length > 0 ? (
+          <Pressable onPress={() => setSearchText('')} hitSlop={8}>
+            <Text style={styles.searchClear}>✕</Text>
+          </Pressable>
+        ) : null}
+      </View>
+
       <FlatList
-        data={budgets}
+        data={visibleBudgets}
         keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={budgets.length === 0 ? styles.emptyContainer : styles.listContent}
+        contentContainerStyle={visibleBudgets.length === 0 ? styles.emptyContainer : styles.listContent}
         ListEmptyComponent={
           <EmptyState
             icon="🎯"
-            title="No budgets set"
-            message="Set a monthly limit for a category to get notified as you approach it."
+            title={query ? 'No matching budgets' : 'No budgets set'}
+            message={
+              query
+                ? `Nothing matches "${searchText.trim()}". Try a different search.`
+                : 'Set a monthly limit for a category to get notified as you approach it.'
+            }
           />
         }
         renderItem={({ item }) => {
@@ -92,6 +121,21 @@ const styles = StyleSheet.create({
     borderBottomColor: PALETTE.border,
   },
   copyButton: { alignSelf: 'center', paddingVertical: 6, paddingHorizontal: 12 },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: PALETTE.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.border,
+    borderRadius: 10,
+    marginHorizontal: 16,
+    marginTop: 12,
+    paddingHorizontal: 12,
+    gap: 8,
+  },
+  searchIcon: { fontSize: 14 },
+  searchInput: { flex: 1, fontSize: 14, color: PALETTE.textPrimary, paddingVertical: 10 },
+  searchClear: { fontSize: 13, color: PALETTE.textSecondary, fontWeight: '600' },
   copyButtonText: { fontSize: 13, fontWeight: '600', color: PALETTE.net },
   listContent: { padding: 16, gap: 12 },
   emptyContainer: { flexGrow: 1, justifyContent: 'center' },

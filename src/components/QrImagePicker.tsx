@@ -1,7 +1,8 @@
-import React from 'react';
-import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 
+import { ActionSheet, type ActionSheetOption } from './ActionSheet';
 import { PALETTE } from '../constants/colors';
 
 interface Props {
@@ -17,6 +18,10 @@ const PICKER_OPTIONS: ImagePicker.ImagePickerOptions = {
 
 /** Lets the user attach a "received payment" QR code image by picking one from the gallery or capturing it. */
 export function QrImagePicker({ uri, onChange }: Props) {
+  const [zoomVisible, setZoomVisible] = useState(false);
+  const [sheetVisible, setSheetVisible] = useState(false);
+  const { width, height } = useWindowDimensions();
+
   async function captureFromCamera() {
     const permission = await ImagePicker.requestCameraPermissionsAsync();
     if (!permission.granted) {
@@ -37,32 +42,67 @@ export function QrImagePicker({ uri, onChange }: Props) {
     if (!result.canceled && result.assets[0]) onChange(result.assets[0].uri);
   }
 
-  function handlePress() {
-    const options: Array<{ text: string; style?: 'cancel' | 'destructive'; onPress?: () => void }> = [
-      { text: 'Choose from gallery', onPress: pickFromLibrary },
-      { text: 'Take photo', onPress: captureFromCamera },
-    ];
-    if (uri) options.push({ text: 'Remove image', style: 'destructive', onPress: () => onChange(null) });
-    options.push({ text: 'Cancel', style: 'cancel' });
-    Alert.alert('Payment QR image', uri ? 'Replace or remove the QR image.' : 'Add an image of your payment QR code.', options);
-  }
+  const sheetOptions: ActionSheetOption[] = [
+    { label: 'Choose from gallery', onPress: pickFromLibrary },
+    { label: 'Take photo', onPress: captureFromCamera },
+  ];
+  if (uri) sheetOptions.push({ label: 'Remove image', destructive: true, onPress: () => onChange(null) });
+
+  const sheet = (
+    <ActionSheet
+      visible={sheetVisible}
+      onClose={() => setSheetVisible(false)}
+      title="Payment QR image"
+      message={uri ? 'Replace or remove the QR image.' : 'Add an image of your payment QR code.'}
+      options={sheetOptions}
+    />
+  );
 
   if (uri) {
     return (
-      <Pressable onPress={handlePress} style={styles.previewWrap}>
-        <Image source={{ uri }} style={styles.preview} resizeMode="contain" />
-        <View style={styles.previewOverlay}>
-          <Text style={styles.previewOverlayText}>Change image</Text>
-        </View>
-      </Pressable>
+      <>
+        <Pressable onPress={() => setSheetVisible(true)} style={styles.previewWrap}>
+          <Image source={{ uri }} style={styles.preview} resizeMode="contain" />
+          <Pressable onPress={() => setZoomVisible(true)} style={styles.zoomButton} hitSlop={8}>
+            <Text style={styles.zoomButtonText}>🔍</Text>
+          </Pressable>
+          <View style={styles.previewOverlay}>
+            <Text style={styles.previewOverlayText}>Change image</Text>
+          </View>
+        </Pressable>
+
+        <Modal visible={zoomVisible} transparent animationType="fade" onRequestClose={() => setZoomVisible(false)}>
+          <View style={styles.zoomBackdrop}>
+            <ScrollView
+              style={styles.zoomScroll}
+              contentContainerStyle={{ width, height }}
+              minimumZoomScale={1}
+              maximumZoomScale={4}
+              centerContent
+              showsHorizontalScrollIndicator={false}
+              showsVerticalScrollIndicator={false}
+            >
+              <Image source={{ uri }} style={{ width, height }} resizeMode="contain" />
+            </ScrollView>
+            <Pressable onPress={() => setZoomVisible(false)} style={styles.zoomClose} hitSlop={8}>
+              <Text style={styles.zoomCloseText}>✕</Text>
+            </Pressable>
+          </View>
+        </Modal>
+
+        {sheet}
+      </>
     );
   }
 
   return (
-    <Pressable onPress={handlePress} style={({ pressed }) => [styles.placeholder, pressed && styles.placeholderPressed]}>
-      <Text style={styles.placeholderIcon}>🖼️</Text>
-      <Text style={styles.placeholderText}>Add QR image</Text>
-    </Pressable>
+    <>
+      <Pressable onPress={() => setSheetVisible(true)} style={({ pressed }) => [styles.placeholder, pressed && styles.placeholderPressed]}>
+        <Text style={styles.placeholderIcon}>🖼️</Text>
+        <Text style={styles.placeholderText}>Add QR image</Text>
+      </Pressable>
+      {sheet}
+    </>
   );
 }
 
@@ -99,4 +139,30 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(15, 23, 42, 0.55)',
   },
   previewOverlayText: { fontSize: 13, fontWeight: '700', color: '#fff' },
+  zoomButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+  },
+  zoomButtonText: { fontSize: 15 },
+  zoomBackdrop: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.92)' },
+  zoomScroll: { flex: 1 },
+  zoomClose: {
+    position: 'absolute',
+    top: 48,
+    right: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  zoomCloseText: { color: '#fff', fontSize: 18, fontWeight: '700' },
 });

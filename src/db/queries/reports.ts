@@ -1,8 +1,8 @@
-import { and, between, eq, sql } from 'drizzle-orm';
+import { and, between, eq, isNotNull, isNull, ne, sql } from 'drizzle-orm';
 
 import type { Database } from '../client';
 import { categories, transactions } from '../schema';
-import type { MonthRange } from '../../utils/dateRanges';
+import type { DayRange, MonthRange, WeekRange } from '../../utils/dateRanges';
 
 export interface CategoryBreakdownEntry {
   categoryId: number | null;
@@ -34,6 +34,7 @@ export async function categoryBreakdown(
         eq(transactions.type, type),
         eq(transactions.excludeFromExpense, false),
         between(transactions.occurredAt, range.start, range.end),
+        isNull(transactions.deletedAt),
       ),
     )
     .groupBy(transactions.categoryId)
@@ -44,6 +45,53 @@ export async function categoryBreakdown(
     categoryName: row.categoryName ?? 'Uncategorized',
     categoryColor: row.categoryColor ?? '#94A3B8',
     total: row.total,
+  }));
+}
+
+export interface EstablishmentBreakdownEntry {
+  establishment: string;
+  /** Sum in minor units (cents) */
+  total: number;
+  /** How many transactions make up `total`. */
+  count: number;
+}
+
+/**
+ * Spend grouped by the free-text `establishment` field. Transactions with no establishment are
+ * skipped rather than bucketed together, since a blank merchant carries no reporting value.
+ */
+export async function establishmentBreakdown(
+  db: Database,
+  type: 'expense' | 'income',
+  range: { start: string; end: string },
+): Promise<EstablishmentBreakdownEntry[]> {
+  const totalExpr = sql<number>`coalesce(sum(${transactions.amount}), 0)`;
+  const countExpr = sql<number>`count(*)`;
+
+  const rows = await db
+    .select({
+      establishment: transactions.establishment,
+      total: totalExpr,
+      count: countExpr,
+    })
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.type, type),
+        eq(transactions.excludeFromExpense, false),
+        between(transactions.occurredAt, range.start, range.end),
+        isNull(transactions.deletedAt),
+        isNotNull(transactions.establishment),
+        ne(transactions.establishment, ''),
+      ),
+    )
+    .groupBy(transactions.establishment)
+    .orderBy(sql`${totalExpr} desc`);
+
+  return rows.map((row) => ({
+    establishment: row.establishment ?? '',
+    total: row.total,
+    count: row.count,
   }));
 }
 
@@ -71,7 +119,11 @@ export async function incomeVsExpenseTrend(db: Database, ranges: MonthRange[]): 
     })
     .from(transactions)
     .where(
-      and(eq(transactions.excludeFromExpense, false), between(transactions.occurredAt, overallStart, overallEnd)),
+      and(
+        eq(transactions.excludeFromExpense, false),
+        between(transactions.occurredAt, overallStart, overallEnd),
+        isNull(transactions.deletedAt),
+      ),
     )
     .groupBy(monthKeyExpr, transactions.type);
 
@@ -89,6 +141,84 @@ export async function incomeVsExpenseTrend(db: Database, ranges: MonthRange[]): 
   });
 }
 
+/** Income vs. expense totals per week — backs the weekly trend chart. Returns `MonthlyTrendEntry[]` since charts only need label/income/expense. */
+export async function incomeVsExpenseTrendWeekly(db: Database, ranges: WeekRange[]): Promise<MonthlyTrendEntry[]> {
+  if (ranges.length === 0) return [];
+
+  const overallStart = ranges[0].start;
+  const overallEnd = ranges[ranges.length - 1].end;
+  // Compute the Monday of the transaction's week: go back ((dayOfWeek + 6) % 7) days.
+  // strftime('%w') returns 0=Sunday … 6=Saturday, so (n+6)%7 gives 0 for Monday, 6 for Sunday.
+  const weekKeyExpr = sql<string>`date(${transactions.occurredAt}, '-' || cast((cast(strftime('%w', ${transactions.occurredAt}) as integer) + 6) % 7 as text) || ' days')`;
+
+  const rows = await db
+    .select({
+      weekKey: weekKeyExpr,
+      type: transactions.type,
+      total: sql<number>`coalesce(sum(${transactions.amount}), 0)`,
+    })
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.excludeFromExpense, false),
+        between(transactions.occurredAt, overallStart, overallEnd),
+        isNull(transactions.deletedAt),
+      ),
+    )
+    .groupBy(weekKeyExpr, transactions.type);
+
+  const totalsByWeek = new Map<string, { income: number; expense: number }>();
+  for (const row of rows) {
+    const entry = totalsByWeek.get(row.weekKey) ?? { income: 0, expense: 0 };
+    if (row.type === 'income') entry.income = row.total;
+    else entry.expense = row.total;
+    totalsByWeek.set(row.weekKey, entry);
+  }
+
+  return ranges.map((range) => {
+    const totals = totalsByWeek.get(range.weekKey) ?? { income: 0, expense: 0 };
+    return { monthKey: range.weekKey, label: range.label, income: totals.income, expense: totals.expense };
+  });
+}
+
+/** Income vs. expense totals per day — backs the daily trend chart. Returns `MonthlyTrendEntry[]` since charts only need label/income/expense. */
+export async function incomeVsExpenseTrendDaily(db: Database, ranges: DayRange[]): Promise<MonthlyTrendEntry[]> {
+  if (ranges.length === 0) return [];
+
+  const overallStart = ranges[0].start;
+  const overallEnd = ranges[ranges.length - 1].end;
+  const dayKeyExpr = sql<string>`strftime('%Y-%m-%d', ${transactions.occurredAt})`;
+
+  const rows = await db
+    .select({
+      dayKey: dayKeyExpr,
+      type: transactions.type,
+      total: sql<number>`coalesce(sum(${transactions.amount}), 0)`,
+    })
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.excludeFromExpense, false),
+        between(transactions.occurredAt, overallStart, overallEnd),
+        isNull(transactions.deletedAt),
+      ),
+    )
+    .groupBy(dayKeyExpr, transactions.type);
+
+  const totalsByDay = new Map<string, { income: number; expense: number }>();
+  for (const row of rows) {
+    const entry = totalsByDay.get(row.dayKey) ?? { income: 0, expense: 0 };
+    if (row.type === 'income') entry.income = row.total;
+    else entry.expense = row.total;
+    totalsByDay.set(row.dayKey, entry);
+  }
+
+  return ranges.map((range) => {
+    const totals = totalsByDay.get(range.dayKey) ?? { income: 0, expense: 0 };
+    return { monthKey: range.dayKey, label: range.label, income: totals.income, expense: totals.expense };
+  });
+}
+
 export interface MonthlyTotals {
   /** Sums in minor units (cents) */
   income: number;
@@ -103,7 +233,13 @@ export async function monthlyTotals(db: Database, range: { start: string; end: s
       total: sql<number>`coalesce(sum(${transactions.amount}), 0)`,
     })
     .from(transactions)
-    .where(and(eq(transactions.excludeFromExpense, false), between(transactions.occurredAt, range.start, range.end)))
+    .where(
+      and(
+        eq(transactions.excludeFromExpense, false),
+        between(transactions.occurredAt, range.start, range.end),
+        isNull(transactions.deletedAt),
+      ),
+    )
     .groupBy(transactions.type);
 
   const totals: MonthlyTotals = { income: 0, expense: 0 };

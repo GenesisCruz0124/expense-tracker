@@ -5,6 +5,7 @@ import { useDatabase } from '../context/DatabaseProvider';
 import {
   createCategory as createCategoryQuery,
   listCategories,
+  mergeCategory as mergeCategoryQuery,
   setCategoryArchived as setCategoryArchivedQuery,
   updateCategory as updateCategoryQuery,
   type CategoryInput,
@@ -64,5 +65,14 @@ export function useCategories(options: ListCategoriesOptions = {}) {
     [db, notifyDataChanged, refresh],
   );
 
-  return { categories, loading, refresh, createCategory, updateCategory, setArchived };
+  const mergeCategory = useCallback(
+    async (sourceId: number, targetId: number) => {
+      await mergeCategoryQuery(db, sourceId, targetId);
+      notifyDataChanged();
+      await refresh();
+    },
+    [db, notifyDataChanged, refresh],
+  );
+
+  return { categories, loading, refresh, createCategory, updateCategory, setArchived, mergeCategory };
 }

@@ -1,47 +1,74 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 
 import { useDatabase } from '../context/DatabaseProvider';
 import {
   categoryBreakdown,
+  establishmentBreakdown,
   incomeVsExpenseTrend,
+  incomeVsExpenseTrendDaily,
+  incomeVsExpenseTrendWeekly,
   monthlyTotals,
   type CategoryBreakdownEntry,
+  type EstablishmentBreakdownEntry,
   type MonthlyTotals,
   type MonthlyTrendEntry,
 } from '../db/queries/reports';
-import { formatIsoDate, lastMonthRanges, monthRangeFor } from '../utils/dateRanges';
+import { lastDayRanges, lastMonthRanges, lastWeekRanges, type DateRange } from '../utils/dateRanges';
 
 export type ReportKind = 'expense' | 'income';
+export type TrendPeriod = 'daily' | 'weekly' | 'monthly';
 
-export function useReportsData(anchorDate: Date, monthsBack: number = 6) {
+export function useReportsData(range: DateRange, monthsBack: number = 8, trendPeriod: TrendPeriod = 'monthly', periodCount: number = 8) {
   const { db, refreshSignal } = useDatabase();
   const [breakdownKind, setBreakdownKind] = useState<ReportKind>('expense');
   const [categoryData, setCategoryData] = useState<CategoryBreakdownEntry[]>([]);
+  const [establishmentData, setEstablishmentData] = useState<EstablishmentBreakdownEntry[]>([]);
   const [trend, setTrend] = useState<MonthlyTrendEntry[]>([]);
   const [totals, setTotals] = useState<MonthlyTotals>({ income: 0, expense: 0 });
   const [loading, setLoading] = useState(true);
-
-  const anchorKey = formatIsoDate(anchorDate);
+  // Track the last range for which we auto-switched, so auto-switch only fires once per range
+  // (not when the user manually switches back to Expenses on an income-only range).
+  const autoSwitchedForRange = useRef('');
 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const range = monthRangeFor(anchorDate);
-      const ranges = lastMonthRanges(anchorDate, monthsBack);
-      const [breakdown, trendData, totalsData] = await Promise.all([
+      const monthRanges = lastMonthRanges(new Date(), periodCount);
+      const weekRanges = lastWeekRanges(new Date(), periodCount);
+      const dayRanges = lastDayRanges(new Date(), periodCount);
+      const [breakdown, establishments, trendData, totalsData] = await Promise.all([
         categoryBreakdown(db, breakdownKind, range),
-        incomeVsExpenseTrend(db, ranges),
+        establishmentBreakdown(db, breakdownKind, range),
+        trendPeriod === 'daily'
+          ? incomeVsExpenseTrendDaily(db, dayRanges)
+          : trendPeriod === 'weekly'
+            ? incomeVsExpenseTrendWeekly(db, weekRanges)
+            : incomeVsExpenseTrend(db, monthRanges),
         monthlyTotals(db, range),
       ]);
       setCategoryData(breakdown);
+      setEstablishmentData(establishments);
       setTrend(trendData);
       setTotals(totalsData);
+
+      // Auto-switch to Income when the period has no expenses but does have income.
+      // Guard: only auto-switch once per range so the user can still manually choose Expenses.
+      const rangeKey = `${range.start}|${range.end}`;
+      if (
+        breakdownKind === 'expense' &&
+        totalsData.expense === 0 &&
+        totalsData.income > 0 &&
+        autoSwitchedForRange.current !== rangeKey
+      ) {
+        autoSwitchedForRange.current = rangeKey;
+        setBreakdownKind('income');
+      }
     } finally {
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [db, anchorKey, monthsBack, breakdownKind]);
+  }, [db, range.start, range.end, monthsBack, breakdownKind, trendPeriod, periodCount]);
 
   useFocusEffect(
     useCallback(() => {
@@ -50,5 +77,5 @@ export function useReportsData(anchorDate: Date, monthsBack: number = 6) {
     }, [refresh, refreshSignal]),
   );
 
-  return { categoryData, trend, totals, loading, breakdownKind, setBreakdownKind, refresh };
+  return { categoryData, establishmentData, trend, totals, loading, breakdownKind, setBreakdownKind, refresh };
 }

@@ -1,0 +1,1 @@
+ALTER TABLE `recurring_transactions` ADD `biller_id` integer REFERENCES categories(id);

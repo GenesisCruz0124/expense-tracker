@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { PALETTE } from '../constants/colors';
 import { formatCurrency } from '../utils/currency';
@@ -9,16 +9,27 @@ interface Props {
   /** Amount in minor units (cents); sign is rendered based on `tone` */
   amount: number;
   tone: 'income' | 'expense' | 'net';
+  onPress?: () => void;
 }
 
-export function SummaryCard({ label, amount, tone }: Props) {
+export function SummaryCard({ label, amount, tone, onPress }: Props) {
   const color = PALETTE[tone];
-  return (
-    <View style={[styles.card, { borderTopColor: color }]}>
+  const content = (
+    <>
       <Text style={styles.label}>{label}</Text>
       <Text style={[styles.amount, { color }]}>{formatCurrency(amount)}</Text>
-    </View>
+    </>
   );
+
+  if (onPress) {
+    return (
+      <Pressable style={[styles.card, { borderTopColor: color }]} onPress={onPress}>
+        {content}
+      </Pressable>
+    );
+  }
+
+  return <View style={[styles.card, { borderTopColor: color }]}>{content}</View>;
 }
 
 const styles = StyleSheet.create({

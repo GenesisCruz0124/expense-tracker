@@ -1,45 +1,351 @@
-import React, { useMemo, useState } from 'react';
-import { Pressable, SectionList, StyleSheet, Switch, Text, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Image, Modal, Pressable, ScrollView, SectionList, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { useNavigation, type CompositeNavigationProp } from '@react-navigation/native';
+import * as MediaLibrary from 'expo-media-library';
+import * as Sharing from 'expo-sharing';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-import { AccountBadge } from '../components/AccountBadge';
+import { AccountIcon } from '../components/AccountIcon';
+import { ActionSheet } from '../components/ActionSheet';
 import { EmptyState } from '../components/EmptyState';
+import { DEFAULT_ACCOUNT_ICON } from '../constants/accountIcons';
 import { PALETTE } from '../constants/colors';
-import type { AccountWithBalance } from '../db/queries/accounts';
+import { useDatabase } from '../context/DatabaseProvider';
+import { getHistoricalAccountBalances, getHistoricalTotals, type AccountWithBalance } from '../db/queries/accounts';
+import { getSetting, setSetting } from '../db/queries/settings';
+import { formatIsoDate } from '../utils/dateRanges';
 import { useAccountCategories } from '../hooks/useAccountCategories';
 import { useAccounts } from '../hooks/useAccounts';
+import { useBills } from '../hooks/useBills';
 import { formatCurrency } from '../utils/currency';
+import { formatDisplayDate } from '../utils/dateRanges';
+import type { AccountsStackParamList, RootStackParamList } from '../navigation/types';
+
+const COLLAPSED_GROUPS_KEY = 'accountsCollapsedGroups';
+const SELECTED_CATEGORY_IDS_KEY = 'accountsSelectedCategoryIds';
+
+function accountOrdinal(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] ?? s[v] ?? s[0]);
+}
+const NET_WORTH_FILTER_KEY = 'accountsNetWorthFilter';
+const HIDE_SMALL_BALANCES_KEY = 'accountsHideSmallBalances';
+
+/** Balances at or under this (in minor units, i.e. ₱50.00) count as "small" and can be hidden. */
+const SMALL_BALANCE_THRESHOLD = 5000;
+
+type NetWorthFilter = 'all' | 'included' | 'excluded';
+
 
 interface AccountSection {
+  key: string;
   title: string;
+  icon: string;
+  color: string;
   total: number;
   data: AccountWithBalance[];
 }
 
+type AccountsScreenNavigationProp = CompositeNavigationProp<
+  NativeStackNavigationProp<AccountsStackParamList, 'AccountsList'>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
+
+const AMOUNT_MASK = '••••••';
+
+function computeTrend(current: number, prev: number): { pct: string; up: boolean } | null {
+  if (prev === 0) return null;
+  const change = ((current - prev) / Math.abs(prev)) * 100;
+  if (Math.abs(change) < 0.005) return null;
+  return { pct: Math.abs(change).toFixed(2) + '%', up: change > 0 };
+}
+
+type SortOption = 'name_asc' | 'name_desc' | 'balance_desc' | 'balance_asc' | 'recent';
+
+const SORT_LABELS: Record<SortOption, string> = {
+  name_asc: 'Name (A–Z)',
+  name_desc: 'Name (Z–A)',
+  balance_desc: 'Balance (high to low)',
+  balance_asc: 'Balance (low to high)',
+  recent: 'Recent',
+};
+
+function sortAccounts(accounts: AccountWithBalance[], sort: SortOption): AccountWithBalance[] {
+  const sorted = [...accounts];
+  switch (sort) {
+    case 'name_asc':
+      return sorted.sort((a, b) => a.name.localeCompare(b.name));
+    case 'name_desc':
+      return sorted.sort((a, b) => b.name.localeCompare(a.name));
+    case 'balance_desc':
+      return sorted.sort((a, b) => b.balance - a.balance);
+    case 'balance_asc':
+      return sorted.sort((a, b) => a.balance - b.balance);
+    case 'recent':
+      return sorted.sort((a, b) => {
+        if (!a.lastTransactionAt && !b.lastTransactionAt) return 0;
+        if (!a.lastTransactionAt) return 1;
+        if (!b.lastTransactionAt) return -1;
+        return b.lastTransactionAt.localeCompare(a.lastTransactionAt);
+      });
+  }
+}
+
+/** Returns the last 4 digits of an account number for a masked subtitle, or null if too short to mask. */
+function lastFourDigits(accountNumber: string | null): string | null {
+  const digits = (accountNumber ?? '').replace(/\D/g, '');
+  return digits.length >= 4 ? digits.slice(-4) : null;
+}
+
 export default function AccountsScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<AccountsScreenNavigationProp>();
   const [showArchived, setShowArchived] = useState(false);
+  const [hideAmounts, setHideAmounts] = useState(false);
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
+  const [netWorthFilter, setNetWorthFilter] = useState<NetWorthFilter>('all');
+  const [netWorthFilterLoaded, setNetWorthFilterLoaded] = useState(false);
+  const [hideSmallBalances, setHideSmallBalances] = useState(false);
+  const [hideSmallBalancesLoaded, setHideSmallBalancesLoaded] = useState(false);
+  const [menuAccount, setMenuAccount] = useState<AccountWithBalance | null>(null);
+  const [qrModalUri, setQrModalUri] = useState<string | null>(null);
+  const [qrModalName, setQrModalName] = useState<string>('');
+  const [sortOption, setSortOption] = useState<SortOption>('recent');
+  const [showSortPicker, setShowSortPicker] = useState(false);
+  const [grouped, setGrouped] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [groupsLoaded, setGroupsLoaded] = useState(false);
+  const [categoryFilterLoaded, setCategoryFilterLoaded] = useState(false);
+  const [prevTotals, setPrevTotals] = useState<{ netWorth: number; totalBalance: number } | null>(null);
+  const [prevBalances, setPrevBalances] = useState<Record<number, number>>({});
+  const { db, refreshSignal } = useDatabase();
+
+  function toggleGroup(key: string) {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  }
+
+  useEffect(() => {
+    (async () => {
+      const stored = await getSetting(db, COLLAPSED_GROUPS_KEY);
+      if (stored) {
+        try {
+          setCollapsedGroups(new Set(JSON.parse(stored)));
+        } catch {
+          // ignore malformed stored value
+        }
+      }
+      setGroupsLoaded(true);
+    })();
+  }, [db]);
+
+  useEffect(() => {
+    if (!groupsLoaded) return;
+    setSetting(db, COLLAPSED_GROUPS_KEY, JSON.stringify(Array.from(collapsedGroups)));
+  }, [collapsedGroups, groupsLoaded, db]);
+
+  useEffect(() => {
+    (async () => {
+      const stored = await getSetting(db, SELECTED_CATEGORY_IDS_KEY);
+      if (stored) {
+        try {
+          setSelectedCategoryIds(JSON.parse(stored));
+        } catch {
+          // ignore malformed stored value
+        }
+      }
+      setCategoryFilterLoaded(true);
+    })();
+  }, [db]);
+
+  useEffect(() => {
+    if (!categoryFilterLoaded) return;
+    setSetting(db, SELECTED_CATEGORY_IDS_KEY, JSON.stringify(selectedCategoryIds));
+  }, [selectedCategoryIds, categoryFilterLoaded, db]);
+
+  useEffect(() => {
+    (async () => {
+      const stored = await getSetting(db, NET_WORTH_FILTER_KEY);
+      if (stored === 'included' || stored === 'excluded') {
+        setNetWorthFilter(stored);
+      }
+      setNetWorthFilterLoaded(true);
+    })();
+  }, [db]);
+
+  useEffect(() => {
+    if (!netWorthFilterLoaded) return;
+    setSetting(db, NET_WORTH_FILTER_KEY, netWorthFilter);
+  }, [netWorthFilter, netWorthFilterLoaded, db]);
+
+  useEffect(() => {
+    (async () => {
+      setHideSmallBalances((await getSetting(db, HIDE_SMALL_BALANCES_KEY)) === 'true');
+      setHideSmallBalancesLoaded(true);
+    })();
+  }, [db]);
+
+  useEffect(() => {
+    if (!hideSmallBalancesLoaded) return;
+    setSetting(db, HIDE_SMALL_BALANCES_KEY, hideSmallBalances ? 'true' : 'false');
+  }, [hideSmallBalances, hideSmallBalancesLoaded, db]);
+
+  useEffect(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    const asOfDate = formatIsoDate(d);
+    Promise.all([
+      getHistoricalTotals(db, asOfDate),
+      getHistoricalAccountBalances(db, asOfDate),
+    ]).then(([totals, balances]) => {
+      setPrevTotals(totals);
+      setPrevBalances(balances);
+    }).catch(() => {});
+  }, [db, refreshSignal]);
+
   const { accounts, error, setArchived } = useAccounts({ includeArchived: true });
   const { accountCategories } = useAccountCategories({ includeArchived: true });
+  const { bills } = useBills();
+
+  // Map: credit card accountId → nearest upcoming bill (by toAccountId)
+  const upcomingBillByAccount = useMemo(() => {
+    const map = new Map<number, { dueDate: string; amount: number }>();
+    for (const bill of bills) {
+      if (bill.isPaid || bill.toAccountId == null) continue;
+      const existing = map.get(bill.toAccountId);
+      if (!existing || bill.dueDate < existing.dueDate) {
+        map.set(bill.toAccountId, { dueDate: bill.dueDate, amount: bill.amount });
+      }
+    }
+    return map;
+  }, [bills]);
 
   const visible = accounts.filter((account) => (showArchived ? account.isArchived : !account.isArchived));
 
+  const filterableCategories = useMemo(
+    () => accountCategories.filter((category) => visible.some((account) => account.categoryId === category.id)),
+    [accountCategories, visible],
+  );
+
+  /**
+   * Collapses the account categories into the four buckets the summary cards show. Credit-card and
+   * investment kinds map straight across; the remaining "standard" categories split by name so
+   * banks/e-wallets stay separate from cash-like ones. Labels are built from whichever categories
+   * actually land in a bucket, so adding a category shows up here without further changes.
+   */
+  const categoryBuckets = useMemo(() => {
+    const standard = filterableCategories.filter((category) => category.kind === 'standard');
+    const isBankLike = (name: string) => /bank|wallet/i.test(name);
+    const definitions = [
+      { key: 'bank', categories: standard.filter((category) => isBankLike(category.name)) },
+      { key: 'cash', categories: standard.filter((category) => !isBankLike(category.name)) },
+      { key: 'credit', categories: filterableCategories.filter((category) => category.kind === 'credit_card') },
+      { key: 'investment', categories: filterableCategories.filter((category) => category.kind === 'investment') },
+    ];
+
+    return definitions
+      .filter((definition) => definition.categories.length > 0)
+      .map((definition) => {
+        const ids = definition.categories.map((category) => category.id);
+        const total = visible
+          .filter((account) => account.categoryId != null && ids.includes(account.categoryId))
+          .reduce((sum, account) => {
+            const category = definition.categories.find((item) => item.id === account.categoryId);
+            return sum + (category?.kind === 'credit_card' ? -account.balance : account.balance);
+          }, 0);
+        return {
+          key: definition.key,
+          label: definition.categories.map((category) => category.name).join(' / '),
+          icon: definition.categories[0].icon,
+          color: definition.categories[0].color,
+          ids,
+          total,
+        };
+      });
+  }, [filterableCategories, visible]);
+
+  const filtered = visible
+    .filter((account) => selectedCategoryIds.length === 0 || (account.categoryId != null && selectedCategoryIds.includes(account.categoryId)))
+    .filter((account) => {
+      if (netWorthFilter === 'included') return account.includeInNetWorth;
+      if (netWorthFilter === 'excluded') return !account.includeInNetWorth;
+      return true;
+    })
+    .filter((account) => !hideSmallBalances || Math.abs(account.balance) > SMALL_BALANCE_THRESHOLD)
+    .filter((account) => !searchQuery.trim() || account.name.toLowerCase().includes(searchQuery.toLowerCase()));
+
+
+  const netWorth = useMemo(() => {
+    return visible.reduce((sum, account) => {
+      if (!account.includeInNetWorth) return sum;
+      const category = accountCategories.find((item) => item.id === account.categoryId);
+      return sum + (category?.kind === 'credit_card' ? -account.balance : account.balance);
+    }, 0);
+  }, [visible, accountCategories]);
+
+  const totalBalance = useMemo(() => {
+    return visible.reduce((sum, account) => {
+      const category = accountCategories.find((item) => item.id === account.categoryId);
+      return sum + (category?.kind === 'credit_card' ? -account.balance : account.balance);
+    }, 0);
+  }, [visible, accountCategories]);
+
+  const linkedLoanTotals = useMemo(() => {
+    const totals: Record<number, number> = {};
+    for (const acc of visible) {
+      if (acc.linkedCreditCardId != null) {
+        totals[acc.linkedCreditCardId] = (totals[acc.linkedCreditCardId] ?? 0) + acc.balance;
+      }
+    }
+    return totals;
+  }, [visible]);
+
+  const accountById = useMemo(() => new Map(visible.map((acc) => [acc.id, acc])), [visible]);
+
   const sections = useMemo<AccountSection[]>(() => {
+    if (!grouped) {
+      const data = sortAccounts(filtered, sortOption);
+      if (data.length === 0) return [];
+      return [
+        {
+          key: 'all',
+          title: 'All accounts',
+          icon: '🏦',
+          color: PALETTE.net,
+          total: data.reduce((sum, account) => {
+            const cat = accountCategories.find((c) => c.id === account.categoryId);
+            return sum + (cat?.kind === 'credit_card' ? -account.balance : account.balance);
+          }, 0),
+          data,
+        },
+      ];
+    }
     return accountCategories
       .map((category) => {
-        const data = visible.filter((account) => account.categoryId === category.id);
-        return { title: category.name, total: data.reduce((sum, account) => sum + account.balance, 0), data };
+        const data = sortAccounts(filtered.filter((account) => account.categoryId === category.id), sortOption);
+        return {
+          key: String(category.id),
+          title: category.name,
+          icon: category.icon ?? DEFAULT_ACCOUNT_ICON,
+          color: category.color,
+          total: data.reduce((sum, account) => sum + (category.kind === 'credit_card' ? -account.balance : account.balance), 0),
+          data,
+        };
       })
       .filter((section) => section.data.length > 0);
-  }, [accountCategories, visible]);
+  }, [accountCategories, filtered, sortOption, grouped]);
+
+  const sectionListData = useMemo(
+    () => sections.map((s) => (collapsedGroups.has(s.key) ? { ...s, data: [] } : s)),
+    [sections, collapsedGroups],
+  );
 
   return (
     <View style={styles.screen}>
-      <View style={styles.toggleRow}>
-        <Text style={styles.toggleLabel}>Show archived</Text>
-        <Switch value={showArchived} onValueChange={setShowArchived} trackColor={{ true: PALETTE.net }} />
-      </View>
-
       {error ? (
         <View style={styles.errorBanner}>
           <Text style={styles.errorBannerText}>Couldn't load accounts: {error.message}</Text>
@@ -47,10 +353,159 @@ export default function AccountsScreen() {
       ) : null}
 
       <SectionList
-        sections={sections}
+        sections={sectionListData}
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={sections.length === 0 ? styles.emptyContainer : styles.listContent}
         stickySectionHeadersEnabled={false}
+        ListHeaderComponent={
+          <>
+            <View style={styles.heroCard}>
+              <View style={{ flex: 1 }}>
+                <View style={styles.heroLabelRow}>
+                  <Text style={styles.heroLabel}>{showArchived ? 'Archived balance' : 'Net worth'}</Text>
+                  <Pressable onPress={() => setHideAmounts((value) => !value)} hitSlop={8}>
+                    <Text style={styles.eyeIcon}>{hideAmounts ? '🙈' : '👁️'}</Text>
+                  </Pressable>
+                  {!hideAmounts && !showArchived && prevTotals != null && (() => {
+                    const t = computeTrend(netWorth, prevTotals.netWorth);
+                    return t ? (
+                      <View style={[styles.trendBadge, t.up ? styles.trendUp : styles.trendDown]}>
+                        <Text style={[styles.trendText, t.up ? styles.trendTextUp : styles.trendTextDown]}>
+                          {t.up ? '▲' : '▼'} {t.up ? '+' : '-'}{t.pct}
+                        </Text>
+                      </View>
+                    ) : null;
+                  })()}
+                </View>
+                <Text style={styles.heroAmount}>{hideAmounts ? AMOUNT_MASK : formatCurrency(netWorth)}</Text>
+                {!showArchived && (
+                  <View style={styles.heroTotalRow}>
+                    <Text style={styles.heroTotalLabel}>Total</Text>
+                    <Text style={styles.heroTotalAmount}>{hideAmounts ? AMOUNT_MASK : formatCurrency(totalBalance)}</Text>
+                    {!hideAmounts && prevTotals != null && (() => {
+                      const t = computeTrend(totalBalance, prevTotals.totalBalance);
+                      return t ? (
+                        <View style={[styles.trendBadge, t.up ? styles.trendUp : styles.trendDown]}>
+                          <Text style={[styles.trendText, t.up ? styles.trendTextUp : styles.trendTextDown]}>
+                            {t.up ? '▲' : '▼'} {t.up ? '+' : '-'}{t.pct}
+                          </Text>
+                        </View>
+                      ) : null;
+                    })()}
+                  </View>
+                )}
+              </View>
+              <View style={styles.heroIconWrap}>
+                <Text style={styles.heroIcon}>💰</Text>
+              </View>
+            </View>
+
+            <View style={styles.searchRow}>
+              <Text style={styles.searchIcon}>🔍</Text>
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search accounts…"
+                placeholderTextColor={PALETTE.textSecondary}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                returnKeyType="search"
+                clearButtonMode="while-editing"
+                autoCorrect={false}
+                autoCapitalize="none"
+              />
+              {searchQuery.length > 0 ? (
+                <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
+                  <Text style={styles.searchClear}>✕</Text>
+                </Pressable>
+              ) : null}
+            </View>
+
+            {categoryBuckets.length > 0 ? (
+              <View style={styles.bucketSection}>
+                <View style={styles.bucketGrid}>
+                  {categoryBuckets.map((bucket) => {
+                    const selected = bucket.ids.every((id) => selectedCategoryIds.includes(id)) &&
+                      selectedCategoryIds.length === bucket.ids.length;
+                    return (
+                      <Pressable
+                        key={bucket.key}
+                        onPress={() => setSelectedCategoryIds(selected ? [] : bucket.ids)}
+                        style={[
+                          styles.bucketCard,
+                          { borderColor: bucket.color },
+                          selected && { backgroundColor: `${bucket.color}22` },
+                        ]}
+                      >
+                        <View style={styles.bucketCardHeader}>
+                          <AccountIcon icon={bucket.icon} size={14} />
+                          <Text style={[styles.bucketCardLabel, { color: bucket.color }]} numberOfLines={2}>
+                            {bucket.label}
+                          </Text>
+                        </View>
+                        <Text style={[styles.bucketCardTotal, bucket.total < 0 && styles.negative]}>
+                          {hideAmounts ? AMOUNT_MASK : formatCurrency(bucket.total)}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                {selectedCategoryIds.length > 0 ? (
+                  <Pressable onPress={() => setSelectedCategoryIds([])} hitSlop={8}>
+                    <Text style={styles.bucketClearLink}>Show all accounts</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : null}
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.filterRow}
+            >
+              {(
+                [
+                  { key: 'all', label: 'All' },
+                  { key: 'included', label: 'In net worth' },
+                  { key: 'excluded', label: 'Excluded' },
+                ] as { key: NetWorthFilter; label: string }[]
+              ).map(({ key, label }) => {
+                const selected = netWorthFilter === key;
+                return (
+                  <Pressable
+                    key={key}
+                    onPress={() => setNetWorthFilter(key)}
+                    style={[styles.filterChip, selected && styles.filterChipAllSelected]}
+                  >
+                    <Text style={[styles.filterChipText, selected && styles.filterChipTextSelected]}>{label}</Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+
+            <View style={styles.controlsRow}>
+              <Pressable style={styles.sortButton} onPress={() => setGrouped((value) => !value)}>
+                <Text style={styles.sortButtonText}>{grouped ? '▦ Grouped' : '☰ Ungrouped'}</Text>
+              </Pressable>
+              <Pressable style={styles.sortButton} onPress={() => setShowSortPicker(true)}>
+                <Text style={styles.sortButtonText}>⇅ Sort: {SORT_LABELS[sortOption]}</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.toggleRow}>
+              <Text style={styles.toggleLabel}>Show archived</Text>
+              <Switch value={showArchived} onValueChange={setShowArchived} trackColor={{ true: PALETTE.net }} />
+            </View>
+
+            <View style={styles.toggleRow}>
+              <Text style={styles.toggleLabel}>Hide small balances</Text>
+              <Switch
+                value={hideSmallBalances}
+                onValueChange={setHideSmallBalances}
+                trackColor={{ true: PALETTE.net }}
+              />
+            </View>
+          </>
+        }
         ListEmptyComponent={
           <EmptyState
             icon="🏦"
@@ -58,48 +513,217 @@ export default function AccountsScreen() {
             message={showArchived ? undefined : 'Add an account to start tracking balances and assigning transactions.'}
           />
         }
-        renderSectionHeader={({ section }) => (
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>{section.title}</Text>
-            <Text style={[styles.sectionTotal, { color: section.total < 0 ? PALETTE.expense : PALETTE.textPrimary }]}>
-              {formatCurrency(section.total)}
-            </Text>
-          </View>
-        )}
-        renderItem={({ item }) => (
-          <Pressable style={styles.row} onPress={() => navigation.navigate('AddEditAccount', { accountId: item.id })}>
-            <View style={styles.rowMain}>
-              <AccountBadge name={item.name} color={item.color} icon={item.icon} />
-              <Text style={[styles.balance, { color: item.balance < 0 ? PALETTE.expense : PALETTE.textPrimary }]}>
-                {formatCurrency(item.balance)}
+        renderSectionHeader={({ section }) => {
+          const collapsed = collapsedGroups.has(section.key);
+          return (
+            <Pressable style={styles.sectionHeader} onPress={() => toggleGroup(section.key)}>
+              <View style={styles.sectionHeaderLeft}>
+                <Text style={styles.sectionChevron}>{collapsed ? '▸' : '▾'}</Text>
+                <View style={[styles.sectionIcon, { backgroundColor: `${section.color}1A` }]}>
+                  <AccountIcon icon={section.icon} size={16} textStyle={styles.sectionIconText} />
+                </View>
+                <Text style={styles.sectionTitle}>{section.title}</Text>
+              </View>
+              <Text style={[styles.sectionTotal, section.total < 0 && styles.negative]}>
+                {hideAmounts ? AMOUNT_MASK : formatCurrency(section.total)}
               </Text>
-            </View>
-            <Pressable onPress={() => setArchived(item.id, !item.isArchived)} hitSlop={8} style={styles.archiveButton}>
-              <Text style={styles.archiveButtonText}>{item.isArchived ? 'Restore' : 'Archive'}</Text>
             </Pressable>
-          </Pressable>
-        )}
+          );
+        }}
+        renderItem={({ item }) => {
+          const subtitle = lastFourDigits(item.accountNumber);
+          const categoryKind = accountCategories.find((c) => c.id === item.categoryId)?.kind;
+          const isInvestment = categoryKind === 'investment';
+          const isLoan = categoryKind === 'credit_card';
+          const upcomingBill = isLoan ? upcomingBillByAccount.get(item.id) : undefined;
+          return (
+            <Pressable
+              style={[styles.card, item.isArchived && styles.cardArchived]}
+              onPress={() => navigation.navigate('AccountTransactions', { accountId: item.id })}
+            >
+              <View style={styles.cardTop}>
+                <View style={[styles.avatar, { backgroundColor: `${item.color}1A` }]}>
+                  <AccountIcon icon={item.icon} size={20} textStyle={styles.avatarIcon} />
+                </View>
+                <View style={styles.cardMain}>
+                  <Text style={styles.cardName} numberOfLines={1}>
+                    {item.name}
+                  </Text>
+                  {subtitle ? <Text style={styles.cardSubtitle}>•••• {subtitle}</Text> : null}
+                  {isInvestment && item.totalMonths > 0 ? (
+                    <Text style={styles.cardMeta}>{item.totalMonths} {item.totalMonths === 1 ? 'month' : 'months'} contributed</Text>
+                  ) : null}
+                  {isLoan && item.totalMonths > 0 ? (
+                    <Text style={styles.cardMeta}>{item.totalMonths} {item.totalMonths === 1 ? 'month' : 'months'} paid</Text>
+                  ) : null}
+                  {isLoan && item.remainingMonths != null && item.remainingMonths > 0 ? (
+                    <Text style={styles.cardMeta}>{item.remainingMonths} {item.remainingMonths === 1 ? 'month' : 'months'} remaining</Text>
+                  ) : null}
+                  {isLoan && item.creditLimit != null ? (
+                    <Text style={styles.cardMetaLimit}>
+                      {hideAmounts ? '••••••' : (() => {
+                        const ownUsed = item.balance + (linkedLoanTotals[item.id] ?? 0);
+                        const partner = item.sharedCreditLimitAccountId != null ? accountById.get(item.sharedCreditLimitAccountId) : undefined;
+                        if (!partner || partner.creditLimit == null) {
+                          const avail = Math.max(0, item.creditLimit - ownUsed);
+                          return `${formatCurrency(item.creditLimit)} limit · ${formatCurrency(avail)} avail.`;
+                        }
+                        // Shared limit: use one common limit (the larger entry) so both cards
+                        // in the pair report the same figure instead of two different ones.
+                        const sharedLimit = Math.max(item.creditLimit, partner.creditLimit);
+                        const used = ownUsed + partner.balance + (linkedLoanTotals[partner.id] ?? 0);
+                        const avail = Math.max(0, sharedLimit - used);
+                        return `${formatCurrency(sharedLimit)} limit (shared w/ ${partner.name}) · ${formatCurrency(avail)} avail.`;
+                      })()}
+                    </Text>
+                  ) : null}
+                  {upcomingBill ? (
+                    <Text style={styles.cardDue}>
+                      {'📅 Due '}{formatDisplayDate(upcomingBill.dueDate)}{'  ·  '}{hideAmounts ? AMOUNT_MASK : formatCurrency(upcomingBill.amount)}
+                    </Text>
+                  ) : null}
+                  {item.subscriptionDueDay != null ? (
+                    <Text style={styles.cardMeta}>Due: {accountOrdinal(item.subscriptionDueDay)} of month</Text>
+                  ) : null}
+                </View>
+                <View style={styles.cardBalanceCol}>
+                  <Text style={[styles.cardBalance, (isLoan ? -item.balance : item.balance) < 0 && styles.negative]}>
+                    {hideAmounts ? AMOUNT_MASK : formatCurrency(isLoan ? -item.balance : item.balance)}
+                  </Text>
+                  {!hideAmounts && prevBalances[item.id] != null && (() => {
+                    const displayBal = isLoan ? -item.balance : item.balance;
+                    const displayPrev = isLoan ? -prevBalances[item.id] : prevBalances[item.id];
+                    const t = computeTrend(displayBal, displayPrev);
+                    return t ? (
+                      <View style={[styles.cardTrendBadge, t.up ? styles.cardTrendUp : styles.cardTrendDown]}>
+                        <Text style={[styles.cardTrendText, t.up ? styles.cardTrendTextUp : styles.cardTrendTextDown]}>
+                          {t.up ? '▲' : '▼'} {t.up ? '+' : '-'}{t.pct}
+                        </Text>
+                      </View>
+                    ) : null;
+                  })()}
+                </View>
+                {item.qrImageUri ? (
+                  <Pressable
+                    style={styles.qrIconBtn}
+                    hitSlop={8}
+                    onPress={() => { setQrModalUri(item.qrImageUri!); setQrModalName(item.name); }}
+                  >
+                    <Text style={styles.qrIconText}>⊡</Text>
+                  </Pressable>
+                ) : null}
+                <Pressable onPress={() => setMenuAccount(item)} hitSlop={8} style={styles.moreButton}>
+                  <Text style={styles.moreButtonText}>⋯</Text>
+                </Pressable>
+              </View>
+              <View style={styles.cardActions}>
+                <Pressable
+                  style={[styles.actionBtn, styles.actionBtnExpense]}
+                  onPress={(e) => { e.stopPropagation(); navigation.navigate('AddEditTransaction', { accountId: item.id, transactionType: 'expense' }); }}
+                >
+                  <Text style={[styles.actionBtnText, styles.actionBtnTextExpense]}>− Expense</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.actionBtn, styles.actionBtnIncome]}
+                  onPress={(e) => { e.stopPropagation(); navigation.navigate('AddEditTransaction', { accountId: item.id, transactionType: 'income' }); }}
+                >
+                  <Text style={[styles.actionBtnText, styles.actionBtnTextIncome]}>+ Income</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.actionBtn, styles.actionBtnTransfer]}
+                  onPress={(e) => { e.stopPropagation(); navigation.navigate('AddEditTransaction', { accountId: item.id, transactionType: 'transfer' }); }}
+                >
+                  <Text style={[styles.actionBtnText, styles.actionBtnTextTransfer]}>⇄ Transfer</Text>
+                </Pressable>
+              </View>
+            </Pressable>
+          );
+        }}
       />
 
       <Pressable style={styles.fab} onPress={() => navigation.navigate('AddEditAccount')}>
         <Text style={styles.fabIcon}>+</Text>
       </Pressable>
+
+      <ActionSheet
+        visible={menuAccount != null}
+        onClose={() => setMenuAccount(null)}
+        title={menuAccount?.name ?? ''}
+        options={
+          menuAccount
+            ? [
+                { label: 'Edit', onPress: () => navigation.navigate('AddEditAccount', { accountId: menuAccount.id }) },
+                {
+                  label: menuAccount.isArchived ? 'Restore' : 'Archive',
+                  onPress: () => setArchived(menuAccount.id, !menuAccount.isArchived),
+                },
+              ]
+            : []
+        }
+      />
+
+      <ActionSheet
+        visible={showSortPicker}
+        onClose={() => setShowSortPicker(false)}
+        title="Sort accounts by"
+        options={(Object.keys(SORT_LABELS) as SortOption[]).map((option) => ({
+          label: SORT_LABELS[option],
+          onPress: () => { setSortOption(option); setShowSortPicker(false); },
+        }))}
+      />
+
+      <Modal visible={qrModalUri != null} transparent animationType="fade" onRequestClose={() => setQrModalUri(null)}>
+        <View style={styles.qrOverlay}>
+          <View style={styles.qrModalCard}>
+            <Text style={styles.qrModalTitle}>{qrModalName}</Text>
+            {qrModalUri ? (
+              <Image source={{ uri: qrModalUri }} style={styles.qrModalImage} resizeMode="contain" />
+            ) : null}
+            <View style={styles.qrModalActions}>
+              <Pressable
+                style={[styles.qrModalBtn, styles.qrModalBtnShare]}
+                onPress={async () => {
+                  if (!qrModalUri) return;
+                  try {
+                    const available = await Sharing.isAvailableAsync();
+                    if (!available) { Alert.alert('Sharing not available on this device'); return; }
+                    await Sharing.shareAsync(qrModalUri, { mimeType: 'image/jpeg', dialogTitle: 'Share QR code' });
+                  } catch {
+                    Alert.alert('Could not share QR code');
+                  }
+                }}
+              >
+                <Text style={styles.qrModalBtnText}>Share</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.qrModalBtn, styles.qrModalBtnSave]}
+                onPress={async () => {
+                  if (!qrModalUri) return;
+                  try {
+                    const { status } = await MediaLibrary.requestPermissionsAsync();
+                    if (status !== 'granted') { Alert.alert('Permission required', 'Allow photo library access to save the QR image.'); return; }
+                    await MediaLibrary.saveToLibraryAsync(qrModalUri);
+                    Alert.alert('Saved', 'QR image saved to your gallery.');
+                  } catch {
+                    Alert.alert('Could not save QR image');
+                  }
+                }}
+              >
+                <Text style={styles.qrModalBtnText}>Save to gallery</Text>
+              </Pressable>
+            </View>
+            <Pressable style={styles.qrModalClose} onPress={() => setQrModalUri(null)}>
+              <Text style={styles.qrModalCloseText}>Close</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: PALETTE.background },
-  toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: PALETTE.border,
-  },
-  toggleLabel: { fontSize: 14, fontWeight: '600', color: PALETTE.textPrimary },
   errorBanner: {
     marginHorizontal: 16,
     marginTop: 12,
@@ -108,34 +732,202 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEE2E2',
   },
   errorBannerText: { color: PALETTE.expense, fontSize: 13, fontWeight: '600' },
-  listContent: { padding: 16 },
+  listContent: { padding: 16, paddingBottom: 100 },
   emptyContainer: { flexGrow: 1, justifyContent: 'center' },
+  heroCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: PALETTE.net,
+    borderRadius: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    marginBottom: 12,
+  },
+  heroLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  heroLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.8)',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  eyeIcon: { fontSize: 13 },
+  heroAmount: { fontSize: 28, fontWeight: '800', color: '#fff', marginTop: 4 },
+  heroTotalRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+  heroTotalLabel: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.65)', textTransform: 'uppercase', letterSpacing: 0.5 },
+  heroTotalAmount: { fontSize: 13, fontWeight: '700', color: 'rgba(255,255,255,0.85)' },
+  trendBadge: { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, marginLeft: 2 },
+  trendUp: { backgroundColor: 'rgba(34, 197, 94, 0.25)' },
+  trendDown: { backgroundColor: 'rgba(239, 68, 68, 0.25)' },
+  trendText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.2 },
+  trendTextUp: { color: '#4ade80' },
+  trendTextDown: { color: '#f87171' },
+  heroIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroIcon: { fontSize: 22 },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: PALETTE.surface,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.border,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 12,
+    gap: 8,
+  },
+  searchIcon: { fontSize: 14 },
+  searchInput: { flex: 1, fontSize: 14, color: PALETTE.textPrimary, padding: 0 },
+  searchClear: { fontSize: 13, color: PALETTE.textSecondary, fontWeight: '600' },
+  filterRow: { gap: 8, paddingBottom: 12 },
+  bucketSection: { paddingBottom: 12, gap: 8 },
+  bucketGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  bucketCard: {
+    flexGrow: 1,
+    flexBasis: '47%',
+    borderWidth: 1.5,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: PALETTE.surface,
+    gap: 6,
+  },
+  bucketCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  bucketCardLabel: { flex: 1, fontSize: 12, fontWeight: '700' },
+  bucketCardTotal: { fontSize: 15, fontWeight: '700', color: PALETTE.textPrimary },
+  bucketClearLink: { fontSize: 13, fontWeight: '600', color: PALETTE.net },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: PALETTE.border,
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    backgroundColor: PALETTE.surface,
+  },
+  filterChipAllSelected: { borderColor: PALETTE.net, backgroundColor: PALETTE.net },
+  filterChipText: { fontSize: 13, fontWeight: '600', color: PALETTE.textSecondary },
+  filterChipTextSelected: { color: '#fff' },
+  controlsRow: { flexDirection: 'row', justifyContent: 'flex-start', gap: 8, paddingBottom: 10 },
+  sortButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: PALETTE.surface,
+    borderWidth: 1.5,
+    borderColor: PALETTE.border,
+  },
+  sortButtonText: { fontSize: 12, fontWeight: '600', color: PALETTE.textSecondary },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+    paddingBottom: 14,
+  },
+  toggleLabel: { fontSize: 13, fontWeight: '600', color: PALETTE.textSecondary },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingTop: 12,
-    paddingBottom: 6,
+    paddingBottom: 8,
   },
-  sectionTitle: { fontSize: 13, fontWeight: '700', color: PALETTE.textSecondary, textTransform: 'uppercase' },
-  sectionTotal: { fontSize: 13, fontWeight: '700' },
-  row: {
-    flexDirection: 'row',
+  sectionHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  sectionChevron: { fontSize: 12, color: PALETTE.textSecondary, width: 14 },
+  sectionIcon: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+  },
+  sectionIconText: { fontSize: 13 },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: PALETTE.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  sectionTotal: { fontSize: 13, fontWeight: '700', color: PALETTE.textPrimary },
+  card: {
     backgroundColor: PALETTE.surface,
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: PALETTE.border,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingHorizontal: 12,
     marginBottom: 10,
-    gap: 12,
+    overflow: 'hidden',
   },
-  rowMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  balance: { fontSize: 14, fontWeight: '700' },
-  archiveButton: { paddingVertical: 6, paddingHorizontal: 10 },
-  archiveButtonText: { fontSize: 13, fontWeight: '600', color: PALETTE.net },
+  cardArchived: { opacity: 0.6 },
+  cardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingBottom: 10,
+  },
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarIcon: { fontSize: 20 },
+  cardMain: { flex: 1, gap: 2 },
+  cardName: { fontSize: 15, fontWeight: '700', color: PALETTE.textPrimary },
+  cardSubtitle: { fontSize: 12, color: PALETTE.textSecondary, letterSpacing: 0.5 },
+  cardMeta: { fontSize: 11, fontWeight: '600', color: PALETTE.net, marginTop: 1 },
+  cardMetaLimit: { fontSize: 11, fontWeight: '600', color: PALETTE.textSecondary, marginTop: 1 },
+  cardDue: { fontSize: 11, fontWeight: '600', color: PALETTE.expense, marginTop: 1 },
+  cardBalanceCol: { alignItems: 'flex-end', gap: 2 },
+  cardBalance: { fontSize: 15, fontWeight: '700', color: PALETTE.textPrimary },
+  cardTrendBadge: { borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 },
+  cardTrendUp: { backgroundColor: '#dcfce7' },
+  cardTrendDown: { backgroundColor: '#fee2e2' },
+  cardTrendText: { fontSize: 9, fontWeight: '700' },
+  cardTrendTextUp: { color: '#16a34a' },
+  cardTrendTextDown: { color: '#dc2626' },
+  negative: { color: PALETTE.expense },
+  cardActions: {
+    flexDirection: 'row',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: PALETTE.border,
+    marginHorizontal: -12,
+  },
+  actionBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionBtnExpense: { backgroundColor: `${PALETTE.expense}0F` },
+  actionBtnIncome: { backgroundColor: `${PALETTE.income}0F`, borderLeftWidth: StyleSheet.hairlineWidth, borderRightWidth: StyleSheet.hairlineWidth, borderColor: PALETTE.border },
+  actionBtnTransfer: { backgroundColor: `${PALETTE.net}0F` },
+  actionBtnText: { fontSize: 12, fontWeight: '700' },
+  actionBtnTextExpense: { color: PALETTE.expense },
+  actionBtnTextIncome: { color: PALETTE.income },
+  actionBtnTextTransfer: { color: PALETTE.net },
+  moreButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: PALETTE.background,
+  },
+  moreButtonText: { fontSize: 18, fontWeight: '800', color: PALETTE.textSecondary, lineHeight: 18 },
   fab: {
     position: 'absolute',
     right: 20,
@@ -153,4 +945,39 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   fabIcon: { color: '#fff', fontSize: 28, fontWeight: '600', lineHeight: 30 },
+  qrIconBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: `${PALETTE.net}1A`,
+    borderWidth: 1,
+    borderColor: `${PALETTE.net}40`,
+  },
+  qrIconText: { fontSize: 15, color: PALETTE.net },
+  qrOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  qrModalCard: {
+    backgroundColor: PALETTE.surface,
+    borderRadius: 20,
+    padding: 20,
+    width: '100%',
+    alignItems: 'center',
+    gap: 16,
+  },
+  qrModalTitle: { fontSize: 16, fontWeight: '700', color: PALETTE.textPrimary, textAlign: 'center' },
+  qrModalImage: { width: 260, height: 260, borderRadius: 8 },
+  qrModalActions: { flexDirection: 'row', gap: 10, width: '100%' },
+  qrModalBtn: { flex: 1, paddingVertical: 13, borderRadius: 12, alignItems: 'center' },
+  qrModalBtnShare: { backgroundColor: PALETTE.net },
+  qrModalBtnSave: { backgroundColor: PALETTE.income },
+  qrModalBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  qrModalClose: { paddingVertical: 6 },
+  qrModalCloseText: { color: PALETTE.textSecondary, fontWeight: '600', fontSize: 14 },
 });

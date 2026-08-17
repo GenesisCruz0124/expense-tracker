@@ -1,22 +1,47 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { differenceInCalendarDays, isSameMonth } from 'date-fns';
+import { differenceInCalendarDays, isSameDay, isSameMonth, isSameWeek } from 'date-fns';
 
-import { CategoryBarChart } from '../components/charts/CategoryBarChart';
+import { DateField } from '../components/DateField';
 import { EmptyState } from '../components/EmptyState';
 import { MonthSelector } from '../components/MonthSelector';
+import { PeriodTypeSelector } from '../components/PeriodTypeSelector';
 import { SummaryCard } from '../components/SummaryCard';
 import { PALETTE } from '../constants/colors';
-import type { RecurringWithStatus } from '../db/queries/recurring';
-import { useBudgets } from '../hooks/useBudgets';
-import { useRecurringTransactions } from '../hooks/useRecurringTransactions';
+import { useAccountCategories } from '../hooks/useAccountCategories';
+import { useAccounts } from '../hooks/useAccounts';
+import { useBills } from '../hooks/useBills';
 import { useReportsData } from '../hooks/useReportsData';
 import { formatCurrency } from '../utils/currency';
-import { formatDisplayDate, monthRangeFor, parseIsoDate, shiftMonth } from '../utils/dateRanges';
+import { buildUpcomingItems, type UpcomingItem } from '../utils/upcoming';
+import {
+  customRangeFor,
+  dayRangeFor,
+  formatDisplayDate,
+  formatIsoDate,
+  monthRangeFor,
+  parseIsoDate,
+  shiftDay,
+  shiftMonth,
+  shiftWeek,
+  weekRangeFor,
+  type PeriodType,
+} from '../utils/dateRanges';
 
 /** A bill is "due soon" once it lands within this many days — flagged amber instead of neutral. */
 const DUE_SOON_THRESHOLD_DAYS = 3;
+
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+/** 'YYYY-MM-DD' → 'August 2026'. Parsed off the string so it stays timezone-independent. */
+function monthLabelFor(isoDate: string): string {
+  const [year, month] = isoDate.split('-');
+  return `${MONTH_NAMES[Number(month) - 1]} ${year}`;
+}
 
 interface BillStatus {
   tone: 'paid' | 'overdue' | 'dueSoon' | 'upcoming';
@@ -30,10 +55,9 @@ const BILL_STATUS_COLOR: Record<BillStatus['tone'], string> = {
   upcoming: PALETTE.textSecondary,
 };
 
-function billStatusFor(rule: RecurringWithStatus, today: Date): BillStatus {
-  if (rule.isPaid) return { tone: 'paid', label: 'Paid' };
-
-  const daysUntil = differenceInCalendarDays(parseIsoDate(rule.nextRunDate), today);
+/** Takes a date rather than a bill so account dues, which aren't bills, can use it too. */
+function dueStatusFor(dueDate: string, today: Date): BillStatus {
+  const daysUntil = differenceInCalendarDays(parseIsoDate(dueDate), today);
   if (daysUntil < 0) {
     const overdueDays = Math.abs(daysUntil);
     return { tone: 'overdue', label: overdueDays === 1 ? '1 day overdue' : `${overdueDays} days overdue` };
@@ -47,21 +71,65 @@ function billStatusFor(rule: RecurringWithStatus, today: Date): BillStatus {
 
 export default function DashboardScreen() {
   const navigation = useNavigation();
+  const [period, setPeriod] = useState<PeriodType>('month');
   const [anchorDate, setAnchorDate] = useState(() => new Date());
-  const range = monthRangeFor(anchorDate);
-  const isCurrentMonth = isSameMonth(anchorDate, new Date());
+  const [customRange, setCustomRange] = useState(() => ({ start: new Date(), end: new Date() }));
 
-  const { totals, categoryData, loading, refresh } = useReportsData(anchorDate, 6);
-  const { budgets } = useBudgets(range);
-  const { rules } = useRecurringTransactions();
+  const range =
+    period === 'custom'
+      ? customRangeFor(customRange.start, customRange.end)
+      : period === 'day'
+        ? dayRangeFor(anchorDate)
+        : period === 'week'
+          ? weekRangeFor(anchorDate)
+          : monthRangeFor(anchorDate);
 
   const today = new Date();
+  const nextDisabled =
+    period === 'day'
+      ? isSameDay(anchorDate, today)
+      : period === 'week'
+        ? isSameWeek(anchorDate, today, { weekStartsOn: 1 })
+        : isSameMonth(anchorDate, today);
+
+  function shiftAnchor(delta: number) {
+    setAnchorDate((current) => {
+      if (period === 'day') return shiftDay(current, delta);
+      if (period === 'week') return shiftWeek(current, delta);
+      return shiftMonth(current, delta);
+    });
+  }
+
+  const { totals, loading, refresh } = useReportsData(range, 6);
+  const { bills } = useBills();
+  const { accounts } = useAccounts();
+  const { accountCategories } = useAccountCategories();
+
   const net = totals.income - totals.expense;
-  const upcomingBills = rules.filter((rule) => rule.isActive && rule.type === 'expense').slice(0, 3);
-  const attentionBudgets = budgets
-    .filter((budget) => budget.percentUsed >= budget.alertThresholdPct)
-    .sort((a, b) => b.percentUsed - a.percentUsed)
-    .slice(0, 3);
+  const upcomingBills = useMemo(
+    () => buildUpcomingItems(bills, accounts, accountCategories),
+    [bills, accounts, accountCategories],
+  );
+  const upcomingBillsTotal = upcomingBills.reduce((sum, item) => sum + item.amount, 0);
+
+  // `buildUpcomingItems` returns items already ordered by due date, so a single pass yields
+  // months in order.
+  const upcomingBillMonths = useMemo(() => {
+    const sections: { key: string; title: string; total: number; data: UpcomingItem[] }[] = [];
+    const byMonth = new Map<string, (typeof sections)[number]>();
+    for (const item of upcomingBills) {
+      const key = item.dueDate.slice(0, 7);
+      let section = byMonth.get(key);
+      if (!section) {
+        section = { key, title: monthLabelFor(item.dueDate), total: 0, data: [] };
+        byMonth.set(key, section);
+        sections.push(section);
+      }
+      section.total += item.amount;
+      section.data.push(item);
+    }
+    return sections;
+  }, [upcomingBills]);
 
   return (
     <ScrollView
@@ -69,34 +137,77 @@ export default function DashboardScreen() {
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={PALETTE.net} />}
     >
-      <MonthSelector
-        label={range.label}
-        onPrevious={() => setAnchorDate((current) => shiftMonth(current, -1))}
-        onNext={() => setAnchorDate((current) => shiftMonth(current, 1))}
-        nextDisabled={isCurrentMonth}
-      />
+      <PeriodTypeSelector value={period} onChange={setPeriod} />
+
+      {period === 'custom' ? (
+        <View style={styles.customRangeRow}>
+          <View style={styles.customRangeField}>
+            <DateField
+              label="From"
+              value={formatIsoDate(customRange.start)}
+              onChangeText={(text) => setCustomRange((current) => ({ ...current, start: parseIsoDate(text) }))}
+            />
+          </View>
+          <View style={styles.customRangeField}>
+            <DateField
+              label="Until"
+              value={formatIsoDate(customRange.end)}
+              onChangeText={(text) => setCustomRange((current) => ({ ...current, end: parseIsoDate(text) }))}
+            />
+          </View>
+        </View>
+      ) : (
+        <MonthSelector
+          label={range.label}
+          onPrevious={() => shiftAnchor(-1)}
+          onNext={() => shiftAnchor(1)}
+          nextDisabled={nextDisabled}
+        />
+      )}
 
       <View style={styles.summaryRow}>
-        <SummaryCard label="Income" amount={totals.income} tone="income" />
-        <SummaryCard label="Expense" amount={totals.expense} tone="expense" />
-        <SummaryCard label="Net" amount={net} tone="net" />
+        <SummaryCard
+          label="Income"
+          amount={totals.income}
+          tone="income"
+          onPress={() =>
+            navigation.navigate('Tabs', {
+              screen: 'TransactionsTab',
+              params: { screen: 'TransactionsList', params: { type: 'income', start: range.start, end: range.end } },
+            })
+          }
+        />
+        <SummaryCard
+          label="Expense"
+          amount={totals.expense}
+          tone="expense"
+          onPress={() =>
+            navigation.navigate('Tabs', {
+              screen: 'TransactionsTab',
+              params: { screen: 'TransactionsList', params: { type: 'expense', start: range.start, end: range.end } },
+            })
+          }
+        />
+        <SummaryCard
+          label="Net"
+          amount={net}
+          tone="net"
+          onPress={() =>
+            navigation.navigate('Tabs', {
+              screen: 'TransactionsTab',
+              params: { screen: 'TransactionsList', params: { start: range.start, end: range.end, runningBalance: true } },
+            })
+          }
+        />
       </View>
 
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Spending by category</Text>
-          <Pressable onPress={() => navigation.navigate('Tabs', { screen: 'Reports' })}>
-            <Text style={styles.sectionLink}>Reports →</Text>
-          </Pressable>
-        </View>
-        <CategoryBarChart entries={categoryData.slice(0, 6)} />
-      </View>
-
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Upcoming bills</Text>
+          <Text style={styles.sectionTitle}>
+            Upcoming bills {upcomingBills.length > 0 ? `(${upcomingBills.length}) −${formatCurrency(upcomingBillsTotal)}` : ''}
+          </Text>
           <View style={styles.sectionHeaderActions}>
-            <Pressable onPress={() => navigation.navigate('AddBill')}>
+            <Pressable onPress={() => navigation.navigate('AddEditBill')}>
               <Text style={styles.sectionLink}>+ Add</Text>
             </Pressable>
             <Pressable onPress={() => navigation.navigate('Tabs', { screen: 'Bills' })}>
@@ -107,57 +218,45 @@ export default function DashboardScreen() {
         {upcomingBills.length === 0 ? (
           <EmptyState icon="↻" title="No upcoming bills" message="Set up rent, subscriptions, or other recurring expenses to track them here." />
         ) : (
-          <View style={styles.list}>
-            {upcomingBills.map((rule) => {
-              const status = billStatusFor(rule, today);
-              return (
-                <View key={rule.id} style={styles.listRow}>
-                  <View style={styles.listRowMain}>
-                    <Text style={styles.listRowTitle}>{rule.note || 'Bill'}</Text>
-                    <View style={styles.billMetaRow}>
-                      <Text style={styles.listRowSubtitle}>Due {formatDisplayDate(rule.nextRunDate)}</Text>
-                      <View style={[styles.billStatusBadge, { backgroundColor: `${BILL_STATUS_COLOR[status.tone]}1A` }]}>
-                        <Text style={[styles.billStatusText, { color: BILL_STATUS_COLOR[status.tone] }]}>{status.label}</Text>
-                      </View>
-                    </View>
+          <View style={styles.monthGroups}>
+            {upcomingBillMonths.map((section) => (
+              <View key={section.key} style={styles.monthGroup}>
+                <View style={styles.monthHeader}>
+                  <Text style={styles.monthTitle}>{section.title}</Text>
+                  <View style={styles.monthSummary}>
+                    <Text style={styles.monthCount}>
+                      {section.data.length} {section.data.length === 1 ? 'bill' : 'bills'}
+                    </Text>
+                    <Text style={styles.monthTotal}>−{formatCurrency(section.total)}</Text>
                   </View>
-                  <Text style={[styles.listRowAmount, { color: PALETTE.expense }]}>−{formatCurrency(rule.amount)}</Text>
                 </View>
-              );
-            })}
-          </View>
-        )}
-      </View>
-
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Budgets needing attention</Text>
-          <Pressable
-            onPress={() =>
-              navigation.navigate('Tabs', {
-                screen: 'MoreTab',
-                params: { screen: 'Budgets', params: { fromDashboard: true } },
-              })
-            }
-          >
-            <Text style={styles.sectionLink}>View all →</Text>
-          </Pressable>
-        </View>
-        {attentionBudgets.length === 0 ? (
-          <EmptyState icon="🎯" title="On track" message="No budgets are nearing their limits this month." />
-        ) : (
-          <View style={styles.list}>
-            {attentionBudgets.map((budget) => (
-              <View key={budget.id} style={styles.listRow}>
-                <View style={styles.listRowMain}>
-                  <Text style={styles.listRowTitle}>{budget.categoryName}</Text>
-                  <Text style={styles.listRowSubtitle}>
-                    {formatCurrency(budget.spend)} of {formatCurrency(budget.amountLimit)}
-                  </Text>
+                <View style={styles.list}>
+                  {section.data.map((item) => {
+                    const status = dueStatusFor(item.dueDate, today);
+                    return (
+                      <Pressable
+                        key={`${item.kind}-${item.id}`}
+                        style={({ pressed }) => [styles.listRow, pressed && styles.listRowPressed]}
+                        onPress={() =>
+                          item.kind === 'bill'
+                            ? navigation.navigate('AddEditBill', { billId: item.id })
+                            : navigation.navigate('AddEditAccount', { accountId: item.id })
+                        }
+                      >
+                        <View style={styles.listRowMain}>
+                          <Text style={styles.listRowTitle}>{item.name}</Text>
+                          <View style={styles.billMetaRow}>
+                            <Text style={styles.listRowSubtitle}>Due {formatDisplayDate(item.dueDate)}</Text>
+                            <View style={[styles.billStatusBadge, { backgroundColor: `${BILL_STATUS_COLOR[status.tone]}1A` }]}>
+                              <Text style={[styles.billStatusText, { color: BILL_STATUS_COLOR[status.tone] }]}>{status.label}</Text>
+                            </View>
+                          </View>
+                        </View>
+                        <Text style={[styles.listRowAmount, { color: PALETTE.expense }]}>−{formatCurrency(item.amount)}</Text>
+                      </Pressable>
+                    );
+                  })}
                 </View>
-                <Text style={[styles.listRowAmount, { color: budget.percentUsed >= 100 ? PALETTE.danger : PALETTE.warning }]}>
-                  {budget.percentUsed}%
-                </Text>
               </View>
             ))}
           </View>
@@ -171,12 +270,27 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: PALETTE.background },
   content: { padding: 20, gap: 20, paddingBottom: 40 },
   summaryRow: { flexDirection: 'row', gap: 12 },
+  customRangeRow: { flexDirection: 'row', gap: 12 },
+  customRangeField: { flex: 1 },
   section: { gap: 12 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   sectionHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   sectionTitle: { fontSize: 15, fontWeight: '700', color: PALETTE.textPrimary },
   sectionLink: { fontSize: 13, fontWeight: '600', color: PALETTE.net },
   list: { gap: 4, backgroundColor: PALETTE.surface, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, borderColor: PALETTE.border },
+  monthGroups: { gap: 16 },
+  monthGroup: { gap: 8 },
+  monthHeader: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
+  monthTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: PALETTE.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  monthSummary: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
+  monthCount: { fontSize: 12, color: PALETTE.textSecondary },
+  monthTotal: { fontSize: 13, fontWeight: '700', color: PALETTE.expense },
   listRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -187,6 +301,7 @@ const styles = StyleSheet.create({
     borderBottomColor: PALETTE.border,
     gap: 12,
   },
+  listRowPressed: { backgroundColor: PALETTE.background },
   listRowMain: { flex: 1, gap: 2 },
   listRowTitle: { fontSize: 14, fontWeight: '600', color: PALETTE.textPrimary },
   listRowSubtitle: { fontSize: 12, color: PALETTE.textSecondary },

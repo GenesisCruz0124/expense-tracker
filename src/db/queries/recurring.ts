@@ -1,14 +1,16 @@
-import { and, asc, eq, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, lte, sql } from 'drizzle-orm';
 
 import type { Database } from '../client';
 import {
+  categories,
   recurringTransactions,
   transactions,
   type NewRecurringTransaction,
   type RecurringTransaction,
 } from '../schema';
 import { generateOccurrencesUpTo } from '../../utils/recurrence';
-import { formatIsoDate } from '../../utils/dateRanges';
+import { formatIsoDate, parseIsoDate } from '../../utils/dateRanges';
+import { generateUuid } from '../../utils/uuid';
 
 export interface RecurringWithStatus extends RecurringTransaction {
   /** True when a transaction has already been logged for this rule's upcoming due date */
@@ -29,6 +31,8 @@ export async function listRecurringTransactions(db: Database): Promise<Recurring
       amount: recurringTransactions.amount,
       note: recurringTransactions.note,
       categoryId: recurringTransactions.categoryId,
+      billerId: recurringTransactions.billerId,
+      accountId: recurringTransactions.accountId,
       frequency: recurringTransactions.frequency,
       intervalCount: recurringTransactions.intervalCount,
       startDate: recurringTransactions.startDate,
@@ -36,16 +40,24 @@ export async function listRecurringTransactions(db: Database): Promise<Recurring
       nextRunDate: recurringTransactions.nextRunDate,
       isActive: recurringTransactions.isActive,
       createdAt: recurringTransactions.createdAt,
+      updatedAt: recurringTransactions.updatedAt,
+      deletedAt: recurringTransactions.deletedAt,
+      uuid: recurringTransactions.uuid,
       isPaid: isPaidExpr,
     })
     .from(recurringTransactions)
+    .where(isNull(recurringTransactions.deletedAt))
     .orderBy(asc(recurringTransactions.nextRunDate));
 
   return rows.map((row) => ({ ...row, isPaid: Boolean(row.isPaid) }));
 }
 
 export async function getRecurringTransaction(db: Database, id: number): Promise<RecurringTransaction | undefined> {
-  const [row] = await db.select().from(recurringTransactions).where(eq(recurringTransactions.id, id)).limit(1);
+  const [row] = await db
+    .select()
+    .from(recurringTransactions)
+    .where(and(eq(recurringTransactions.id, id), isNull(recurringTransactions.deletedAt)))
+    .limit(1);
   return row;
 }
 
@@ -55,6 +67,8 @@ export interface RecurringInput {
   amount: number;
   note?: string | null;
   categoryId?: number | null;
+  billerId?: number | null;
+  accountId?: number | null;
   frequency: 'weekly' | 'monthly';
   intervalCount: number;
   startDate: string;
@@ -67,12 +81,15 @@ export async function createRecurringTransaction(db: Database, input: RecurringI
     amount: input.amount,
     note: input.note?.trim() || null,
     categoryId: input.categoryId ?? null,
+    billerId: input.billerId ?? null,
+    accountId: input.accountId ?? null,
     frequency: input.frequency,
     intervalCount: input.intervalCount,
     startDate: input.startDate,
     endDate: input.endDate ?? null,
     nextRunDate: input.startDate,
     isActive: true,
+    uuid: generateUuid(),
   };
   const [row] = await db.insert(recurringTransactions).values(values).returning();
   return row;
@@ -86,20 +103,115 @@ export async function updateRecurringTransaction(db: Database, id: number, input
       amount: input.amount,
       note: input.note?.trim() || null,
       categoryId: input.categoryId ?? null,
+      billerId: input.billerId ?? null,
+      accountId: input.accountId ?? null,
       frequency: input.frequency,
       intervalCount: input.intervalCount,
       startDate: input.startDate,
       endDate: input.endDate ?? null,
+      updatedAt: sql`(datetime('now'))`,
     })
     .where(eq(recurringTransactions.id, id));
 }
 
 export async function setRecurringActive(db: Database, id: number, isActive: boolean): Promise<void> {
-  await db.update(recurringTransactions).set({ isActive }).where(eq(recurringTransactions.id, id));
+  await db
+    .update(recurringTransactions)
+    .set({ isActive, updatedAt: sql`(datetime('now'))` })
+    .where(eq(recurringTransactions.id, id));
 }
 
 export async function deleteRecurringTransaction(db: Database, id: number): Promise<void> {
-  await db.delete(recurringTransactions).where(eq(recurringTransactions.id, id));
+  await db
+    .update(recurringTransactions)
+    .set({ deletedAt: sql`(datetime('now'))`, updatedAt: sql`(datetime('now'))` })
+    .where(eq(recurringTransactions.id, id));
+}
+
+/**
+ * Manually marks one occurrence of a recurring rule as paid: inserts a transaction dated
+ * to the rule's current `nextRunDate`, then advances the cursor to the next occurrence.
+ * Idempotent — exits early if a transaction already exists for that date.
+ */
+export async function markRecurringPaid(
+  db: Database,
+  rule: RecurringWithStatus,
+): Promise<{ nextRunDate: string; isExhausted: boolean } | null> {
+  if (rule.isPaid) return null;
+
+  let outcome: { nextRunDate: string; isExhausted: boolean } | null = null;
+  await db.transaction(async (tx) => {
+    let billerName: string | null = null;
+    if (rule.billerId != null) {
+      const [biller] = await tx
+        .select({ name: categories.name })
+        .from(categories)
+        .where(eq(categories.id, rule.billerId))
+        .limit(1);
+      billerName = biller?.name ?? null;
+    }
+
+    await tx.insert(transactions).values({
+      type: rule.type,
+      amount: rule.amount,
+      occurredAt: rule.nextRunDate,
+      note: rule.note,
+      establishment: billerName,
+      categoryId: rule.categoryId,
+      accountId: rule.accountId ?? null,
+      recurringId: rule.id,
+      uuid: generateUuid(),
+    });
+
+    const result = generateOccurrencesUpTo(
+      { frequency: rule.frequency, intervalCount: rule.intervalCount, endDate: rule.endDate, nextRunDate: rule.nextRunDate },
+      parseIsoDate(rule.nextRunDate),
+    );
+
+    await tx
+      .update(recurringTransactions)
+      .set({
+        nextRunDate: result.nextRunDate,
+        isActive: result.isExhausted ? false : rule.isActive,
+        updatedAt: sql`(datetime('now'))`,
+      })
+      .where(eq(recurringTransactions.id, rule.id));
+
+    outcome = { nextRunDate: result.nextRunDate, isExhausted: result.isExhausted };
+  });
+
+  return outcome;
+}
+
+/**
+ * Reverses the most recent `markRecurringPaid` / auto-generated occurrence for a rule:
+ * deletes that transaction and rolls `next_run_date` back to its date, reactivating the
+ * rule if it had been deactivated for running past its `end_date`.
+ */
+export async function undoRecurringPaid(db: Database, ruleId: number): Promise<void> {
+  await db.transaction(async (tx) => {
+    const [lastTransaction] = await tx
+      .select({ id: transactions.id, occurredAt: transactions.occurredAt })
+      .from(transactions)
+      .where(and(eq(transactions.recurringId, ruleId), isNull(transactions.deletedAt)))
+      .orderBy(desc(transactions.occurredAt), desc(transactions.id))
+      .limit(1);
+    if (!lastTransaction) return;
+
+    await tx
+      .update(transactions)
+      .set({ deletedAt: sql`(datetime('now'))`, updatedAt: sql`(datetime('now'))` })
+      .where(eq(transactions.id, lastTransaction.id));
+
+    await tx
+      .update(recurringTransactions)
+      .set({
+        nextRunDate: lastTransaction.occurredAt,
+        isActive: true,
+        updatedAt: sql`(datetime('now'))`,
+      })
+      .where(eq(recurringTransactions.id, ruleId));
+  });
 }
 
 export interface GeneratedOccurrenceSummary {
@@ -121,7 +233,13 @@ export async function generateDueRecurringTransactions(
   const dueRules = await db
     .select()
     .from(recurringTransactions)
-    .where(and(eq(recurringTransactions.isActive, true), lte(recurringTransactions.nextRunDate, todayIso)));
+    .where(
+      and(
+        eq(recurringTransactions.isActive, true),
+        lte(recurringTransactions.nextRunDate, todayIso),
+        isNull(recurringTransactions.deletedAt),
+      ),
+    );
 
   const summaries: GeneratedOccurrenceSummary[] = [];
 
@@ -138,14 +256,23 @@ export async function generateDueRecurringTransactions(
     if (result.dueDates.length === 0) continue;
 
     await db.transaction(async (tx) => {
+      let billerName: string | null = null;
+      if (rule.billerId != null) {
+        const [biller] = await tx.select({ name: categories.name }).from(categories).where(eq(categories.id, rule.billerId)).limit(1);
+        billerName = biller?.name ?? null;
+      }
+
       for (const dueDate of result.dueDates) {
         await tx.insert(transactions).values({
           type: rule.type,
           amount: rule.amount,
           occurredAt: dueDate,
           note: rule.note,
+          establishment: billerName,
           categoryId: rule.categoryId,
+          accountId: rule.accountId ?? null,
           recurringId: rule.id,
+          uuid: generateUuid(),
         });
       }
       await tx
@@ -153,6 +280,7 @@ export async function generateDueRecurringTransactions(
         .set({
           nextRunDate: result.nextRunDate,
           isActive: result.isExhausted ? false : rule.isActive,
+          updatedAt: sql`(datetime('now'))`,
         })
         .where(eq(recurringTransactions.id, rule.id));
     });
