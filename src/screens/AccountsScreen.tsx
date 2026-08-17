@@ -582,8 +582,18 @@ export default function AccountsScreen() {
                       {'📅 Due '}{formatDisplayDate(upcomingBill.dueDate)}{'  ·  '}{hideAmounts ? AMOUNT_MASK : formatCurrency(upcomingBill.amount)}
                     </Text>
                   ) : null}
-                  {item.subscriptionDueDay != null ? (
-                    <Text style={styles.cardMeta}>Due: {accountOrdinal(item.subscriptionDueDay)} of month</Text>
+                  {/* Monthly due and due day read as one fact, so they share a line when both are set. */}
+                  {item.monthlyAmountDue != null || item.subscriptionDueDay != null ? (
+                    <Text style={styles.cardMeta}>
+                      {[
+                        item.monthlyAmountDue != null
+                          ? `${hideAmounts ? AMOUNT_MASK : formatCurrency(item.monthlyAmountDue)}/mo`
+                          : null,
+                        item.subscriptionDueDay != null ? `due ${accountOrdinal(item.subscriptionDueDay)}` : null,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </Text>
                   ) : null}
                 </View>
                 <View style={styles.cardBalanceCol}>
