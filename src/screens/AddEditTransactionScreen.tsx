@@ -303,6 +303,16 @@ export default function AddEditTransactionScreen() {
             <Text style={styles.label}>From account</Text>
             <AccountPicker selectedAccountId={accountId} onSelect={setAccountId} />
           </View>
+          <Pressable
+            style={styles.swapButton}
+            onPress={() => {
+              setAccountId(toAccountId);
+              setToAccountId(accountId);
+            }}
+            hitSlop={8}
+          >
+            <Text style={styles.swapButtonText}>⇅ Swap</Text>
+          </Pressable>
           <View style={styles.field}>
             <Text style={styles.label}>To account</Text>
             <AccountPicker selectedAccountId={toAccountId} onSelect={setToAccountId} />
@@ -503,6 +513,15 @@ const styles = StyleSheet.create({
   },
   toggleTextGroup: { flex: 1, gap: 4 },
   helperText: { fontSize: 12, color: PALETTE.textSecondary, lineHeight: 16 },
+  swapButton: {
+    alignSelf: 'center',
+    marginTop: -4,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    backgroundColor: `${PALETTE.net}1A`,
+  },
+  swapButtonText: { fontSize: 13, fontWeight: '700', color: PALETTE.net },
   error: { fontSize: 13, color: PALETTE.danger, textAlign: 'center' },
   saveButton: { backgroundColor: PALETTE.net, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   saveButtonDisabled: { opacity: 0.6 },
