@@ -234,7 +234,15 @@ export default function DashboardScreen() {
                   {section.data.map((item) => {
                     const status = dueStatusFor(item.dueDate, today);
                     return (
-                      <View key={`${item.kind}-${item.id}`} style={styles.listRow}>
+                      <Pressable
+                        key={`${item.kind}-${item.id}`}
+                        style={({ pressed }) => [styles.listRow, pressed && styles.listRowPressed]}
+                        onPress={() =>
+                          item.kind === 'bill'
+                            ? navigation.navigate('AddEditBill', { billId: item.id })
+                            : navigation.navigate('AddEditAccount', { accountId: item.id })
+                        }
+                      >
                         <View style={styles.listRowMain}>
                           <Text style={styles.listRowTitle}>{item.name}</Text>
                           <View style={styles.billMetaRow}>
@@ -245,7 +253,7 @@ export default function DashboardScreen() {
                           </View>
                         </View>
                         <Text style={[styles.listRowAmount, { color: PALETTE.expense }]}>−{formatCurrency(item.amount)}</Text>
-                      </View>
+                      </Pressable>
                     );
                   })}
                 </View>
@@ -293,6 +301,7 @@ const styles = StyleSheet.create({
     borderBottomColor: PALETTE.border,
     gap: 12,
   },
+  listRowPressed: { backgroundColor: PALETTE.background },
   listRowMain: { flex: 1, gap: 2 },
   listRowTitle: { fontSize: 14, fontWeight: '600', color: PALETTE.textPrimary },
   listRowSubtitle: { fontSize: 12, color: PALETTE.textSecondary },
