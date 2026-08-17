@@ -37,7 +37,7 @@ const UNGROUPED_LAST = ['Payroll deduction', 'Other'];
 export default function PaidBillsScreen() {
   const navigation = useNavigation();
   const { bills, unpayBill, updatePaidDate } = useBills();
-  const { accounts, markMonthlyDueUnpaid } = useAccounts();
+  const { accounts, markMonthlyDueUnpaid, updateMonthlyDuePaidDate } = useAccounts();
   const { accountCategories } = useAccountCategories();
   const { undoPaid: undoRecurringPaid } = useRecurringTransactions();
   const [monthOffset, setMonthOffset] = useState(0);
@@ -78,6 +78,10 @@ export default function PaidBillsScreen() {
     return [...billItems, ...dueItems, ...recurringItems];
   }, [paidThisMonth, paidDuesThisMonth, paidRecurringThisMonth, searchText]);
 
+  const transactionById = useMemo(
+    () => new Map(monthTransactions.map((transaction) => [transaction.id, transaction])),
+    [monthTransactions],
+  );
   const accountById = useMemo(() => new Map(accounts.map((account) => [account.id, account])), [accounts]);
   const categoryById = useMemo(() => new Map(accountCategories.map((category) => [category.id, category])), [accountCategories]);
 
@@ -125,16 +129,24 @@ export default function PaidBillsScreen() {
     }
 
     for (const [label, ids] of accountIdsByLabel) {
+      const section = byLabel.get(label)!;
+      // Groups funded by an untracked source (salary-deducted loans, say) have no source account
+      // to report, so fall back to what the paid accounts themselves are still carrying.
+      const targetIds =
+        ids.size > 0
+          ? ids
+          : new Set(section.data.filter((item) => item.kind === 'due').map((item) => item.data.id));
+
       let balance = 0;
       let found = false;
-      for (const id of ids) {
+      for (const id of targetIds) {
         const account = accountById.get(id);
         if (!account) continue;
         const kind = categoryById.get(account.categoryId ?? -1)?.kind;
         balance += kind === 'credit_card' ? -account.balance : account.balance;
         found = true;
       }
-      if (found) byLabel.get(label)!.balance = balance;
+      if (found) section.balance = balance;
     }
 
     return Array.from(byLabel.values()).sort((a, b) => {
@@ -156,19 +168,23 @@ export default function PaidBillsScreen() {
     return billsTotal + duesTotal + recurringTotal;
   }, [paidThisMonth, paidDuesThisMonth, paidRecurringThisMonth]);
 
-  const [editDateBill, setEditDateBill] = useState<BillWithDetails | null>(null);
+  const [editDateTarget, setEditDateTarget] = useState<{ kind: 'bill' | 'due'; id: number; name: string } | null>(null);
   const [editDateText, setEditDateText] = useState('');
 
-  function handleOpenEditDate(bill: BillWithDetails) {
-    setEditDateBill(bill);
-    setEditDateText(bill.lastPaidAt ?? '');
+  function handleOpenEditDate(target: { kind: 'bill' | 'due'; id: number; name: string }, currentDate: string) {
+    setEditDateTarget(target);
+    setEditDateText(currentDate);
   }
 
   function handleSaveEditDate() {
-    if (editDateBill && editDateText) {
-      updatePaidDate(editDateBill.id, editDateText);
+    if (editDateTarget && editDateText) {
+      if (editDateTarget.kind === 'bill') {
+        updatePaidDate(editDateTarget.id, editDateText);
+      } else {
+        updateMonthlyDuePaidDate(editDateTarget.id, editDateText);
+      }
     }
-    setEditDateBill(null);
+    setEditDateTarget(null);
   }
 
   function handleMarkUnpaid(bill: BillWithDetails) {
@@ -237,7 +253,7 @@ export default function PaidBillsScreen() {
         contentContainerStyle={combinedList.length === 0 ? styles.emptyContainer : styles.listContent}
         renderSectionHeader={({ section }) => (
           <View style={styles.sourceHeader}>
-            <Text style={styles.sourceTitle}>{section.title}</Text>
+            <Text style={styles.sourceTitle} numberOfLines={1}>{section.title}</Text>
             <View style={styles.sourceSummary}>
               {section.balance != null ? (
                 <Text style={styles.sourceBalance}>Bal {formatCurrency(section.balance)}</Text>
@@ -266,6 +282,9 @@ export default function PaidBillsScreen() {
         renderItem={({ item }) => {
           if (item.kind === 'due') {
             const account = item.data;
+            // Dues paid before transaction logging existed have no linked transaction, so their
+            // exact date is unknown and the row keeps the old "Paid this month" wording.
+            const paidDate = transactionById.get(account.monthlyDuePaidTransactionId ?? -1)?.occurredAt ?? null;
             return (
               <Pressable
                 style={styles.card}
@@ -276,7 +295,19 @@ export default function PaidBillsScreen() {
                     <View style={[styles.accountDot, { backgroundColor: account.color ?? PALETTE.textSecondary }]} />
                     <Text style={styles.cardTitle}>{account.name}</Text>
                   </View>
-                  <Text style={styles.cardSubtitle}>Monthly due · Paid this month</Text>
+                  {paidDate ? (
+                    <Pressable
+                      onPress={(event) => {
+                        event.stopPropagation();
+                        handleOpenEditDate({ kind: 'due', id: account.id, name: account.name }, paidDate);
+                      }}
+                      hitSlop={4}
+                    >
+                      <Text style={styles.cardSubtitleLink}>Paid {formatDisplayDate(paidDate)} · Edit</Text>
+                    </Pressable>
+                  ) : (
+                    <Text style={styles.cardSubtitle}>Monthly due · Paid this month</Text>
+                  )}
                 </View>
                 <View style={styles.cardTrailing}>
                   <Text style={styles.cardAmount}>{formatCurrency(account.monthlyAmountDue!)}</Text>
@@ -349,7 +380,7 @@ export default function PaidBillsScreen() {
                 <Pressable
                   onPress={(event) => {
                     event.stopPropagation();
-                    handleOpenEditDate(bill);
+                    handleOpenEditDate({ kind: 'bill', id: bill.id, name: bill.name }, bill.lastPaidAt ?? '');
                   }}
                   hitSlop={4}
                 >
@@ -370,14 +401,14 @@ export default function PaidBillsScreen() {
         }}
       />
 
-      <Modal visible={editDateBill != null} transparent animationType="fade" onRequestClose={() => setEditDateBill(null)}>
+      <Modal visible={editDateTarget != null} transparent animationType="fade" onRequestClose={() => setEditDateTarget(null)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Edit paid date</Text>
-            <Text style={styles.modalSubtitle}>{editDateBill?.name}</Text>
+            <Text style={styles.modalSubtitle}>{editDateTarget?.name}</Text>
             <DateField value={editDateText} onChangeText={setEditDateText} />
             <View style={styles.modalActions}>
-              <Pressable style={styles.modalCancelButton} onPress={() => setEditDateBill(null)}>
+              <Pressable style={styles.modalCancelButton} onPress={() => setEditDateTarget(null)}>
                 <Text style={styles.modalCancelButtonText}>Cancel</Text>
               </Pressable>
               <Pressable style={styles.modalSaveButton} onPress={handleSaveEditDate}>
@@ -427,8 +458,17 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: PALETTE.border,
   },
-  sourceTitle: { fontSize: 13, fontWeight: '700', color: PALETTE.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4 },
-  sourceSummary: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  // A long account name as a group title has to shrink rather than push the totals off-screen.
+  sourceTitle: {
+    flexShrink: 1,
+    marginRight: 8,
+    fontSize: 13,
+    fontWeight: '700',
+    color: PALETTE.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  sourceSummary: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 },
   sourceCount: { fontSize: 12, color: PALETTE.textSecondary },
   sourceBalance: { fontSize: 12, fontWeight: '600', color: PALETTE.net },
   sourceTotal: { fontSize: 14, fontWeight: '700', color: PALETTE.textPrimary },

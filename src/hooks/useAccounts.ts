@@ -8,6 +8,7 @@ import {
   listAccounts,
   markMonthlyDuePaid as markMonthlyDuePaidQuery,
   markMonthlyDueUnpaid as markMonthlyDueUnpaidQuery,
+  updateMonthlyDuePaidDate as updateMonthlyDuePaidDateQuery,
   setAccountArchived as setAccountArchivedQuery,
   updateAccount as updateAccountQuery,
   type AccountInput,
@@ -90,6 +91,15 @@ export function useAccounts(options: ListAccountsOptions = {}) {
     [db, notifyDataChanged, refresh],
   );
 
+  const updateMonthlyDuePaidDate = useCallback(
+    async (id: number, occurredAt: string) => {
+      await updateMonthlyDuePaidDateQuery(db, id, occurredAt);
+      notifyDataChanged();
+      await refresh();
+    },
+    [db, notifyDataChanged, refresh],
+  );
+
   const incrementBalance = useCallback(
     async (id: number) => {
       await incrementAccountBalanceQuery(db, id);
@@ -109,6 +119,7 @@ export function useAccounts(options: ListAccountsOptions = {}) {
     setArchived,
     markMonthlyDuePaid,
     markMonthlyDueUnpaid,
+    updateMonthlyDuePaidDate,
     incrementBalance,
   };
 }

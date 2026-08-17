@@ -360,6 +360,25 @@ export async function markMonthlyDuePaid(
 }
 
 /**
+ * Re-dates the transfer logged by `markMonthlyDuePaid`. Dues paid before transaction logging
+ * existed have no linked transaction, so there is nothing to move and this is a no-op.
+ */
+export async function updateMonthlyDuePaidDate(db: Database, id: number, occurredAt: string): Promise<void> {
+  const [account] = await db
+    .select({ monthlyDuePaidTransactionId: accounts.monthlyDuePaidTransactionId })
+    .from(accounts)
+    .where(eq(accounts.id, id))
+    .limit(1);
+  const paidTransactionId = account?.monthlyDuePaidTransactionId;
+  if (paidTransactionId == null) return;
+
+  await db
+    .update(transactions)
+    .set({ occurredAt, updatedAt: sql`(datetime('now'))` })
+    .where(eq(transactions.transferId, paidTransactionId));
+}
+
+/**
  * Reverses `markMonthlyDuePaid`, restoring the account's monthly due to the Recurring screen and
  * deleting the transfer legs it logged. Dues paid before transaction logging existed have no
  * `monthlyDuePaidTransactionId` — those adjusted `startingBalance` directly, so undo restores it
