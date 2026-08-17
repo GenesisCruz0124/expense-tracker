@@ -27,6 +27,8 @@ type PaidListItem =
 interface SourceSection {
   title: string;
   total: number;
+  /** Current balance across the accounts that funded this group, or null when none are tracked. */
+  balance: number | null;
   data: PaidListItem[];
 }
 
@@ -90,6 +92,12 @@ export default function PaidBillsScreen() {
     return account.paymentSource?.trim() || categoryById.get(account.categoryId ?? -1)?.name || 'Other';
   }
 
+  /** The account the money came out of, or null for untracked sources like a salary deduction. */
+  function sourceAccountIdFor(item: PaidListItem): number | null {
+    if (item.kind === 'due') return item.data.paymentSourceAccountId ?? null;
+    return item.data.accountId ?? null;
+  }
+
   function itemSignedAmount(item: PaidListItem): number {
     if (item.kind === 'recurring') {
       return item.data.type === 'income' ? -item.data.amount : item.data.amount;
@@ -99,16 +107,36 @@ export default function PaidBillsScreen() {
 
   const sourceSections = useMemo((): SourceSection[] => {
     const byLabel = new Map<string, SourceSection>();
+    // Distinct funding accounts per group, so an account shared by several items is only counted
+    // once toward the group's balance.
+    const accountIdsByLabel = new Map<string, Set<number>>();
     for (const item of combinedList) {
       const label = sourceLabelFor(item);
       let section = byLabel.get(label);
       if (!section) {
-        section = { title: label, total: 0, data: [] };
+        section = { title: label, total: 0, balance: null, data: [] };
         byLabel.set(label, section);
+        accountIdsByLabel.set(label, new Set());
       }
       section.total += itemSignedAmount(item);
       section.data.push(item);
+      const sourceId = sourceAccountIdFor(item);
+      if (sourceId != null) accountIdsByLabel.get(label)!.add(sourceId);
     }
+
+    for (const [label, ids] of accountIdsByLabel) {
+      let balance = 0;
+      let found = false;
+      for (const id of ids) {
+        const account = accountById.get(id);
+        if (!account) continue;
+        const kind = categoryById.get(account.categoryId ?? -1)?.kind;
+        balance += kind === 'credit_card' ? -account.balance : account.balance;
+        found = true;
+      }
+      if (found) byLabel.get(label)!.balance = balance;
+    }
+
     return Array.from(byLabel.values()).sort((a, b) => {
       const aLast = UNGROUPED_LAST.includes(a.title);
       const bLast = UNGROUPED_LAST.includes(b.title);
@@ -211,6 +239,9 @@ export default function PaidBillsScreen() {
           <View style={styles.sourceHeader}>
             <Text style={styles.sourceTitle}>{section.title}</Text>
             <View style={styles.sourceSummary}>
+              {section.balance != null ? (
+                <Text style={styles.sourceBalance}>Bal {formatCurrency(section.balance)}</Text>
+              ) : null}
               <Text style={styles.sourceCount}>{section.data.length} {section.data.length === 1 ? 'item' : 'items'}</Text>
               <Text style={styles.sourceTotal}>{formatCurrency(section.total)}</Text>
             </View>
@@ -399,6 +430,7 @@ const styles = StyleSheet.create({
   sourceTitle: { fontSize: 13, fontWeight: '700', color: PALETTE.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4 },
   sourceSummary: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   sourceCount: { fontSize: 12, color: PALETTE.textSecondary },
+  sourceBalance: { fontSize: 12, fontWeight: '600', color: PALETTE.net },
   sourceTotal: { fontSize: 14, fontWeight: '700', color: PALETTE.textPrimary },
   card: {
     flexDirection: 'row',
