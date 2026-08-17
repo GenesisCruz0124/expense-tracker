@@ -139,9 +139,32 @@ export default function RecurringTransactionsScreen() {
   }, [rules]);
 
   function handleMarkPaid(account: AccountWithBalance) {
+    const amountDue = account.monthlyAmountDue ?? 0;
     Alert.alert('Mark as paid?', `This hides "${account.name}" from Recurring until next month.`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Mark paid', onPress: () => markMonthlyDuePaid(account.id, currentMonthKey, formatIsoDate(new Date())) },
+      {
+        text: 'Mark paid',
+        onPress: async () => {
+          await markMonthlyDuePaid(account.id, currentMonthKey, formatIsoDate(new Date()));
+          // Derived from the pre-payment values, since the account drops off this list once paid.
+          // The payment posts as income against a credit-card-kind account, reducing what is owed.
+          const newBalance = account.balance - amountDue;
+          const remaining = account.remainingMonths != null ? Math.max(0, account.remainingMonths - 1) : null;
+          const source = accounts.find((item) => item.id === account.paymentSourceAccountId);
+          Alert.alert(
+            'Marked as paid',
+            [
+              account.name,
+              ``,
+              `Paid: ${formatCurrency(amountDue)}`,
+              `Remaining balance: ${formatCurrency(newBalance)}`,
+              `Months paid: ${account.totalMonths + 1}`,
+              ...(remaining != null ? [`Months remaining: ${remaining}`] : []),
+              ...(source ? [``, `From ${source.name}: ${formatCurrency(source.balance - amountDue)}`] : []),
+            ].join('\n'),
+          );
+        },
+      },
     ]);
   }
 
@@ -152,7 +175,39 @@ export default function RecurringTransactionsScreen() {
       `Log "${label}" for ${formatDisplayDate(item.nextRunDate)} and advance to the next occurrence.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Mark paid', onPress: () => markPaid(item) },
+        {
+          text: 'Mark paid',
+          onPress: async () => {
+            const outcome = await markPaid(item);
+            const account = accounts.find((a) => a.id === item.accountId);
+            const category = account
+              ? accountCategories.find((c) => c.id === account.categoryId)
+              : undefined;
+            // Income raises a normal balance but pays down a credit card, so the sign flips by kind.
+            const delta =
+              category?.kind === 'credit_card'
+                ? item.type === 'income'
+                  ? -item.amount
+                  : item.amount
+                : item.type === 'income'
+                  ? item.amount
+                  : -item.amount;
+            Alert.alert(
+              'Marked as paid',
+              [
+                label,
+                ``,
+                `${item.type === 'income' ? 'Received' : 'Paid'}: ${formatCurrency(item.amount)}`,
+                `Dated: ${formatDisplayDate(item.nextRunDate)}`,
+                ...(account ? [`${account.name}: ${formatCurrency(account.balance + delta)}`] : []),
+                ``,
+                outcome?.isExhausted
+                  ? 'No further occurrences — this rule is now inactive.'
+                  : `Next due: ${formatDisplayDate(outcome?.nextRunDate ?? item.nextRunDate)}`,
+              ].join('\n'),
+            );
+          },
+        },
       ],
     );
   }

@@ -133,9 +133,13 @@ export async function deleteRecurringTransaction(db: Database, id: number): Prom
  * to the rule's current `nextRunDate`, then advances the cursor to the next occurrence.
  * Idempotent — exits early if a transaction already exists for that date.
  */
-export async function markRecurringPaid(db: Database, rule: RecurringWithStatus): Promise<void> {
-  if (rule.isPaid) return;
+export async function markRecurringPaid(
+  db: Database,
+  rule: RecurringWithStatus,
+): Promise<{ nextRunDate: string; isExhausted: boolean } | null> {
+  if (rule.isPaid) return null;
 
+  let outcome: { nextRunDate: string; isExhausted: boolean } | null = null;
   await db.transaction(async (tx) => {
     let billerName: string | null = null;
     if (rule.billerId != null) {
@@ -172,7 +176,11 @@ export async function markRecurringPaid(db: Database, rule: RecurringWithStatus)
         updatedAt: sql`(datetime('now'))`,
       })
       .where(eq(recurringTransactions.id, rule.id));
+
+    outcome = { nextRunDate: result.nextRunDate, isExhausted: result.isExhausted };
   });
+
+  return outcome;
 }
 
 /**

@@ -73,9 +73,10 @@ export function useRecurringTransactions() {
 
   const markPaid = useCallback(
     async (rule: RecurringWithStatus) => {
-      await markRecurringPaidQuery(db, rule);
+      const outcome = await markRecurringPaidQuery(db, rule);
       notifyDataChanged();
       await refresh();
+      return outcome;
     },
     [db, notifyDataChanged, refresh],
   );
