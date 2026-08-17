@@ -81,6 +81,17 @@ export default function RecurringTransactionsScreen() {
     [investmentAccounts],
   );
 
+  // Every investment account, not just those still due this month, so the post-contribution
+  // summary can report the full portfolio rather than the shrinking "still due" list.
+  const allInvestmentBalance = useMemo(
+    () =>
+      accounts.reduce((sum, account) => {
+        const category = accountCategories.find((item) => item.id === account.categoryId);
+        return category?.kind === 'investment' ? sum + account.balance : sum;
+      }, 0),
+    [accounts, accountCategories],
+  );
+
   function groupBySource(list: AccountWithBalance[], amountOf: (account: AccountWithBalance) => number) {
     const byLabel = new Map<string, { label: string; total: number; data: AccountWithBalance[] }>();
     for (const account of list) {
@@ -147,12 +158,34 @@ export default function RecurringTransactionsScreen() {
   }
 
   function handleAddContribution(account: AccountWithBalance) {
+    const contribution = account.monthlyContribution!;
     Alert.alert(
       'Add this month’s contribution?',
-      `This adds ${formatCurrency(account.monthlyContribution!)} to "${account.name}"'s balance.`,
+      `This adds ${formatCurrency(contribution)} to "${account.name}"'s balance.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Add', onPress: () => incrementBalance(account.id) },
+        {
+          text: 'Add',
+          onPress: async () => {
+            await incrementBalance(account.id);
+            // Derived from the pre-add values rather than re-reading, since the refreshed list
+            // drops this account once it is no longer due this month.
+            const newBalance = account.balance + contribution;
+            const monthsAdded = account.totalMonths + 1;
+            Alert.alert(
+              'Contribution added',
+              [
+                `${account.name}`,
+                ``,
+                `Added: ${formatCurrency(contribution)}`,
+                `New balance: ${formatCurrency(newBalance)}`,
+                `Months added: ${monthsAdded}`,
+                ``,
+                `All investments: ${formatCurrency(allInvestmentBalance + contribution)}`,
+              ].join('\n'),
+            );
+          },
+        },
       ],
     );
   }
