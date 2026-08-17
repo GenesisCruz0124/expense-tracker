@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { differenceInCalendarDays, isSameDay, isSameMonth, isSameWeek } from 'date-fns';
 
@@ -11,9 +11,12 @@ import { SummaryCard } from '../components/SummaryCard';
 import { PALETTE } from '../constants/colors';
 import { useAccountCategories } from '../hooks/useAccountCategories';
 import { useAccounts } from '../hooks/useAccounts';
+import type { AccountWithBalance } from '../db/queries/accounts';
+import type { BillWithDetails } from '../db/queries/bills';
 import { useBills } from '../hooks/useBills';
 import { useReportsData } from '../hooks/useReportsData';
 import { formatCurrency } from '../utils/currency';
+import { monthKeyFor } from '../utils/dateRanges';
 import { buildUpcomingItems, type UpcomingItem } from '../utils/upcoming';
 import {
   customRangeFor,
@@ -101,8 +104,8 @@ export default function DashboardScreen() {
   }
 
   const { totals, loading, refresh } = useReportsData(range, 6);
-  const { bills } = useBills();
-  const { accounts } = useAccounts();
+  const { bills, payBill } = useBills();
+  const { accounts, markMonthlyDuePaid } = useAccounts();
   const { accountCategories } = useAccountCategories();
 
   const net = totals.income - totals.expense;
@@ -130,6 +133,31 @@ export default function DashboardScreen() {
     }
     return sections;
   }, [upcomingBills]);
+
+  function handleMarkBillPaid(bill: BillWithDetails) {
+    Alert.alert(
+      'Mark as paid?',
+      `This logs a ${formatCurrency(bill.amount)} expense dated today for "${bill.name}".`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Mark paid', onPress: () => payBill(bill.id, formatIsoDate(new Date())) },
+      ],
+    );
+  }
+
+  function handleMarkDuePaid(account: AccountWithBalance) {
+    Alert.alert(
+      'Mark as paid?',
+      `This logs a ${formatCurrency(account.monthlyAmountDue!)} payment for "${account.name}" and hides it until next month.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Mark paid',
+          onPress: () => markMonthlyDuePaid(account.id, monthKeyFor(new Date()), formatIsoDate(new Date())),
+        },
+      ],
+    );
+  }
 
   return (
     <ScrollView
@@ -252,7 +280,18 @@ export default function DashboardScreen() {
                             </View>
                           </View>
                         </View>
-                        <Text style={[styles.listRowAmount, { color: PALETTE.expense }]}>−{formatCurrency(item.amount)}</Text>
+                        <View style={styles.listRowTrailing}>
+                          <Text style={[styles.listRowAmount, { color: PALETTE.expense }]}>−{formatCurrency(item.amount)}</Text>
+                          <Pressable
+                            style={styles.payButton}
+                            onPress={(event) => {
+                              event.stopPropagation();
+                              item.kind === 'bill' ? handleMarkBillPaid(item.bill) : handleMarkDuePaid(item.account);
+                            }}
+                          >
+                            <Text style={styles.payButtonText}>Mark paid</Text>
+                          </Pressable>
+                        </View>
                       </Pressable>
                     );
                   })}
@@ -302,6 +341,14 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   listRowPressed: { backgroundColor: PALETTE.background },
+  listRowTrailing: { alignItems: 'flex-end', gap: 6 },
+  payButton: {
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: `${PALETTE.net}1A`,
+  },
+  payButtonText: { fontSize: 12, fontWeight: '700', color: PALETTE.net },
   listRowMain: { flex: 1, gap: 2 },
   listRowTitle: { fontSize: 14, fontWeight: '600', color: PALETTE.textPrimary },
   listRowSubtitle: { fontSize: 12, color: PALETTE.textSecondary },
